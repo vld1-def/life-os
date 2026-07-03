@@ -75,6 +75,7 @@
   .neon-cyan{color:var(--cyan)} .neon-purple{color:var(--purple)} .neon-green{color:var(--green)} .neon-red{color:var(--red)}
 
   .card{padding:20px}
+  #app{max-width:1180px; margin:0 auto}
   .layout{display:flex; gap:15px; align-items:flex-start}
   .main{flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:15px}
   .side{flex:0 0 340px; width:340px; display:flex; flex-direction:column; gap:15px}
@@ -120,7 +121,7 @@
   .calbig{display:grid; grid-template-columns:repeat(7,1fr); gap:8px}
   .calbig+.calbig{margin-top:8px}
   .calbig .hd{color:var(--muted); font-size:10px; text-align:center; text-transform:uppercase; letter-spacing:.5px; padding-bottom:2px}
-  .calbig .d{aspect-ratio:1.45; border-radius:13px; background:rgba(255,255,255,.05); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; font-size:12px; color:var(--muted)}
+  .calbig .d{height:clamp(42px,6vw,58px); border-radius:11px; background:rgba(255,255,255,.05); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; font-size:12px; color:var(--muted)}
   .calbig .d b{font-size:14px; font-weight:700}
   .calbig .d small{font-size:10px; opacity:.85}
   @media(max-width:640px){.calbig{gap:5px}.calbig .d{border-radius:9px}.calbig .d b{font-size:12px}.calbig .d small{font-size:8px}}
@@ -501,7 +502,7 @@ function renderMonth(){
   } else {
     const data=[];for(let dd=1;dd<=days;dd++){const k=dayKey(new Date(y,mo,dd)),r=metricDay(mt,k);data.push({x:dd,y:r.has?r.v:0});}
     const color=mt.kind==='limit'?'#e56b7b':'#5cc9dd';
-    $('monthBody').innerHTML=svgLine({data,color,goal:metricGoal(mt),goalLabel:mt.kind==='limit'?'ліміт':'ціль',h:230});
+    $('monthBody').innerHTML=svgLine({data,color,goal:metricGoal(mt),goalLabel:mt.kind==='limit'?'ліміт':'ціль',h:150});
     $('monthLegend').textContent=(mt.kind==='limit'?'Значення по днях; зелена пунктирна — ліміт.':'Значення по днях; зелена пунктирна — ціль.');
   }
 }
@@ -527,7 +528,7 @@ function renderFinance(){
   // графік
   $('fcM').className='sm '+(finChart==='month'?'acc':'');
   $('fcD').className='sm '+(finChart==='day'?'acc':'');
-  $('finChart').innerHTML=have?svgLine({data:finChart==='month'?monthlySeries(6):dailySeries(mk),color:'#e56b7b',h:190}):'<div class="empty">завантаження витрат...</div>';
+  $('finChart').innerHTML=have?svgLine({data:finChart==='month'?monthlySeries(6):dailySeries(mk),color:'#e56b7b',h:150}):'<div class="empty">завантаження витрат...</div>';
   // категорії
   if(have){const cats=Object.entries(catOf(mk)).sort((a,b)=>b[1]-a[1]).slice(0,5);const mx=cats.length?cats[0][1]:1;
     $('catBreak').innerHTML='<div class="sec-title" style="margin-top:16px">Куди йдуть гроші</div>'+(cats.length?cats.map(([n,v])=>`<div style="padding:6px 0"><div class="between"><span>${n}</span><span class="muted cnt">${fmt(Math.round(v))} ${cur}</span></div><div class="bar"><i class="g-cyan" style="width:${Math.min(100,v/mx*100)}%"></i></div></div>`).join(''):'<div class="empty">цього місяця витрат ще немає</div>');
