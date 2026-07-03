@@ -129,6 +129,10 @@
   .auth-card button{width:100%; padding:14px; font-size:16px}
   .toast{position:fixed; bottom:calc(24px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); background:rgba(18,20,32,.92); backdrop-filter:blur(20px); border:1px solid var(--stroke); padding:12px 20px; border-radius:16px; font-size:13px; z-index:200; opacity:0; transition:.3s; pointer-events:none; box-shadow:var(--shadow)}
   .toast.show{opacity:1}
+  #tip{position:fixed; z-index:300; pointer-events:none; background:rgba(18,20,32,.97); backdrop-filter:blur(12px); border:1px solid var(--stroke); border-radius:12px; padding:9px 12px; font-size:12px; line-height:1.55; white-space:pre-line; max-width:250px; box-shadow:var(--shadow); opacity:0; transition:opacity .1s; left:0; top:0}
+  #tip.on{opacity:1}
+  .week-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:10px}
+  @media(max-width:520px){.week-grid{grid-template-columns:repeat(2,1fr)}}
   .hidden{display:none!important}
   .sync-dot{width:8px;height:8px;border-radius:50%;background:var(--green);transition:.3s}
   .sync-dot.busy{background:var(--yellow)} .sync-dot.off{background:var(--red)}
@@ -173,10 +177,17 @@
         <div style="width:1px; height:22px; background:var(--stroke)"></div>
         <button class="sm" id="btnCal" onclick="setMonthView('cal')">🗓 Календар</button>
         <button class="sm" id="btnLine" onclick="setMonthView('line')">📈 Графік</button>
+        <button class="sm" id="btnRest" onclick="toggleRest()" title="Зробити сьогодні вихідним — серія 🔥 не перерветься">🛡</button>
       </div>
     </div>
     <div id="monthBody" style="margin-top:16px"></div>
     <div class="muted" id="monthLegend" style="margin-top:10px"></div>
+  </div>
+
+  <!-- ТИЖДЕНЬ -->
+  <div class="glass card">
+    <h2><span class="dot" style="background:var(--yellow)"></span>Тиждень — останні 7 днів</h2>
+    <div id="weekBody"></div>
   </div>
 
   <!-- АКТИВНІСТЬ -->
@@ -200,7 +211,10 @@
     <div id="catBreak"></div>
     <div class="sec-title" style="margin-top:18px">💳 Кредити — впиши поточний борг (зберігається на сьогодні)</div>
     <div id="loanList"></div>
-    <div class="sec-title" style="margin-top:16px">📉 Борг по місяцях</div>
+    <div class="between" style="margin-top:16px">
+      <div class="sec-title" style="margin:0">📉 Борг</div>
+      <div class="flex"><button class="sm" id="dcM" onclick="setDebtChart('month')">По місяцях</button><button class="sm" id="dcD" onclick="setDebtChart('day')">По днях</button></div>
+    </div>
     <div id="debtChart"></div>
   </div>
  </div>
@@ -260,6 +274,7 @@
     <button class="sm" onclick="setTab('lim')">Ліміти</button>
     <button class="sm" onclick="setTab('cnt')">Лічильники</button>
     <button class="sm" onclick="setTab('loan')">Кредити</button>
+    <button class="sm" onclick="setTab('rem')">Нагадування</button>
     <button class="sm" onclick="setTab('data')">Дані</button>
   </div>
 
@@ -285,6 +300,14 @@
     <div class="sec-title">💳 Кредити / борги</div>
     <div id="setLoans"></div><button class="sm" onclick="addLoan()">+ кредит</button>
   </div>
+  <div class="tabpane" id="tab-rem">
+    <div class="sec-title">⏰ Нагадування пити воду / рухатись</div>
+    <label class="flex" style="margin-bottom:10px"><input type="checkbox" id="remOn" style="width:auto"> <span>Увімкнути нагадування</span></label>
+    <div class="settings-item"><span class="muted" style="min-width:110px">Кожні (хв)</span><input type="number" id="remEvery" min="15" step="15" style="max-width:100px"></div>
+    <div class="settings-item"><span class="muted" style="min-width:110px">З години</span><input type="number" id="remFrom" min="0" max="23" style="max-width:80px"><span class="muted">до</span><input type="number" id="remTo" min="1" max="24" style="max-width:80px"></div>
+    <button class="sm" onclick="enableNotif()">🔔 Дозволити сповіщення</button>
+    <div class="muted" style="margin-top:8px">Працює, поки застосунок відкрито (вкладка або встановлений PWA на телефоні).</div>
+  </div>
   <div class="tabpane" id="tab-data">
     <div class="sec-title">💾 Резервна копія</div>
     <div class="flex" style="flex-wrap:wrap">
@@ -304,6 +327,7 @@
 </dialog>
 
 <div class="toast" id="toast"></div>
+<div id="tip"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -331,8 +355,9 @@ const defaults={
     exercises:[{id:uid(),name:'Віджимання',base:10,penalty:2},{id:uid(),name:'Присідання',base:20,penalty:2}],
     limitHabits:[{id:uid(),name:'Ігри',max:2,unit:'год'}],
     counters:[{id:uid(),name:'Кроки',goal:8000,unit:''}],
-    loans:[{id:uid(),name:'Кредит'}]},
-  days:{},months:{},tasks:[],loanLog:{}
+    loans:[{id:uid(),name:'Кредит'}],
+    reminders:{on:false,everyMin:120,from:9,to:21}},
+  days:{},months:{},tasks:[],loanLog:{},restDays:{}
 };
 let state=structuredClone(defaults);
 const cacheKey='lifeos_cache';
@@ -361,6 +386,8 @@ async function onLogin(){
   if(cached){try{state=migrate(JSON.parse(cached));render();}catch(e){}}
   await pullState();
   loadExpenses();
+  initTip();
+  startReminders();
 }
 async function pullState(){
   setSync('busy');
@@ -383,8 +410,9 @@ function toast(m){const t=$('toast'); t.textContent=m; t.classList.add('show'); 
 
 function migrate(s){
   s=Object.assign(structuredClone(defaults),s);
-  s.months=s.months||{}; s.tasks=s.tasks||[]; s.loanLog=s.loanLog||{};
+  s.months=s.months||{}; s.tasks=s.tasks||[]; s.loanLog=s.loanLog||{}; s.restDays=s.restDays||{};
   s.settings=Object.assign(structuredClone(defaults.settings),s.settings);
+  s.settings.reminders=Object.assign({on:false,everyMin:120,from:9,to:21},s.settings.reminders||{});
   if(s.settings.waterGoal<100) s.settings.waterGoal=2000;
   return s;
 }
@@ -394,9 +422,9 @@ function save(){ render(); scheduleSync(); }
 let expRows=null;
 async function loadExpenses(){
   if(!sb) return;
-  const {data,error}=await sb.from('expenses').select('sum,categoria,date').eq('who',ME);
+  const {data,error}=await sb.from('expenses').select('sum,categoria,subcategory,date').eq('who',ME);
   if(error){ toast('Витрати: '+error.message); return; }
-  expRows=data.map(r=>({sum:+r.sum||0,cat:r.categoria||'—',ym:(r.date||'').slice(0,7),day:+((r.date||'').slice(8,10))||0}));
+  expRows=data.map(r=>({sum:+r.sum||0,cat:r.categoria||'—',sub:r.subcategory||'без підкатегорії',ym:(r.date||'').slice(0,7),day:+((r.date||'').slice(8,10))||0}));
   renderFinance();
 }
 function monthTotal(ym){return (expRows||[]).reduce((s,r)=>s+(r.ym===ym?r.sum:0),0);}
@@ -432,7 +460,8 @@ function dayScore(k){const d=state.days[k];if(!d)return null;const S=state.setti
   S.limitHabits.forEach(l=>{t++;if((d.limits[l.id]||0)<=l.max)ok++;});
   S.counters.forEach(c=>{t++;if((d.counters[c.id]||0)>=c.goal)ok++;});
   return t?Math.round(ok/t*100):0;}
-function computeStreak(){let s=0,d=new Date();for(let i=0;i<400;i++){const k=dayKey(d),sc=dayScore(k);if(sc!=null&&sc>=70)s++;else if(k!==todayKey())break;d.setDate(d.getDate()-1);}return s;}
+function computeStreak(){let s=0,d=new Date();for(let i=0;i<400;i++){const k=dayKey(d);if(state.restDays&&state.restDays[k]){s++;d.setDate(d.getDate()-1);continue;}const sc=dayScore(k);if(sc!=null&&sc>=70)s++;else if(k!==todayKey())break;d.setDate(d.getDate()-1);}return s;}
+function toggleRest(){if(!state.restDays)state.restDays={};const k=todayKey();if(state.restDays[k])delete state.restDays[k];else state.restDays[k]=true;save();}
 
 function dayComponents(k){const d=state.days[k];if(!d)return null;const S=state.settings,a=[];
   a.push({label:'Вода',kind:'goal',ok:d.water>=S.waterGoal,pct:d.water/S.waterGoal,txt:(d.water/1000).toFixed(1)+'л / '+(S.waterGoal/1000)+'л'});
@@ -466,6 +495,7 @@ function render(){
 
   renderFinance();
   renderMonth();
+  renderWeek();
   $('scoreVal').textContent=(dayScore(tk)??0)+'%';
   $('streakVal').textContent=computeStreak();
   $('debtVal').textContent=fmt(Math.round(totalDebtNow()));
@@ -515,17 +545,18 @@ function renderMonth(){
   $('metricBar').innerHTML=metricList().map(m=>`<button class="sm ${m.id===metricSel?'acc':''}" onclick="setMetric('${m.id}')">${m.label}</button>`).join('');
   $('btnCal').className='sm '+(monthView==='cal'?'acc':'');
   $('btnLine').className='sm '+(monthView==='line'?'acc':'');
+  $('btnRest').className='sm '+(state.restDays&&state.restDays[todayKey()]?'acc':'');
   const mt=curMetric();
   const now=new Date(),y=now.getFullYear(),mo=now.getMonth(),days=new Date(y,mo+1,0).getDate();
   if(monthView==='cal'){
     const start=(new Date(y,mo,1).getDay()+6)%7;
     const head=['Пн','Вт','Ср','Чт','Пт','Сб','Нд'].map(h=>`<div class="hd">${h}</div>`).join('');
     let cells='';for(let i=0;i<start;i++)cells+='<div></div>';
-    for(let dd=1;dd<=days;dd++){const k=dayKey(new Date(y,mo,dd)),t=k===todayKey(),ttl=dayTitle(k).replace(/"/g,'&quot;');
+    for(let dd=1;dd<=days;dd++){const k=dayKey(new Date(y,mo,dd)),t=k===todayKey(),rest=!!(state.restDays&&state.restDays[k]);const tip=((rest?'🛡 Вихідний\n':'')+dayTitle(k)).replace(/"/g,'&quot;').replace(/\n/g,'¶');const num=dd+(rest?' 🛡':'');
       if(mt.id==='all'){const comps=dayComponents(k);const dots=comps?`<div class="mdots">${comps.map(c=>`<i style="background:${compColor(c)}"></i>`).join('')}</div>`:'';
-        cells+=`<div class="d" title="${ttl}" style="${t?'outline:2px solid var(--cyan);outline-offset:1px':''}"><b>${dd}</b>${dots}</div>`;
+        cells+=`<div class="d" data-tip="${tip}" style="${t?'outline:2px solid var(--cyan);outline-offset:1px':''}"><b>${num}</b>${dots}</div>`;
       } else {const r=metricDay(mt,k),c=metricColor(mt,r);
-        cells+=`<div class="d" title="${ttl}" style="background:${c.bg};color:${c.col};${t?'outline:2px solid var(--cyan);outline-offset:1px':''}"><b>${dd}</b>${r.has?`<small>${metricValTxt(mt,r.v)}</small>`:''}</div>`;}
+        cells+=`<div class="d" data-tip="${tip}" style="background:${c.bg};color:${c.col};${t?'outline:2px solid var(--cyan);outline-offset:1px':''}"><b>${num}</b>${r.has?`<small>${metricValTxt(mt,r.v)}</small>`:''}</div>`;}
     }
     $('monthBody').innerHTML=`<div class="calbig">${head}</div><div class="calbig">${cells}</div>`;
     $('monthLegend').textContent=mt.id==='all'?'Кожна крапка = один пункт дня (🟢 виконано · 🟡 частково · 🔴 ні). Наведи на день — побачиш деталі й нотатку.':(mt.kind==='limit'?'🟩 в межах ліміту · 🟥 перебір · ▫️ немає даних':'🟩 ціль виконана · 🟨 частково · 🟥 мало · ▫️ немає даних');
@@ -539,8 +570,38 @@ function renderMonth(){
 }
 
 /* ===== ФІНАНСИ ===== */
-let finChart='month';
+let finChart='month', debtChart='month', catOpen=null;
 function setFinChart(v){finChart=v;renderFinance();}
+function setDebtChart(v){debtChart=v;renderFinance();}
+function toggleCat(n){catOpen=catOpen===n?null:n;renderFinance();}
+function subOf(ym,cat){const o={};(expRows||[]).forEach(r=>{if(r.ym===ym&&r.cat===cat){o[r.sub]=(o[r.sub]||0)+r.sum;}});return o;}
+function debtDailySeries(ym){const[y,mm]=ym.split('-').map(Number);const days=new Date(y,mm,0).getDate();const last=ym===monthKey()?new Date().getDate():days;const arr=[];for(let dd=1;dd<=last;dd++){const ds=ym+'-'+String(dd).padStart(2,'0');let tot=0;state.settings.loans.forEach(l=>{const v=loanValAt(l.id,ds);if(v!=null)tot+=v;});arr.push({x:dd,y:Math.round(tot)});}return arr;}
+
+/* тижневий підсумок */
+function weekStats(){const set=new Set();for(let i=0;i<7;i++){const d=new Date();d.setDate(d.getDate()-i);set.add(dayKey(d));}
+  let scSum=0,scN=0,good=0,waterOk=0;set.forEach(k=>{const sc=dayScore(k);if(sc!=null){scSum+=sc;scN++;if(sc>=70||state.restDays[k])good++;}const d=state.days[k];if(d&&d.water>=state.settings.waterGoal)waterOk++;});
+  let spent=0;(expRows||[]).forEach(r=>{const ds=r.ym+'-'+String(r.day).padStart(2,'0');if(set.has(ds))spent+=r.sum;});
+  return{good,avg:scN?Math.round(scSum/scN):0,waterOk,spent};}
+function renderWeek(){const w=weekStats(),cur=state.settings.currency;
+  $('weekBody').innerHTML=`<div class="week-grid">
+    <div class="fin-box"><div class="lbl">Хороші дні</div><div class="big-num neon-green">${w.good}/7</div></div>
+    <div class="fin-box"><div class="lbl">Сер. бал</div><div class="big-num neon-cyan">${w.avg}%</div></div>
+    <div class="fin-box"><div class="lbl">Вода ✓</div><div class="big-num">${w.waterOk}/7</div></div>
+    <div class="fin-box"><div class="lbl">Витрачено</div><div class="big-num neon-red">${fmt(Math.round(w.spent))} ${cur}</div></div>
+  </div>`;}
+
+/* тултіп календаря (миттєвий) */
+function initTip(){const mb=$('monthBody'),tip=$('tip');if(!mb||mb._tip)return;mb._tip=1;
+  mb.addEventListener('mouseover',e=>{const d=e.target.closest('.d');if(!d||!d.dataset.tip){tip.classList.remove('on');return;}tip.textContent=d.dataset.tip.replace(/¶/g,'\n');tip.classList.add('on');});
+  mb.addEventListener('mousemove',e=>{if(!tip.classList.contains('on'))return;const r=tip.getBoundingClientRect();let x=e.clientX+14,y=e.clientY+14;if(x+r.width>innerWidth-8)x=e.clientX-r.width-14;if(y+r.height>innerHeight-8)y=e.clientY-r.height-14;tip.style.left=x+'px';tip.style.top=y+'px';});
+  mb.addEventListener('mouseleave',()=>tip.classList.remove('on'));}
+
+/* нагадування */
+let remTimer=null,lastRemMs=0;
+function startReminders(){clearInterval(remTimer);const r=state.settings.reminders;if(!r||!r.on)return;remTimer=setInterval(remTick,60000);}
+function remTick(){const r=state.settings.reminders;if(!r||!r.on)return;const h=new Date().getHours();if(h<r.from||h>=r.to)return;if(Date.now()-lastRemMs>=r.everyMin*60000){lastRemMs=Date.now();notify('LIFE OS','💧 Час випити води і трохи порухатись!');}}
+function notify(title,body){if('Notification'in window&&Notification.permission==='granted')new Notification(title,{body});}
+async function enableNotif(){if(!('Notification'in window)){toast('Браузер не підтримує сповіщення');return;}const p=await Notification.requestPermission();toast(p==='granted'?'Сповіщення увімкнено ✅':'Сповіщення заблоковані');}
 function renderFinance(){
   const mk=monthKey(),pmk=prevMonth(mk),cur=state.settings.currency;
   $('finMonthLabel').textContent=new Date().toLocaleDateString('uk-UA',{month:'long',year:'numeric'});
@@ -557,9 +618,16 @@ function renderFinance(){
   $('fcM').className='sm '+(finChart==='month'?'acc':'');
   $('fcD').className='sm '+(finChart==='day'?'acc':'');
   $('finChart').innerHTML=have?svgLine({data:finChart==='month'?monthlySeries(6):dailySeries(mk),color:'#e56b7b',h:150}):'<div class="empty">завантаження витрат...</div>';
-  // категорії
-  if(have){const cats=Object.entries(catOf(mk)).sort((a,b)=>b[1]-a[1]).slice(0,5);const mx=cats.length?cats[0][1]:1;
-    $('catBreak').innerHTML='<div class="sec-title" style="margin-top:16px">Куди йдуть гроші</div>'+(cats.length?cats.map(([n,v])=>`<div style="padding:6px 0"><div class="between"><span>${n}</span><span class="muted cnt">${fmt(Math.round(v))} ${cur}</span></div><div class="bar"><i class="g-cyan" style="width:${Math.min(100,v/mx*100)}%"></i></div></div>`).join(''):'<div class="empty">цього місяця витрат ще немає</div>');
+  // категорії + підкатегорії
+  if(have){const cats=Object.entries(catOf(mk)).sort((a,b)=>b[1]-a[1]).slice(0,6);const mx=cats.length?cats[0][1]:1;
+    let html='<div class="sec-title" style="margin-top:16px">Куди йдуть гроші <span style="text-transform:none;letter-spacing:0">(тисни, щоб розкрити)</span></div>';
+    if(!cats.length)html+='<div class="empty">цього місяця витрат ще немає</div>';
+    cats.forEach(([n,v])=>{const open=catOpen===n,esc=n.replace(/'/g,"\\'");
+      html+=`<div style="padding:5px 0"><div class="between" style="cursor:pointer" onclick="toggleCat('${esc}')"><span>${open?'▾':'▸'} ${n}</span><span class="muted cnt">${fmt(Math.round(v))} ${cur}</span></div><div class="bar" style="height:5px"><i class="g-cyan" style="width:${Math.min(100,v/mx*100)}%"></i></div>`;
+      if(open){const subs=Object.entries(subOf(mk,n)).sort((a,b)=>b[1]-a[1]).slice(0,8);const smx=subs.length?subs[0][1]:1;
+        html+='<div style="margin:6px 0 4px 16px">'+(subs.length?subs.map(([sn,sv])=>`<div style="padding:3px 0"><div class="between"><span class="muted">${sn}</span><span class="muted cnt">${fmt(Math.round(sv))} ${cur}</span></div><div class="bar" style="height:4px"><i class="g-purple" style="width:${Math.min(100,sv/smx*100)}%"></i></div></div>`).join(''):'<div class="empty">немає підкатегорій</div>')+'</div>';}
+      html+='</div>';});
+    $('catBreak').innerHTML=html;
   } else $('catBreak').innerHTML='';
   // кредити
   $('loanList').innerHTML=state.settings.loans.map(l=>{
@@ -570,13 +638,15 @@ function renderFinance(){
     return `<div class="row"><div style="flex:1"><div>${l.name}</div><div class="delta">${info}</div></div><div class="flex"><input type="number" placeholder="${latest!=null?latest:'борг сьогодні'}" value="${todayVal??''}" style="width:130px" onchange="setLoanToday('${l.id}',this.value)"><span class="muted">${cur}</span></div></div>`;
   }).join('')||'<div class="empty">Додай кредити в налаштуваннях</div>';
   // графік боргу
+  $('dcM').className='sm '+(debtChart==='month'?'acc':'');
+  $('dcD').className='sm '+(debtChart==='day'?'acc':'');
   const hasDebtData=Object.keys(state.loanLog).some(id=>Object.keys(state.loanLog[id]||{}).length);
-  $('debtChart').innerHTML=hasDebtData?svgLine({data:debtMonthlySeries(6),color:'#9d8ad6',h:150}):'<div class="empty">почни вписувати борг — і тут з\'явиться графік</div>';
+  $('debtChart').innerHTML=hasDebtData?svgLine({data:debtChart==='month'?debtMonthlySeries(6):debtDailySeries(mk),color:'#9d8ad6',h:150}):'<div class="empty">почни вписувати борг — і тут з\'явиться графік</div>';
 }
 
 /* ===== НАЛАШТУВАННЯ ===== */
-function setTab(name){['gen','act','lim','cnt','loan','data'].forEach(t=>$('tab-'+t).classList.toggle('on',t===name));[...$('setTabs').children].forEach(b=>b.className='sm'+(b.getAttribute('onclick').includes("'"+name+"'")?' acc':''));}
-function openSettings(){const S=state.settings;$('setWaterGoal').value=S.waterGoal;$('setCurrency').value=S.currency;rl('setExercises',S.exercises,'ex');rl('setLimits',S.limitHabits,'lim');rl('setCounters',S.counters,'cnt');rl('setLoans',S.loans,'loan');setTab('gen');settings.showModal();}
+function setTab(name){['gen','act','lim','cnt','loan','rem','data'].forEach(t=>$('tab-'+t).classList.toggle('on',t===name));[...$('setTabs').children].forEach(b=>b.className='sm'+(b.getAttribute('onclick').includes("'"+name+"'")?' acc':''));}
+function openSettings(){const S=state.settings,R=S.reminders||{};$('setWaterGoal').value=S.waterGoal;$('setCurrency').value=S.currency;$('remOn').checked=!!R.on;$('remEvery').value=R.everyMin||120;$('remFrom').value=R.from??9;$('remTo').value=R.to??21;rl('setExercises',S.exercises,'ex');rl('setLimits',S.limitHabits,'lim');rl('setCounters',S.counters,'cnt');rl('setLoans',S.loans,'loan');setTab('gen');settings.showModal();}
 function rl(elId,arr,type){$(elId).innerHTML=arr.map((it,i)=>{const del=`<button class="del" onclick="delItem('${type}',${i})">✕</button>`;
   if(type==='ex')return `<div class="settings-item"><input value="${it.name}" data-f="name" placeholder="Назва"><input type="number" value="${it.base}" data-f="base" style="width:74px" title="норма"><input type="number" value="${it.penalty}" data-f="penalty" step="0.5" style="width:64px" title="штраф ×">${del}</div>`;
   if(type==='lim')return `<div class="settings-item"><input value="${it.name}" data-f="name" placeholder="Назва"><input type="number" value="${it.max}" data-f="max" step="0.5" style="width:64px"><input value="${it.unit}" data-f="unit" style="width:64px" placeholder="од.">${del}</div>`;
@@ -593,7 +663,7 @@ function addLimit(){state.settings.limitHabits.push({id:uid(),name:'Новий �
 function addCounter(){state.settings.counters.push({id:uid(),name:'Лічильник',goal:100,unit:''});rl('setCounters',state.settings.counters,'cnt');}
 function addLoan(){state.settings.loans.push({id:uid(),name:'Кредит'});rl('setLoans',state.settings.loans,'loan');}
 function delItem(type,i){const map={ex:'exercises',lim:'limitHabits',cnt:'counters',loan:'loans'},el={ex:'setExercises',lim:'setLimits',cnt:'setCounters',loan:'setLoans'};state.settings[map[type]].splice(i,1);rl(el[type],state.settings[map[type]],type);}
-function saveSettings(){const S=state.settings,keep=(a,o)=>a.map((n,i)=>o[i]?{...n,id:o[i].id}:n);S.exercises=keep(readL('setExercises','ex'),S.exercises);S.limitHabits=keep(readL('setLimits','lim'),S.limitHabits);S.counters=keep(readL('setCounters','cnt'),S.counters);S.loans=keep(readL('setLoans','loan'),S.loans);S.waterGoal=+$('setWaterGoal').value||2000;S.currency=$('setCurrency').value||'₴';settings.close();save();}
+function saveSettings(){const S=state.settings,keep=(a,o)=>a.map((n,i)=>o[i]?{...n,id:o[i].id}:n);S.exercises=keep(readL('setExercises','ex'),S.exercises);S.limitHabits=keep(readL('setLimits','lim'),S.limitHabits);S.counters=keep(readL('setCounters','cnt'),S.counters);S.loans=keep(readL('setLoans','loan'),S.loans);S.waterGoal=+$('setWaterGoal').value||2000;S.currency=$('setCurrency').value||'₴';S.reminders={on:$('remOn').checked,everyMin:Math.max(15,+$('remEvery').value||120),from:Math.min(23,Math.max(0,+$('remFrom').value||9)),to:Math.min(24,Math.max(1,+$('remTo').value||21))};settings.close();save();startReminders();}
 function resetAll(){if(confirm('Скинути ВСІ дані?')){localStorage.removeItem(cacheKey);state=structuredClone(defaults);if(session&&sb)sb.from('app_state').upsert({user_id:session.user.id,data:state,updated_at:new Date().toISOString()});settings.close();render();}}
 
 function exportData(){const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='lifeos-backup-'+todayKey()+'.json';a.click();}
