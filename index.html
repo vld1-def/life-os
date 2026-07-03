@@ -350,11 +350,11 @@ let sb=null, session=null;
 if(configured){ sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY); }
 
 const uid=()=>Math.random().toString(36).slice(2,9);
-const dayKey=d=>d.toISOString().slice(0,10);
+const dayKey=d=>{const x=new Date(d);return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0');};
 const todayKey=()=>dayKey(new Date());
-const monthKey=()=>new Date().toISOString().slice(0,7);
-const prevKey=k=>{const d=new Date(k);d.setDate(d.getDate()-1);return dayKey(d);};
-const prevMonth=k=>{const[y,m]=k.split('-').map(Number);return new Date(y,m-2,1).toISOString().slice(0,7);};
+const monthKey=()=>todayKey().slice(0,7);
+const prevKey=k=>{const[y,m,d]=k.split('-').map(Number);return dayKey(new Date(y,m-1,d-1));};
+const prevMonth=k=>{const[y,m]=k.split('-').map(Number);return dayKey(new Date(y,m-2,1)).slice(0,7);};
 const fmt=n=>Number(n||0).toLocaleString('uk-UA');
 const $=id=>document.getElementById(id);
 
@@ -441,7 +441,7 @@ async function loadExpenses(){
 }
 function monthTotal(ym){return (expRows||[]).reduce((s,r)=>s+(r.ym===ym?r.sum:0),0);}
 function catOf(ym){const o={};(expRows||[]).forEach(r=>{if(r.ym===ym)o[r.cat]=(o[r.cat]||0)+r.sum;});return o;}
-function monthlySeries(n){const arr=[],now=new Date();for(let i=n-1;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);const ym=d.toISOString().slice(0,7);arr.push({x:d.toLocaleDateString('uk-UA',{month:'short'}),y:Math.round(monthTotal(ym))});}return arr;}
+function monthlySeries(n){const arr=[],now=new Date();for(let i=n-1;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);const ym=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');arr.push({x:d.toLocaleDateString('uk-UA',{month:'short'}),y:Math.round(monthTotal(ym))});}return arr;}
 function dailySeries(ym){const[y,mm]=ym.split('-').map(Number);const days=new Date(y,mm,0).getDate();const per={};(expRows||[]).forEach(r=>{if(r.ym===ym)per[r.day]=(per[r.day]||0)+r.sum;});const arr=[];for(let d=1;d<=days;d++)arr.push({x:d,y:Math.round(per[d]||0)});return arr;}
 
 /* ===== STEAM (час гри з бази steam_playtime) ===== */
