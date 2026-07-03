@@ -136,6 +136,7 @@
   .hidden{display:none!important}
   .sync-dot{width:8px;height:8px;border-radius:50%;background:var(--green);transition:.3s}
   .sync-dot.busy{background:var(--yellow)} .sync-dot.off{background:var(--red)}
+  #notifBadge{position:absolute; top:-5px; right:-5px; background:var(--red); color:#fff; font-size:10px; min-width:17px; height:17px; border-radius:9px; display:none; align-items:center; justify-content:center; padding:0 4px; font-weight:800}
 </style>
 </head>
 <body>
@@ -161,6 +162,7 @@
     <div class="glass pill"><div class="big neon-red" id="debtVal">0</div><div class="lbl">💳 борг</div></div>
     <div class="flex">
       <div class="glass pill" style="min-width:auto;padding:11px" title="Синхронізація: зелений — збережено, жовтий — зберігаю, червоний — немає зв'язку"><span class="sync-dot" id="syncDot"></span></div>
+      <button class="acc" onclick="openNotifs()" style="position:relative">🔔<span id="notifBadge">0</span></button>
       <button class="acc" onclick="openSettings()">⚙️</button>
     </div>
   </div>
@@ -238,6 +240,7 @@
   <div class="glass card">
     <h2><span class="dot" style="background:var(--red)"></span>Ліміти</h2>
     <div id="limitList"></div>
+    <div id="steamInfo" class="muted" style="margin-top:10px"></div>
   </div>
 
   <!-- ЛІЧИЛЬНИКИ -->
@@ -326,6 +329,11 @@
   </div>
 </dialog>
 
+<dialog id="notifs">
+  <div class="between"><h2 style="margin:0">🔔 Сповіщення</h2><button class="sm" onclick="notifs.close()">✕</button></div>
+  <div id="notifBody"></div>
+</dialog>
+
 <div class="toast" id="toast"></div>
 <div id="tip"></div>
 
@@ -386,6 +394,7 @@ async function onLogin(){
   if(cached){try{state=migrate(JSON.parse(cached));render();}catch(e){}}
   await pullState();
   loadExpenses();
+  loadSteam();
   initTip();
   startReminders();
 }
@@ -414,6 +423,7 @@ function migrate(s){
   s.settings=Object.assign(structuredClone(defaults.settings),s.settings);
   s.settings.reminders=Object.assign({on:false,everyMin:120,from:9,to:21},s.settings.reminders||{});
   if(s.settings.waterGoal<100) s.settings.waterGoal=2000;
+  if(!s.settings.limitHabits.some(l=>/кав|coffee/i.test(l.name))) s.settings.limitHabits.push({id:uid(),name:'☕ Кава (цукор)',mode:'week',startPerWeek:5,stepPerWeek:1,minPerWeek:2,max:99,unit:'чашок',startDate:weekMondayKey(new Date())});
   return s;
 }
 function save(){ render(); scheduleSync(); }
@@ -431,6 +441,19 @@ function monthTotal(ym){return (expRows||[]).reduce((s,r)=>s+(r.ym===ym?r.sum:0)
 function catOf(ym){const o={};(expRows||[]).forEach(r=>{if(r.ym===ym)o[r.cat]=(o[r.cat]||0)+r.sum;});return o;}
 function monthlySeries(n){const arr=[],now=new Date();for(let i=n-1;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);const ym=d.toISOString().slice(0,7);arr.push({x:d.toLocaleDateString('uk-UA',{month:'short'}),y:Math.round(monthTotal(ym))});}return arr;}
 function dailySeries(ym){const[y,mm]=ym.split('-').map(Number);const days=new Date(y,mm,0).getDate();const per={};(expRows||[]).forEach(r=>{if(r.ym===ym)per[r.day]=(per[r.day]||0)+r.sum;});const arr=[];for(let d=1;d<=days;d++)arr.push({x:d,y:Math.round(per[d]||0)});return arr;}
+
+/* ===== STEAM (час гри з бази steam_playtime) ===== */
+let steamPlay={}; // dateKey -> хвилин за той день
+async function loadSteam(){
+  if(!sb) return;
+  const {data,error}=await sb.from('steam_playtime').select('date,total_minutes').order('date');
+  if(error||!data){return;} // таблиці ще немає — тихо пропускаємо
+  steamPlay={};
+  for(let i=0;i<data.length-1;i++){const delta=data[i+1].total_minutes-data[i].total_minutes;steamPlay[data[i].date]=Math.max(0,delta);}
+  applySteam(); render();
+}
+function gamesLimitId(){const l=state.settings.limitHabits.find(x=>/гра|ігр|steam/i.test(x.name));return l?l.id:null;}
+function applySteam(){const gid=gamesLimitId();if(!gid)return;Object.keys(steamPlay).forEach(dk=>{getDay(dk).limits[gid]=Math.round(steamPlay[dk]/60*10)/10;});}
 
 /* ===== КРЕДИТИ (щоденні знімки боргу) ===== */
 function setLoanToday(id,v){ if(!state.loanLog[id])state.loanLog[id]={}; state.loanLog[id][todayKey()]=Math.max(0,+v||0); save(); }
@@ -457,16 +480,21 @@ function delTask(id){state.tasks=state.tasks.filter(x=>x.id!==id);save();}
 function dayScore(k){const d=state.days[k];if(!d)return null;const S=state.settings;let t=0,ok=0;
   t++;if(d.water>=S.waterGoal)ok++;
   S.exercises.forEach(ex=>{t++;if((d.exercises[ex.id]||0)>=exTarget(ex,k))ok++;});
-  S.limitHabits.forEach(l=>{t++;if((d.limits[l.id]||0)<=l.max)ok++;});
+  S.limitHabits.forEach(l=>{if(l.mode==='week')return;t++;if((d.limits[l.id]||0)<=l.max)ok++;});
   S.counters.forEach(c=>{t++;if((d.counters[c.id]||0)>=c.goal)ok++;});
   return t?Math.round(ok/t*100):0;}
+function weekMonday(d){const x=new Date(d);const dow=(x.getDay()+6)%7;x.setDate(x.getDate()-dow);x.setHours(0,0,0,0);return x;}
+function weekMondayKey(d){return dayKey(weekMonday(d));}
+function limitWeekQuota(l){const startK=l.startDate||weekMondayKey(new Date());const weeks=Math.max(0,Math.floor((weekMonday(new Date())-new Date(startK))/(7*86400000)));return Math.max(l.minPerWeek||1,(l.startPerWeek||7)-(l.stepPerWeek||1)*weeks);}
+function weekConsumed(id){const mon=weekMonday(new Date());let s=0;for(let i=0;i<7;i++){const dd=new Date(mon);dd.setDate(dd.getDate()+i);const day=state.days[dayKey(dd)];if(day&&day.limits)s+=day.limits[id]||0;}return s;}
+function addLimitToday(id,n){const d=getDay(todayKey());d.limits[id]=Math.max(0,(d.limits[id]||0)+n);save();}
 function computeStreak(){let s=0,d=new Date();for(let i=0;i<400;i++){const k=dayKey(d);if(state.restDays&&state.restDays[k]){s++;d.setDate(d.getDate()-1);continue;}const sc=dayScore(k);if(sc!=null&&sc>=70)s++;else if(k!==todayKey())break;d.setDate(d.getDate()-1);}return s;}
 function toggleRest(){if(!state.restDays)state.restDays={};const k=todayKey();if(state.restDays[k])delete state.restDays[k];else state.restDays[k]=true;save();}
 
 function dayComponents(k){const d=state.days[k];if(!d)return null;const S=state.settings,a=[];
   a.push({label:'Вода',kind:'goal',ok:d.water>=S.waterGoal,pct:d.water/S.waterGoal,txt:(d.water/1000).toFixed(1)+'л / '+(S.waterGoal/1000)+'л'});
   S.exercises.forEach(ex=>{const t=exTarget(ex,k),v=d.exercises[ex.id]||0;a.push({label:ex.name,kind:'goal',ok:v>=t,pct:t?v/t:0,txt:v+' / '+t});});
-  S.limitHabits.forEach(l=>{const v=d.limits[l.id]||0;a.push({label:l.name,kind:'limit',ok:v<=l.max,pct:0,txt:v+' / '+l.max+(l.unit?(' '+l.unit):'')});});
+  S.limitHabits.forEach(l=>{if(l.mode==='week')return;const v=d.limits[l.id]||0;a.push({label:l.name,kind:'limit',ok:v<=l.max,pct:0,txt:v+' / '+l.max+(l.unit?(' '+l.unit):'')});});
   S.counters.forEach(c=>{const v=d.counters[c.id]||0;a.push({label:c.name,kind:'goal',ok:v>=c.goal,pct:c.goal?v/c.goal:0,txt:fmt(v)+' / '+fmt(c.goal)});});
   return a;}
 function compColor(c){if(c.ok)return 'var(--green)';if(c.kind!=='limit'&&c.pct>=.5)return 'var(--yellow)';return 'var(--red)';}
@@ -486,7 +514,10 @@ function render(){
     return `<div class="row"><div style="flex:1"><div class="between"><span>${ex.name} ${pen?`<span class="tag pen">штраф ×${ex.penalty}</span>`:''}</span><span class="muted cnt">${done} / ${t}${ok?' ✅':''}</span></div><div class="bar"><i class="g-green" style="width:${Math.min(100,done/t*100)}%"></i></div></div><div class="flex" style="margin-left:10px"><button class="sm" onclick="addEx('${ex.id}',-5)">−5</button><button class="sm" onclick="addEx('${ex.id}',5)">+5</button><button class="${ok?'done':'acc'} sm" onclick="addEx('${ex.id}',${t-done})">✓</button></div></div>`;
   }).join('')||'<div class="empty">Додай вправи в налаштуваннях</div>';
 
-  $('limitList').innerHTML=S.limitHabits.map(l=>{const v=d.limits[l.id]||0,over=v>l.max;return `<div class="row"><div><div>${l.name} <span class="tag ${over?'warn':'ok'}">${over?'перебір':'ок'}</span></div><div class="muted">макс ${l.max} ${l.unit}</div></div><div class="flex"><input type="number" style="width:72px" value="${v}" step="0.5" min="0" onchange="setLimit('${l.id}',this.value)"><span class="muted">${l.unit}</span></div></div>`;}).join('')||'<div class="empty">Додай ліміти</div>';
+  $('limitList').innerHTML=S.limitHabits.map(l=>{
+    if(l.mode==='week'){const q=limitWeekQuota(l),cons=weekConsumed(l.id),today=d.limits[l.id]||0,over=cons>q;
+      return `<div class="row"><div style="flex:1"><div>${l.name} <span class="tag ${over?'warn':'ok'}">${cons}/${q} на тиждень</span></div><div class="muted">сьогодні: ${today} · тижнева норма спадає (зараз ${q} ${l.unit})</div><div class="bar"><i style="width:${Math.min(100,cons/q*100)}%;background:${over?'linear-gradient(90deg,#dc2626,#e56b7b)':'linear-gradient(90deg,#2f8b66,#4fc596)'}"></i></div></div><div class="flex" style="margin-left:10px"><button class="sm" onclick="addLimitToday('${l.id}',-1)">−1</button><button class="acc sm" onclick="addLimitToday('${l.id}',1)">+1</button></div></div>`;}
+    const v=d.limits[l.id]||0,over=v>l.max;return `<div class="row"><div><div>${l.name} <span class="tag ${over?'warn':'ok'}">${over?'перебір':'ок'}</span></div><div class="muted">макс ${l.max} ${l.unit}</div></div><div class="flex"><input type="number" style="width:72px" value="${v}" step="0.5" min="0" onchange="setLimit('${l.id}',this.value)"><span class="muted">${l.unit}</span></div></div>`;}).join('')||'<div class="empty">Додай ліміти</div>';
 
   $('counterList').innerHTML=S.counters.map(c=>{const v=d.counters[c.id]||0,ok=v>=c.goal;return `<div class="row"><div style="flex:1"><div class="between"><span>${c.name} ${ok?'✅':''}</span><span class="muted cnt">${fmt(v)} / ${fmt(c.goal)} ${c.unit}</span></div><div class="bar"><i class="g-purple" style="width:${Math.min(100,v/c.goal*100)}%"></i></div></div><div class="flex" style="margin-left:10px"><input type="number" style="width:80px" value="${v}" onchange="setCounter('${c.id}',this.value)"></div></div>`;}).join('')||'<div class="empty">Додай лічильники</div>';
 
@@ -499,7 +530,21 @@ function render(){
   $('scoreVal').textContent=(dayScore(tk)??0)+'%';
   $('streakVal').textContent=computeStreak();
   $('debtVal').textContent=fmt(Math.round(totalDebtNow()));
+  renderNotifBadge();
+  const sdays=Object.keys(steamPlay).sort(),sl=sdays[sdays.length-1];
+  $('steamInfo').innerHTML=sl?`🎮 Steam: ${sl} — ${(steamPlay[sl]/60).toFixed(1)} год гри`+(gamesLimitId()?' → авто в ліміт':''):'🎮 Steam: синхронізація щоранку о 08:00';
 }
+function buildNotifs(){const tk=todayKey(),d=getDay(tk),S=state.settings;const todo=[],over=[],pen=[];
+  if(d.water<S.waterGoal)todo.push(`💧 Вода — лишилось ${S.waterGoal-d.water} мл`);
+  S.exercises.forEach(ex=>{const t=exTarget(ex,tk),v=d.exercises[ex.id]||0;if(v<t)todo.push(`💪 ${ex.name}: ${v}/${t}`);if(t>ex.base)pen.push(`${ex.name}: ціль ${t} замість ${ex.base} (штраф ×${ex.penalty} — вчора не закрив)`);});
+  S.counters.forEach(c=>{const v=d.counters[c.id]||0;if(v<c.goal)todo.push(`🔢 ${c.name}: ${fmt(v)}/${fmt(c.goal)} ${c.unit}`);});
+  S.limitHabits.forEach(l=>{if(l.mode==='week'){const q=limitWeekQuota(l),cons=weekConsumed(l.id);if(cons>q)over.push(`☕ ${l.name}: ${cons} > ${q} на тиждень — перебір`);return;}const v=d.limits[l.id]||0;if(v>l.max)over.push(`🎮 ${l.name}: ${v} > ${l.max} ${l.unit||''} — перебір`);});
+  return{todo,over,pen};}
+function notifCount(){const n=buildNotifs();return n.todo.length+n.over.length+n.pen.length;}
+function renderNotifBadge(){const b=$('notifBadge');if(!b)return;const c=notifCount();b.textContent=c;b.style.display=c?'flex':'none';}
+function openNotifs(){const n=buildNotifs();const sec=(t,arr,empty)=>`<div class="sec-title">${t}</div>`+(arr.length?arr.map(x=>`<div class="row" style="padding:7px 0">${x}</div>`).join(''):`<div class="empty">${empty}</div>`);
+  $('notifBody').innerHTML=sec('📋 Зробити сьогодні',n.todo,'усе виконано 🎉')+sec('⚠️ Перевищені ліміти',n.over,'лімітів не перевищено 👍')+sec('🔥 Активні штрафи',n.pen,'штрафів немає');
+  notifs.showModal();}
 
 /* ===== ГРАФІК ===== */
 function svgLine({data,w=800,h=150,color='#5cc9dd',goal=null,goalLabel=''}){
@@ -518,15 +563,29 @@ function svgLine({data,w=800,h=150,color='#5cc9dd',goal=null,goalLabel=''}){
   const yl=`<text x="8" y="${(Y(0)).toFixed(1)}" fill="#7d859c" font-size="10">0</text><text x="8" y="${(Y(maxY*.9)+3).toFixed(1)}" fill="#7d859c" font-size="10">${fmt(Math.round(maxY*.9))}</text>`;
   let gl='';if(goal!=null){const gy=Y(goal);gl=`<line x1="${pad.l}" y1="${gy.toFixed(1)}" x2="${w-pad.r}" y2="${gy.toFixed(1)}" stroke="#4fc596" stroke-dasharray="4 4" stroke-width="1" opacity=".8"/><text x="${w-pad.r}" y="${(gy-4).toFixed(1)}" fill="#4fc596" font-size="9" text-anchor="end">${goalLabel||('ціль '+fmt(goal))}</text>`;}
   const dots=n<=40?pts.map(p=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.6" fill="${color}"/>`).join(''):'';
+  const seg=n>1?iw/(n-1):iw;
+  let hits='';data.forEach((d,i)=>{hits+=`<rect x="${(X(i)-seg/2).toFixed(1)}" y="0" width="${seg.toFixed(1)}" height="${h}" fill="transparent" data-tip="${(d.tip||(d.x+': '+fmt(d.y))).replace(/"/g,'&quot;')}"/>`;});
   const g='g'+uid();
-  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;display:block"><defs><linearGradient id="${g}" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".32"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>${gl}<path d="${area}" fill="url(#${g})"/><path d="${path}" fill="none" stroke="${color}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>${dots}${xl}${yl}</svg>`;
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;display:block"><defs><linearGradient id="${g}" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".32"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>${gl}<path d="${area}" fill="url(#${g})"/><path d="${path}" fill="none" stroke="${color}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>${dots}${xl}${yl}${hits}</svg>`;
+}
+function svgBars({data,w=800,h=175,color='#5cc9dd'}){
+  if(!data.length)return '<div class="empty">немає даних</div>';
+  const pad={l:44,r:10,t:12,b:58}, n=data.length;
+  const maxY=Math.max(...data.map(d=>d.y),1)*1.1;
+  const iw=w-pad.l-pad.r, ih=h-pad.t-pad.b, gap=iw/n, bw=Math.min(46,gap*0.6);
+  let bars='';data.forEach((d,i)=>{const cx=pad.l+i*gap+gap/2,bh=(d.y/maxY)*ih,yy=pad.t+ih-bh,x=cx-bw/2;
+    bars+=`<rect x="${x.toFixed(1)}" y="${yy.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1,bh).toFixed(1)}" rx="5" fill="${color}" data-tip="${(d.tip||(d.x+': '+fmt(d.y))).replace(/"/g,'&quot;')}"/>`;
+    const lbl=d.x.length>13?d.x.slice(0,12)+'…':d.x;
+    bars+=`<text x="${cx.toFixed(1)}" y="${h-8}" fill="#7d859c" font-size="9" text-anchor="end" transform="rotate(-32 ${cx.toFixed(1)} ${h-8})">${lbl}</text>`;});
+  const yl=`<text x="6" y="${(pad.t+ih).toFixed(1)}" fill="#7d859c" font-size="10">0</text><text x="6" y="${pad.t+9}" fill="#7d859c" font-size="10">${fmt(Math.round(maxY*.9))}</text>`;
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;display:block">${bars}${yl}</svg>`;
 }
 
 /* ===== ПРОГРЕС ===== */
 let metricSel='all', monthView='cal';
 function setMetric(id){metricSel=id;renderMonth();}
 function setMonthView(v){monthView=v;renderMonth();}
-function metricList(){const S=state.settings;const a=[{id:'all',label:'Усі',kind:'all'},{id:'score',label:'Бал дня',unit:'%',kind:'score'},{id:'water',label:'Вода',unit:'мл',kind:'goal'}];S.counters.forEach(c=>a.push({id:'cnt:'+c.id,label:c.name,unit:c.unit,kind:'goal',ref:c}));S.limitHabits.forEach(l=>a.push({id:'lim:'+l.id,label:l.name,unit:l.unit,kind:'limit',ref:l}));return a;}
+function metricList(){const S=state.settings;const a=[{id:'all',label:'Усі',kind:'all'},{id:'score',label:'Бал дня',unit:'%',kind:'score'},{id:'water',label:'Вода',unit:'мл',kind:'goal'}];S.counters.forEach(c=>a.push({id:'cnt:'+c.id,label:c.name,unit:c.unit,kind:'goal',ref:c}));S.limitHabits.forEach(l=>{if(l.mode==='week')return;a.push({id:'lim:'+l.id,label:l.name,unit:l.unit,kind:'limit',ref:l});});return a;}
 function curMetric(){return metricList().find(m=>m.id===metricSel)||metricList()[0];}
 function metricGoal(mt){if(mt.id==='water')return state.settings.waterGoal;if(mt.id==='score')return 70;if(mt.kind==='goal')return mt.ref.goal;if(mt.kind==='limit')return mt.ref.max;return null;}
 function metricDay(mt,k){const d=state.days[k];if(!d)return{has:false};
@@ -562,7 +621,8 @@ function renderMonth(){
     $('monthLegend').textContent=mt.id==='all'?'Кожна крапка = один пункт дня (🟢 виконано · 🟡 частково · 🔴 ні). Наведи на день — побачиш деталі й нотатку.':(mt.kind==='limit'?'🟩 в межах ліміту · 🟥 перебір · ▫️ немає даних':'🟩 ціль виконана · 🟨 частково · 🟥 мало · ▫️ немає даних');
   } else {
     const gm=mt.id==='all'?metricList().find(m=>m.id==='score'):mt;
-    const data=[];for(let dd=1;dd<=days;dd++){const k=dayKey(new Date(y,mo,dd)),r=metricDay(gm,k);data.push({x:dd,y:r.has?r.v:0});}
+    const msh=now.toLocaleDateString('uk-UA',{month:'short'});
+    const data=[];for(let dd=1;dd<=days;dd++){const k=dayKey(new Date(y,mo,dd)),r=metricDay(gm,k);data.push({x:dd,y:r.has?r.v:0,tip:dd+' '+msh+': '+(r.has?metricValTxt(gm,r.v):'немає даних')});}
     const color=gm.kind==='limit'?'#e56b7b':'#5cc9dd';
     $('monthBody').innerHTML=svgLine({data,color,goal:metricGoal(gm),goalLabel:gm.kind==='limit'?'ліміт':'ціль',h:180});
     $('monthLegend').textContent=(gm.kind==='limit'?'Значення по днях; зелена пунктирна — ліміт.':'Значення по днях; зелена пунктирна — ціль.');
@@ -583,18 +643,23 @@ function weekStats(){const set=new Set();for(let i=0;i<7;i++){const d=new Date()
   let spent=0;(expRows||[]).forEach(r=>{const ds=r.ym+'-'+String(r.day).padStart(2,'0');if(set.has(ds))spent+=r.sum;});
   return{good,avg:scN?Math.round(scSum/scN):0,waterOk,spent};}
 function renderWeek(){const w=weekStats(),cur=state.settings.currency;
+  const wl=state.settings.limitHabits.filter(l=>l.mode==='week');
+  let extra='';
+  if(wl.length){extra='<div style="margin-top:12px">'+wl.map(l=>{const q=limitWeekQuota(l),c=weekConsumed(l.id),over=c>q,left=Math.max(0,q-c);
+    return `<div class="row"><div style="flex:1"><div>${l.name} <span class="tag ${over?'warn':'ok'}">${c}/${q} ${l.unit}</span></div><div class="muted">лишилось ${left} ${l.unit} до кінця тижня · наступний тиждень: ${Math.max(l.minPerWeek||1,q-(l.stepPerWeek||1))}</div><div class="bar" style="height:6px"><i style="width:${Math.min(100,c/q*100)}%;background:${over?'linear-gradient(90deg,#dc2626,#e56b7b)':'linear-gradient(90deg,#2f8b66,#4fc596)'}"></i></div></div></div>`;}).join('')+'</div>';}
   $('weekBody').innerHTML=`<div class="week-grid">
     <div class="fin-box"><div class="lbl">Хороші дні</div><div class="big-num neon-green">${w.good}/7</div></div>
     <div class="fin-box"><div class="lbl">Сер. бал</div><div class="big-num neon-cyan">${w.avg}%</div></div>
     <div class="fin-box"><div class="lbl">Вода ✓</div><div class="big-num">${w.waterOk}/7</div></div>
     <div class="fin-box"><div class="lbl">Витрачено</div><div class="big-num neon-red">${fmt(Math.round(w.spent))} ${cur}</div></div>
-  </div>`;}
+  </div>`+extra;}
 
 /* тултіп календаря (миттєвий) */
-function initTip(){const mb=$('monthBody'),tip=$('tip');if(!mb||mb._tip)return;mb._tip=1;
-  mb.addEventListener('mouseover',e=>{const d=e.target.closest('.d');if(!d||!d.dataset.tip){tip.classList.remove('on');return;}tip.textContent=d.dataset.tip.replace(/¶/g,'\n');tip.classList.add('on');});
-  mb.addEventListener('mousemove',e=>{if(!tip.classList.contains('on'))return;const r=tip.getBoundingClientRect();let x=e.clientX+14,y=e.clientY+14;if(x+r.width>innerWidth-8)x=e.clientX-r.width-14;if(y+r.height>innerHeight-8)y=e.clientY-r.height-14;tip.style.left=x+'px';tip.style.top=y+'px';});
-  mb.addEventListener('mouseleave',()=>tip.classList.remove('on'));}
+function initTip(){if(document.body._tip)return;document.body._tip=1;const tip=$('tip');
+  document.body.addEventListener('pointermove',e=>{const el=e.target.closest&&e.target.closest('[data-tip]');
+    if(!el){tip.classList.remove('on');return;}
+    tip.textContent=el.getAttribute('data-tip').replace(/¶/g,'\n');tip.classList.add('on');
+    const r=tip.getBoundingClientRect();let x=e.clientX+14,y=e.clientY+14;if(x+r.width>innerWidth-8)x=e.clientX-r.width-14;if(y+r.height>innerHeight-8)y=e.clientY-r.height-14;tip.style.left=x+'px';tip.style.top=y+'px';});}
 
 /* нагадування */
 let remTimer=null,lastRemMs=0;
@@ -619,14 +684,16 @@ function renderFinance(){
   $('fcD').className='sm '+(finChart==='day'?'acc':'');
   $('finChart').innerHTML=have?svgLine({data:finChart==='month'?monthlySeries(6):dailySeries(mk),color:'#e56b7b',h:150}):'<div class="empty">завантаження витрат...</div>';
   // категорії + підкатегорії
-  if(have){const cats=Object.entries(catOf(mk)).sort((a,b)=>b[1]-a[1]).slice(0,6);const mx=cats.length?cats[0][1]:1;
-    let html='<div class="sec-title" style="margin-top:16px">Куди йдуть гроші <span style="text-transform:none;letter-spacing:0">(тисни, щоб розкрити)</span></div>';
-    if(!cats.length)html+='<div class="empty">цього місяця витрат ще немає</div>';
-    cats.forEach(([n,v])=>{const open=catOpen===n,esc=n.replace(/'/g,"\\'");
-      html+=`<div style="padding:5px 0"><div class="between" style="cursor:pointer" onclick="toggleCat('${esc}')"><span>${open?'▾':'▸'} ${n}</span><span class="muted cnt">${fmt(Math.round(v))} ${cur}</span></div><div class="bar" style="height:5px"><i class="g-cyan" style="width:${Math.min(100,v/mx*100)}%"></i></div>`;
-      if(open){const subs=Object.entries(subOf(mk,n)).sort((a,b)=>b[1]-a[1]).slice(0,8);const smx=subs.length?subs[0][1]:1;
-        html+='<div style="margin:6px 0 4px 16px">'+(subs.length?subs.map(([sn,sv])=>`<div style="padding:3px 0"><div class="between"><span class="muted">${sn}</span><span class="muted cnt">${fmt(Math.round(sv))} ${cur}</span></div><div class="bar" style="height:4px"><i class="g-purple" style="width:${Math.min(100,sv/smx*100)}%"></i></div></div>`).join(''):'<div class="empty">немає підкатегорій</div>')+'</div>';}
-      html+='</div>';});
+  if(have){const cats=Object.entries(catOf(mk)).sort((a,b)=>b[1]-a[1]).slice(0,8);
+    let html='<div class="sec-title" style="margin-top:16px">Куди йдуть гроші <span style="text-transform:none;letter-spacing:0">(наведи на стовпчик · тисни назву для підкатегорій)</span></div>';
+    if(!cats.length){html+='<div class="empty">цього місяця витрат ще немає</div>';}
+    else{
+      html+=svgBars({data:cats.map(([n,v])=>({x:n,y:Math.round(v),tip:n+': '+fmt(Math.round(v))+' '+cur})),color:'#5cc9dd'});
+      html+='<div class="chip-row" style="margin-top:8px">'+cats.map(([n])=>`<button class="sm ${catOpen===n?'acc':''}" onclick="toggleCat('${n.replace(/'/g,"\\'")}')">${n}</button>`).join('')+'</div>';
+      if(catOpen){const subs=Object.entries(subOf(mk,catOpen)).sort((a,b)=>b[1]-a[1]).slice(0,10);
+        html+='<div class="sec-title" style="margin-top:12px">Підкатегорії: '+catOpen+'</div>';
+        html+=subs.length?svgBars({data:subs.map(([n,v])=>({x:n,y:Math.round(v),tip:n+': '+fmt(Math.round(v))+' '+cur})),color:'#9d8ad6'}):'<div class="empty">немає підкатегорій</div>';}
+    }
     $('catBreak').innerHTML=html;
   } else $('catBreak').innerHTML='';
   // кредити
@@ -649,13 +716,13 @@ function setTab(name){['gen','act','lim','cnt','loan','rem','data'].forEach(t=>$
 function openSettings(){const S=state.settings,R=S.reminders||{};$('setWaterGoal').value=S.waterGoal;$('setCurrency').value=S.currency;$('remOn').checked=!!R.on;$('remEvery').value=R.everyMin||120;$('remFrom').value=R.from??9;$('remTo').value=R.to??21;rl('setExercises',S.exercises,'ex');rl('setLimits',S.limitHabits,'lim');rl('setCounters',S.counters,'cnt');rl('setLoans',S.loans,'loan');setTab('gen');settings.showModal();}
 function rl(elId,arr,type){$(elId).innerHTML=arr.map((it,i)=>{const del=`<button class="del" onclick="delItem('${type}',${i})">✕</button>`;
   if(type==='ex')return `<div class="settings-item"><input value="${it.name}" data-f="name" placeholder="Назва"><input type="number" value="${it.base}" data-f="base" style="width:74px" title="норма"><input type="number" value="${it.penalty}" data-f="penalty" step="0.5" style="width:64px" title="штраф ×">${del}</div>`;
-  if(type==='lim')return `<div class="settings-item"><input value="${it.name}" data-f="name" placeholder="Назва"><input type="number" value="${it.max}" data-f="max" step="0.5" style="width:64px"><input value="${it.unit}" data-f="unit" style="width:64px" placeholder="од.">${del}</div>`;
+  if(type==='lim')return `<div class="settings-item"><input value="${it.name}" data-f="name" placeholder="Назва" style="min-width:90px"><select data-f="mode" style="width:auto"><option value="day"${it.mode!=='week'?' selected':''}>на день</option><option value="week"${it.mode==='week'?' selected':''}>на тиждень ↓</option></select><input type="number" value="${it.max??2}" data-f="max" step="0.5" style="width:56px" title="макс на день"><input type="number" value="${it.startPerWeek??5}" data-f="startPerWeek" style="width:48px" title="старт: скільки на тиждень"><input type="number" value="${it.stepPerWeek??1}" data-f="stepPerWeek" style="width:44px" title="мінус за тиждень"><input type="number" value="${it.minPerWeek??2}" data-f="minPerWeek" style="width:44px" title="мінімум на тиждень"><input value="${it.unit||''}" data-f="unit" style="width:56px" placeholder="од.">${del}</div>`;
   if(type==='cnt')return `<div class="settings-item"><input value="${it.name}" data-f="name" placeholder="Назва"><input type="number" value="${it.goal}" data-f="goal" style="width:84px" title="ціль"><input value="${it.unit}" data-f="unit" style="width:64px" placeholder="од.">${del}</div>`;
   if(type==='loan')return `<div class="settings-item"><input value="${it.name}" data-f="name" placeholder="Назва кредиту">${del}</div>`;
 }).join('');}
 function readL(elId,type){return [...$(elId).querySelectorAll('.settings-item')].map(r=>{const g=f=>r.querySelector(`[data-f="${f}"]`)?.value;
   if(type==='ex')return{id:uid(),name:g('name')||'Вправа',base:+g('base')||10,penalty:+g('penalty')||2};
-  if(type==='lim')return{id:uid(),name:g('name')||'Ліміт',max:+g('max')||1,unit:g('unit')||''};
+  if(type==='lim'){const mode=g('mode')||'day';const o={id:uid(),name:g('name')||'Ліміт',mode,unit:g('unit')||'',max:+g('max')||1};if(mode==='week'){o.startPerWeek=+g('startPerWeek')||5;o.stepPerWeek=+g('stepPerWeek')||1;o.minPerWeek=+g('minPerWeek')||1;o.startDate=weekMondayKey(new Date());}return o;}
   if(type==='cnt')return{id:uid(),name:g('name')||'Лічильник',goal:+g('goal')||1,unit:g('unit')||''};
   if(type==='loan')return{id:uid(),name:g('name')||'Кредит'};});}
 function addExercise(){state.settings.exercises.push({id:uid(),name:'Нова вправа',base:10,penalty:2});rl('setExercises',state.settings.exercises,'ex');}
@@ -663,7 +730,7 @@ function addLimit(){state.settings.limitHabits.push({id:uid(),name:'Новий �
 function addCounter(){state.settings.counters.push({id:uid(),name:'Лічильник',goal:100,unit:''});rl('setCounters',state.settings.counters,'cnt');}
 function addLoan(){state.settings.loans.push({id:uid(),name:'Кредит'});rl('setLoans',state.settings.loans,'loan');}
 function delItem(type,i){const map={ex:'exercises',lim:'limitHabits',cnt:'counters',loan:'loans'},el={ex:'setExercises',lim:'setLimits',cnt:'setCounters',loan:'setLoans'};state.settings[map[type]].splice(i,1);rl(el[type],state.settings[map[type]],type);}
-function saveSettings(){const S=state.settings,keep=(a,o)=>a.map((n,i)=>o[i]?{...n,id:o[i].id}:n);S.exercises=keep(readL('setExercises','ex'),S.exercises);S.limitHabits=keep(readL('setLimits','lim'),S.limitHabits);S.counters=keep(readL('setCounters','cnt'),S.counters);S.loans=keep(readL('setLoans','loan'),S.loans);S.waterGoal=+$('setWaterGoal').value||2000;S.currency=$('setCurrency').value||'₴';S.reminders={on:$('remOn').checked,everyMin:Math.max(15,+$('remEvery').value||120),from:Math.min(23,Math.max(0,+$('remFrom').value||9)),to:Math.min(24,Math.max(1,+$('remTo').value||21))};settings.close();save();startReminders();}
+function saveSettings(){const S=state.settings,keep=(a,o)=>a.map((n,i)=>o[i]?{...n,id:o[i].id}:n);S.exercises=keep(readL('setExercises','ex'),S.exercises);S.limitHabits=readL('setLimits','lim').map((n,i)=>{const o=S.limitHabits[i];if(!o)return n;return {...n,id:o.id,startDate:(n.mode==='week'?(o.mode==='week'&&o.startDate?o.startDate:n.startDate):undefined)};});S.counters=keep(readL('setCounters','cnt'),S.counters);S.loans=keep(readL('setLoans','loan'),S.loans);S.waterGoal=+$('setWaterGoal').value||2000;S.currency=$('setCurrency').value||'₴';S.reminders={on:$('remOn').checked,everyMin:Math.max(15,+$('remEvery').value||120),from:Math.min(23,Math.max(0,+$('remFrom').value||9)),to:Math.min(24,Math.max(1,+$('remTo').value||21))};settings.close();save();startReminders();}
 function resetAll(){if(confirm('Скинути ВСІ дані?')){localStorage.removeItem(cacheKey);state=structuredClone(defaults);if(session&&sb)sb.from('app_state').upsert({user_id:session.user.id,data:state,updated_at:new Date().toISOString()});settings.close();render();}}
 
 function exportData(){const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='lifeos-backup-'+todayKey()+'.json';a.click();}

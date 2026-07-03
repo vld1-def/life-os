@@ -1,0 +1,38 @@
+name: Steam playtime sync
+
+on:
+  schedule:
+    - cron: '0 5 * * *'   # 05:00 UTC = 08:00 за Києвом (літній час)
+  workflow_dispatch:       # можна запустити вручну для тесту
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch Steam playtime and upsert to Supabase
+        env:
+          STEAM_KEY: ${{ secrets.STEAM_KEY }}
+          STEAM_ID: ${{ secrets.STEAM_ID }}
+          SB_URL: ${{ secrets.SB_URL }}
+          SB_KEY: ${{ secrets.SB_KEY }}
+        run: |
+          node <<'EOF'
+          const https=require('https');
+          const get=u=>new Promise((res,rej)=>{https.get(u,r=>{let d='';r.on('data',c=>d+=c);r.on('end',()=>res(d));}).on('error',rej);});
+          (async()=>{
+            const {STEAM_KEY,STEAM_ID,SB_URL,SB_KEY}=process.env;
+            const raw=await get(`https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=${STEAM_KEY}&steamid=${STEAM_ID}&include_played_free_games=1&format=json`);
+            const games=(JSON.parse(raw).response||{}).games||[];
+            const total=games.reduce((s,g)=>s+(g.playtime_forever||0),0);
+            if(!games.length){console.error('Профіль приватний або немає ігор');process.exit(1);}
+            const now=new Date(Date.now()+3*3600*1000); // Київ UTC+3
+            const date=now.toISOString().slice(0,10);
+            const body=JSON.stringify([{date,total_minutes:total}]);
+            const url=new URL(SB_URL+'/rest/v1/steam_playtime?on_conflict=date');
+            await new Promise((res,rej)=>{
+              const rq=https.request(url,{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'}},r=>{let d='';r.on('data',c=>d+=c);r.on('end',()=>{console.log('Supabase status',r.statusCode,d);if(r.statusCode>=400)process.exit(1);res();});});
+              rq.on('error',rej);rq.write(body);rq.end();
+            });
+            console.log('OK: date',date,'total_minutes',total,'('+Math.round(total/60)+' год)');
+          })().catch(e=>{console.error(e);process.exit(1);});
+          EOF
