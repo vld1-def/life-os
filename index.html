@@ -230,6 +230,7 @@
 
   <div class="glass card col-8">
     <h2><span class="dot" style="color:var(--green)"></span>Фінанси — <span id="finMonthLabel" style="text-transform:none;letter-spacing:0;color:var(--text)"></span></h2>
+    <div class="flex" id="whoFilter" style="flex-wrap:wrap;gap:6px;margin-bottom:12px"></div>
     <div class="fin-grid">
       <div class="fin-box"><div class="lbl">Дохід / міс</div><input type="number" id="finIncome" placeholder="0" onchange="setFin('income',this.value)"><div class="delta" id="incomeDelta"></div></div>
       <div class="fin-box"><div class="lbl">Витрати (з бази)</div><div class="big-num" id="finExpenses">—</div><div class="delta" id="expenseDelta"></div></div>
@@ -356,7 +357,8 @@ async function pullState(){
   render(); setSync('ok');
 }
 /* ---------- ФІНАНСИ З БАЗИ (таблиця expenses) ---------- */
-let finCache={};
+let finCache={};   // mk -> [{sum,cat,who}]
+let finWho='Всі';  // активний фільтр «хто витрачає»
 async function loadFinance(mk){
   if(!sb) return null;
   const [y,m]=mk.split('-').map(Number);
@@ -364,10 +366,16 @@ async function loadFinance(mk){
   const end=new Date(Date.UTC(y,m,1)).toISOString().slice(0,10); // 1-ше число наступного місяця
   const {data,error}=await sb.from('expenses').select('sum,categoria,who,date').gte('date',start).lt('date',end);
   if(error){return null;}
-  const agg={total:0,byCat:{},byWho:{}};
-  data.forEach(r=>{const s=+r.sum||0; agg.total+=s; if(r.categoria)agg.byCat[r.categoria]=(agg.byCat[r.categoria]||0)+s; if(r.who)agg.byWho[r.who]=(agg.byWho[r.who]||0)+s;});
-  finCache[mk]=agg; return agg;
+  finCache[mk]=data.map(r=>({sum:+r.sum||0,cat:r.categoria||'—',who:r.who||'—'}));
+  return finCache[mk];
 }
+function aggFin(mk,who){
+  const rows=finCache[mk]; if(!rows) return null;
+  const a={total:0,byCat:{},byWho:{}};
+  rows.forEach(r=>{a.byWho[r.who]=(a.byWho[r.who]||0)+r.sum; if(who&&who!=='Всі'&&r.who!==who)return; a.total+=r.sum; a.byCat[r.cat]=(a.byCat[r.cat]||0)+r.sum;});
+  return a;
+}
+function setWho(w){finWho=w;renderFinance();}
 async function refreshFinance(){
   const mk=monthKey();
   await Promise.all([loadFinance(mk),loadFinance(prevMonth(mk))]);
@@ -457,20 +465,26 @@ function renderFinance(){
   const mk=monthKey(),m=getMonth(mk),pm=state.months[prevMonth(mk)],cur=state.settings.currency;
   $('finMonthLabel').textContent=new Date().toLocaleDateString('uk-UA',{month:'long',year:'numeric'});
   $('finIncome').value=m.income||'';
-  const fx=finCache[mk],pfx=finCache[prevMonth(mk)];
+  const hasCur=!!finCache[mk], hasPrev=!!finCache[prevMonth(mk)];
+  const fx=aggFin(mk,finWho), pfx=aggFin(prevMonth(mk),finWho);
   const exp=fx?fx.total:(m.expenses||0);
   const pexp=pfx?pfx.total:(pm?.expenses||0);
-  $('finExpenses').textContent=(fx?fmt(Math.round(exp)):'—')+' '+cur;
+  $('finExpenses').textContent=(hasCur?fmt(Math.round(exp)):'—')+' '+cur;
   const net=(m.income||0)-exp;
   $('finNet').textContent=fmt(Math.round(net))+' '+cur;$('finNet').className='big-num '+(net>=0?'neon-green':'neon-red');
   $('netVal').textContent=fmt(Math.round(net));$('netVal').className='big neon-'+(net>=0?'green':'red');
-  const delta=(c,p,goodUp,hasPrev)=>{if(!hasPrev)return'<span class="muted">перший місяць</span>';const df=Math.round(c-p);if(df===0)return'<span class="muted">= як минулого</span>';const good=goodUp?df>0:df<0;return `<span class="${good?'up':'down'}">${df>0?'▲':'▼'} ${fmt(Math.abs(df))} ${cur}</span>`;};
+  const delta=(c,p,goodUp,hp)=>{if(!hp)return'<span class="muted">перший місяць</span>';const df=Math.round(c-p);if(df===0)return'<span class="muted">= як минулого</span>';const good=goodUp?df>0:df<0;return `<span class="${good?'up':'down'}">${df>0?'▲':'▼'} ${fmt(Math.abs(df))} ${cur}</span>`;};
   $('incomeDelta').innerHTML=delta(m.income||0,pm?.income||0,true,!!pm);
-  $('expenseDelta').innerHTML=delta(exp,pexp,false,!!pfx);
-  $('netDelta').innerHTML=delta(net,(pm?.income||0)-pexp,true,!!pm||!!pfx);
+  $('expenseDelta').innerHTML=delta(exp,pexp,false,hasPrev);
+  $('netDelta').innerHTML=delta(net,(pm?.income||0)-pexp,true,!!pm||hasPrev);
+  // фільтр «хто витрачає»
+  const all=aggFin(mk,'Всі');
+  if(all){const people=Object.keys(all.byWho).sort();
+    $('whoFilter').innerHTML=['Всі',...people].map(w=>`<button class="sm ${finWho===w?'acc':''}" onclick="setWho('${w}')">${w==='Всі'?'👥 Всі':w+' · '+fmt(Math.round(all.byWho[w]))}</button>`).join('');
+  } else $('whoFilter').innerHTML='';
   // розбивка по категоріях
   if(fx){const cats=Object.entries(fx.byCat).sort((a,b)=>b[1]-a[1]).slice(0,5);const mx=cats.length?cats[0][1]:1;
-    $('catBreak').innerHTML='<div class="sec-title" style="margin-top:16px">Куди йдуть гроші</div>'+cats.map(([n,v])=>`<div style="padding:6px 0"><div class="between"><span>${n}</span><span class="muted cnt">${fmt(Math.round(v))} ${cur}</span></div><div class="bar"><i class="g-cyan" style="width:${Math.min(100,v/mx*100)}%"></i></div></div>`).join('');
+    $('catBreak').innerHTML='<div class="sec-title" style="margin-top:16px">Куди йдуть гроші'+(finWho!=='Всі'?' · '+finWho:'')+'</div>'+cats.map(([n,v])=>`<div style="padding:6px 0"><div class="between"><span>${n}</span><span class="muted cnt">${fmt(Math.round(v))} ${cur}</span></div><div class="bar"><i class="g-cyan" style="width:${Math.min(100,v/mx*100)}%"></i></div></div>`).join('');
   } else $('catBreak').innerHTML='';
   $('loanList').innerHTML=state.settings.loans.map(loan=>{const bal=m.loanBalances[loan.id]??'',pbal=pm?.loanBalances?.[loan.id];let info='<span class="muted">введи залишок боргу</span>';if(bal!==''&&pbal!=null){const df=(+bal)-pbal;info=df<0?`<span class="up">✅ погасив ${fmt(Math.abs(df))} ${cur}</span>`:df>0?`<span class="down">⚠ виріс на ${fmt(df)} ${cur}</span>`:'<span class="muted">без змін</span>';}if(bal!==''&&(+bal)===0)info='<span class="up">🎉 кредит закрито!</span>';return `<div class="row"><div style="flex:1"><div>${loan.name}</div><div class="delta">${info}</div></div><div class="flex"><span class="muted">залишок</span><input type="number" style="width:110px" value="${bal}" placeholder="0" onchange="setLoan('${loan.id}',this.value)"><span class="muted">${cur}</span></div></div>`;}).join('')||'<div class="empty">Додай кредити</div>';
 }
