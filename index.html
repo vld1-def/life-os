@@ -395,6 +395,7 @@ async function onLogin(){
   await pullState();
   loadExpenses();
   loadSteam();
+  loadScreen();
   initTip();
   startReminders();
 }
@@ -424,6 +425,7 @@ function migrate(s){
   s.settings.reminders=Object.assign({on:false,everyMin:120,from:9,to:21},s.settings.reminders||{});
   if(s.settings.waterGoal<100) s.settings.waterGoal=2000;
   if(!s.settings.limitHabits.some(l=>/кав|coffee/i.test(l.name))) s.settings.limitHabits.push({id:uid(),name:'☕ Кава (цукор)',mode:'week',startPerWeek:5,stepPerWeek:1,minPerWeek:2,max:99,unit:'чашок',startDate:weekMondayKey(new Date())});
+  if(!s.settings.limitHabits.some(l=>/соц|екран|screen|мереж/i.test(l.name))) s.settings.limitHabits.push({id:uid(),name:'📱 Соцмережі',mode:'day',max:60,unit:'хв'});
   return s;
 }
 function save(){ render(); scheduleSync(); }
@@ -454,6 +456,22 @@ async function loadSteam(){
 }
 function gamesLimitId(){const l=state.settings.limitHabits.find(x=>/гра|ігр|steam/i.test(x.name));return l?l.id:null;}
 function applySteam(){const gid=gamesLimitId();if(!gid)return;Object.keys(steamPlay).forEach(dk=>{getDay(dk).limits[gid]=Math.round(steamPlay[dk]/60*10)/10;});}
+
+/* ===== SCREEN TIME (айфон → таблиця screen_time) ===== */
+let screenMin={}; // dateKey -> хвилин за день (сума застосунків)
+const UA_MON={'січ':1,'лют':2,'бер':3,'квіт':4,'трав':5,'черв':6,'лип':7,'серп':8,'вер':9,'жовт':10,'лист':11,'груд':12};
+function parseUaDate(s){s=String(s||'');const m=s.match(/(\d{1,2})\s+([а-яіїєґ]+)/i);const ym=s.match(/(\d{4})/);if(!m||!ym)return null;const key=Object.keys(UA_MON).find(k=>m[2].toLowerCase().startsWith(k));if(!key)return null;return ym[1]+'-'+String(UA_MON[key]).padStart(2,'0')+'-'+String(+m[1]).padStart(2,'0');}
+function parseMins(s){const m=String(s||'').match(/\(([^)]*)\)/);if(!m)return 0;let mins=0;const h=m[1].match(/(\d+)\s*год/);if(h)mins+=+h[1]*60;const mm=m[1].match(/(\d+)\s*хв/);if(mm)mins+=+mm[1];return mins;}
+async function loadScreen(){
+  if(!sb) return;
+  const {data,error}=await sb.from('screen_time').select('data').limit(3000);
+  if(error||!data) return;
+  screenMin={};
+  data.forEach(row=>{let o=row.data;if(typeof o==='string'){try{o=JSON.parse(o);}catch(e){return;}}if(!o)return;const dk=parseUaDate(o.date);if(!dk)return;screenMin[dk]=(screenMin[dk]||0)+parseMins(o.App||o.app);});
+  applyScreen(); render();
+}
+function screenLimitId(){const l=state.settings.limitHabits.find(x=>/соц|екран|screen|мереж/i.test(x.name));return l?l.id:null;}
+function applyScreen(){const gid=screenLimitId();if(!gid)return;Object.keys(screenMin).forEach(dk=>{getDay(dk).limits[gid]=screenMin[dk];});}
 
 /* ===== КРЕДИТИ (щоденні знімки боргу) ===== */
 function setLoanToday(id,v){ if(!state.loanLog[id])state.loanLog[id]={}; state.loanLog[id][todayKey()]=Math.max(0,+v||0); save(); }
@@ -532,7 +550,10 @@ function render(){
   $('debtVal').textContent=fmt(Math.round(totalDebtNow()));
   renderNotifBadge();
   const sdays=Object.keys(steamPlay).sort(),sl=sdays[sdays.length-1];
-  $('steamInfo').innerHTML=sl?`🎮 Steam: ${sl} — ${(steamPlay[sl]/60).toFixed(1)} год гри`+(gamesLimitId()?' → авто в ліміт':''):'🎮 Steam: синхронізація щоранку о 08:00';
+  const scd=Object.keys(screenMin).sort(),scl=scd[scd.length-1];
+  const steamTxt=sl?`🎮 Steam: ${sl} — ${(steamPlay[sl]/60).toFixed(1)} год`:'🎮 Steam: синхр. 08:00';
+  const scrTxt=scl?`📱 Екран: ${scl} — ${screenMin[scl]} хв`:'📱 Екран: синхр. 00:00';
+  $('steamInfo').innerHTML=steamTxt+' · '+scrTxt;
 }
 function buildNotifs(){const tk=todayKey(),d=getDay(tk),S=state.settings;const todo=[],over=[],pen=[];
   if(d.water<S.waterGoal)todo.push(`💧 Вода — лишилось ${S.waterGoal-d.water} мл`);
@@ -688,11 +709,11 @@ function renderFinance(){
     let html='<div class="sec-title" style="margin-top:16px">Куди йдуть гроші <span style="text-transform:none;letter-spacing:0">(наведи на стовпчик · тисни назву для підкатегорій)</span></div>';
     if(!cats.length){html+='<div class="empty">цього місяця витрат ще немає</div>';}
     else{
-      html+=svgBars({data:cats.map(([n,v])=>({x:n,y:Math.round(v),tip:n+': '+fmt(Math.round(v))+' '+cur})),color:'#5cc9dd'});
+      html+=svgLine({data:cats.map(([n,v])=>({x:n.length>8?n.slice(0,7)+'…':n,y:Math.round(v),tip:n+': '+fmt(Math.round(v))+' '+cur})),color:'#5cc9dd',h:150});
       html+='<div class="chip-row" style="margin-top:8px">'+cats.map(([n])=>`<button class="sm ${catOpen===n?'acc':''}" onclick="toggleCat('${n.replace(/'/g,"\\'")}')">${n}</button>`).join('')+'</div>';
       if(catOpen){const subs=Object.entries(subOf(mk,catOpen)).sort((a,b)=>b[1]-a[1]).slice(0,10);
         html+='<div class="sec-title" style="margin-top:12px">Підкатегорії: '+catOpen+'</div>';
-        html+=subs.length?svgBars({data:subs.map(([n,v])=>({x:n,y:Math.round(v),tip:n+': '+fmt(Math.round(v))+' '+cur})),color:'#9d8ad6'}):'<div class="empty">немає підкатегорій</div>';}
+        html+=subs.length?svgLine({data:subs.map(([n,v])=>({x:n.length>8?n.slice(0,7)+'…':n,y:Math.round(v),tip:n+': '+fmt(Math.round(v))+' '+cur})),color:'#9d8ad6',h:150}):'<div class="empty">немає підкатегорій</div>';}
     }
     $('catBreak').innerHTML=html;
   } else $('catBreak').innerHTML='';
