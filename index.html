@@ -294,6 +294,15 @@
   <div class="tabpane" id="tab-lim">
     <div class="sec-title">🎮 Ліміти «не переборщи»</div>
     <div id="setLimits"></div><button class="sm" onclick="addLimit()">+ ліміт</button>
+    <div class="muted" style="margin-top:12px;line-height:1.7">
+      <b>Назва</b> — як зветься ліміт (для Steam лиши слово «Ігри», для айфона — «Соцмережі/екран»).<br>
+      <b>на день / на тиждень ↓</b> — тип: денний максимум, або тижнева квота що щотижня зменшується.<br>
+      <b>макс/день</b> — скільки максимум дозволено за день (тип «на день»).<br>
+      <b>старт</b> — з якої кількості на тиждень стартуємо (тип «на тиждень»).<br>
+      <b>−/тиж</b> — на скільки зменшувати щотижня.<br>
+      <b>мін</b> — нижче цього тижнева норма не опускається.<br>
+      <b>од.</b> — одиниця виміру (хв, год, чашок…).
+    </div>
   </div>
   <div class="tabpane" id="tab-cnt">
     <div class="sec-title">🔢 Кастомні лічильники</div>
@@ -424,7 +433,8 @@ function migrate(s){
   s.settings=Object.assign(structuredClone(defaults.settings),s.settings);
   s.settings.reminders=Object.assign({on:false,everyMin:120,from:9,to:21},s.settings.reminders||{});
   if(s.settings.waterGoal<100) s.settings.waterGoal=2000;
-  if(!s.settings.limitHabits.some(l=>/кав|coffee/i.test(l.name))) s.settings.limitHabits.push({id:uid(),name:'☕ Кава (цукор)',mode:'week',startPerWeek:5,stepPerWeek:1,minPerWeek:2,max:99,unit:'чашок',startDate:weekMondayKey(new Date())});
+  s.settings.limitHabits.forEach(l=>{if(l.name==='☕ Кава (цукор)')l.name='Кава (цукор)';});
+  if(!s.settings.limitHabits.some(l=>/кав|coffee/i.test(l.name))) s.settings.limitHabits.push({id:uid(),name:'Кава (цукор)',mode:'week',startPerWeek:5,stepPerWeek:1,minPerWeek:2,max:99,unit:'чашок',startDate:weekMondayKey(new Date())});
   if(!s.settings.limitHabits.some(l=>/соц|екран|screen|мереж/i.test(l.name))) s.settings.limitHabits.push({id:uid(),name:'📱 Соцмережі',mode:'day',max:60,unit:'хв'});
   return s;
 }
@@ -455,7 +465,7 @@ async function loadSteam(){
   applySteam(); render();
 }
 function gamesLimitId(){const l=state.settings.limitHabits.find(x=>/гра|ігр|steam/i.test(x.name));return l?l.id:null;}
-function applySteam(){const gid=gamesLimitId();if(!gid)return;Object.keys(steamPlay).forEach(dk=>{getDay(dk).limits[gid]=Math.round(steamPlay[dk]/60*10)/10;});}
+function applySteam(){const gid=gamesLimitId();if(!gid)return;Object.keys(steamPlay).forEach(dk=>{getDay(dk).limits[gid]=Math.round(steamPlay[dk]);});}
 
 /* ===== SCREEN TIME (айфон → таблиця screen_time) ===== */
 let screenMin={}; // dateKey -> хвилин за день (сума застосунків)
@@ -534,7 +544,7 @@ function render(){
 
   $('limitList').innerHTML=S.limitHabits.map(l=>{
     if(l.mode==='week'){const q=limitWeekQuota(l),cons=weekConsumed(l.id),today=d.limits[l.id]||0,over=cons>q;
-      return `<div class="row"><div style="flex:1"><div>${l.name} <span class="tag ${over?'warn':'ok'}">${cons}/${q} на тиждень</span></div><div class="muted">сьогодні: ${today} · тижнева норма спадає (зараз ${q} ${l.unit})</div><div class="bar"><i style="width:${Math.min(100,cons/q*100)}%;background:${over?'linear-gradient(90deg,#dc2626,#e56b7b)':'linear-gradient(90deg,#2f8b66,#4fc596)'}"></i></div></div><div class="flex" style="margin-left:10px"><button class="sm" onclick="addLimitToday('${l.id}',-1)">−1</button><button class="acc sm" onclick="addLimitToday('${l.id}',1)">+1</button></div></div>`;}
+      return `<div class="row"><div style="flex:1"><div>${l.name} <span class="tag ${over?'warn':'ok'}">${cons}/${q} на тиждень</span></div><div class="muted">сьогодні: ${today} · норма ${q} ${l.unit}</div><div class="bar"><i style="width:${Math.min(100,cons/q*100)}%;background:${over?'linear-gradient(90deg,#dc2626,#e56b7b)':'linear-gradient(90deg,#2f8b66,#4fc596)'}"></i></div></div><div class="flex" style="margin-left:10px"><button class="sm" onclick="addLimitToday('${l.id}',-1)">−1</button><button class="acc sm" onclick="addLimitToday('${l.id}',1)">+1</button></div></div>`;}
     const v=d.limits[l.id]||0,over=v>l.max;return `<div class="row"><div><div>${l.name} <span class="tag ${over?'warn':'ok'}">${over?'перебір':'ок'}</span></div><div class="muted">макс ${l.max} ${l.unit}</div></div><div class="flex"><input type="number" style="width:72px" value="${v}" step="0.5" min="0" onchange="setLimit('${l.id}',this.value)"><span class="muted">${l.unit}</span></div></div>`;}).join('')||'<div class="empty">Додай ліміти</div>';
 
   $('counterList').innerHTML=S.counters.map(c=>{const v=d.counters[c.id]||0,ok=v>=c.goal;return `<div class="row"><div style="flex:1"><div class="between"><span>${c.name} ${ok?'✅':''}</span><span class="muted cnt">${fmt(v)} / ${fmt(c.goal)} ${c.unit}</span></div><div class="bar"><i class="g-purple" style="width:${Math.min(100,v/c.goal*100)}%"></i></div></div><div class="flex" style="margin-left:10px"><input type="number" style="width:80px" value="${v}" onchange="setCounter('${c.id}',this.value)"></div></div>`;}).join('')||'<div class="empty">Додай лічильники</div>';
@@ -549,11 +559,8 @@ function render(){
   $('streakVal').textContent=computeStreak();
   $('debtVal').textContent=fmt(Math.round(totalDebtNow()));
   renderNotifBadge();
-  const sdays=Object.keys(steamPlay).sort(),sl=sdays[sdays.length-1];
   const scd=Object.keys(screenMin).sort(),scl=scd[scd.length-1];
-  const steamTxt=sl?`🎮 Steam: ${sl} — ${(steamPlay[sl]/60).toFixed(1)} год`:'🎮 Steam: синхр. 08:00';
-  const scrTxt=scl?`📱 Екран: ${scl} — ${screenMin[scl]} хв`:'📱 Екран: синхр. 00:00';
-  $('steamInfo').innerHTML=steamTxt+' · '+scrTxt;
+  $('steamInfo').innerHTML=scl?`📱 Екран: ${scl} — ${screenMin[scl]} хв`:'';
 }
 function buildNotifs(){const tk=todayKey(),d=getDay(tk),S=state.settings;const todo=[],over=[],pen=[];
   if(d.water<S.waterGoal)todo.push(`💧 Вода — лишилось ${S.waterGoal-d.water} мл`);
@@ -651,11 +658,13 @@ function renderMonth(){
 }
 
 /* ===== ФІНАНСИ ===== */
-let finChart='month', debtChart='month', catOpen=null;
+let finChart='month', debtChart='month', catOpen=null, subOpen=null;
 function setFinChart(v){finChart=v;renderFinance();}
 function setDebtChart(v){debtChart=v;renderFinance();}
-function toggleCat(n){catOpen=catOpen===n?null:n;renderFinance();}
+function toggleCat(n){catOpen=catOpen===n?null:n;subOpen=null;renderFinance();}
+function toggleSub(n){subOpen=subOpen===n?null:n;renderFinance();}
 function subOf(ym,cat){const o={};(expRows||[]).forEach(r=>{if(r.ym===ym&&r.cat===cat){o[r.sub]=(o[r.sub]||0)+r.sum;}});return o;}
+function catDailySeries(ym,cat,sub){const[y,mm]=ym.split('-').map(Number);const days=new Date(y,mm,0).getDate();const per={};(expRows||[]).forEach(r=>{if(r.ym!==ym)return;if(cat&&r.cat!==cat)return;if(sub&&r.sub!==sub)return;per[r.day]=(per[r.day]||0)+r.sum;});const cur=state.settings.currency;const arr=[];for(let d=1;d<=days;d++)arr.push({x:d,y:Math.round(per[d]||0),tip:d+' число: '+fmt(Math.round(per[d]||0))+' '+cur});return arr;}
 function debtDailySeries(ym){const[y,mm]=ym.split('-').map(Number);const days=new Date(y,mm,0).getDate();const last=ym===monthKey()?new Date().getDate():days;const arr=[];for(let dd=1;dd<=last;dd++){const ds=ym+'-'+String(dd).padStart(2,'0');let tot=0;state.settings.loans.forEach(l=>{const v=loanValAt(l.id,ds);if(v!=null)tot+=v;});arr.push({x:dd,y:Math.round(tot)});}return arr;}
 
 /* тижневий підсумок */
@@ -705,15 +714,23 @@ function renderFinance(){
   $('fcD').className='sm '+(finChart==='day'?'acc':'');
   $('finChart').innerHTML=have?svgLine({data:finChart==='month'?monthlySeries(6):dailySeries(mk),color:'#e56b7b',h:150}):'<div class="empty">завантаження витрат...</div>';
   // категорії + підкатегорії
-  if(have){const cats=Object.entries(catOf(mk)).sort((a,b)=>b[1]-a[1]).slice(0,8);
-    let html='<div class="sec-title" style="margin-top:16px">Куди йдуть гроші <span style="text-transform:none;letter-spacing:0">(наведи на стовпчик · тисни назву для підкатегорій)</span></div>';
+  if(have){const cats=Object.entries(catOf(mk)).sort((a,b)=>b[1]-a[1]).slice(0,10);
+    let html='<div class="sec-title" style="margin-top:16px">Куди йдуть гроші <span style="text-transform:none;letter-spacing:0">(тисни категорію → графік по днях)</span></div>';
     if(!cats.length){html+='<div class="empty">цього місяця витрат ще немає</div>';}
     else{
-      html+=svgLine({data:cats.map(([n,v])=>({x:n.length>8?n.slice(0,7)+'…':n,y:Math.round(v),tip:n+': '+fmt(Math.round(v))+' '+cur})),color:'#5cc9dd',h:150});
-      html+='<div class="chip-row" style="margin-top:8px">'+cats.map(([n])=>`<button class="sm ${catOpen===n?'acc':''}" onclick="toggleCat('${n.replace(/'/g,"\\'")}')">${n}</button>`).join('')+'</div>';
-      if(catOpen){const subs=Object.entries(subOf(mk,catOpen)).sort((a,b)=>b[1]-a[1]).slice(0,10);
-        html+='<div class="sec-title" style="margin-top:12px">Підкатегорії: '+catOpen+'</div>';
-        html+=subs.length?svgLine({data:subs.map(([n,v])=>({x:n.length>8?n.slice(0,7)+'…':n,y:Math.round(v),tip:n+': '+fmt(Math.round(v))+' '+cur})),color:'#9d8ad6',h:150}):'<div class="empty">немає підкатегорій</div>';}
+      html+='<div class="chip-row">'+cats.map(([n,v])=>`<button class="sm ${catOpen===n?'acc':''}" onclick="toggleCat('${n.replace(/'/g,"\\'")}')">${n} · ${fmt(Math.round(v))}</button>`).join('')+'</div>';
+      if(catOpen){
+        html+=`<div class="sec-title" style="margin-top:12px">📈 ${catOpen} по днях — ${fmt(Math.round(catOf(mk)[catOpen]||0))} ${cur}</div>`;
+        html+=svgLine({data:catDailySeries(mk,catOpen,null),color:'#5cc9dd',h:150});
+        const subs=Object.entries(subOf(mk,catOpen)).sort((a,b)=>b[1]-a[1]).slice(0,12);
+        if(subs.length){
+          html+='<div class="chip-row" style="margin-top:8px">'+subs.map(([n,v])=>`<button class="sm ${subOpen===n?'acc':''}" onclick="toggleSub('${n.replace(/'/g,"\\'")}')">${n} · ${fmt(Math.round(v))}</button>`).join('')+'</div>';
+          if(subOpen){
+            html+=`<div class="sec-title" style="margin-top:12px">📈 ${subOpen} по днях</div>`;
+            html+=svgLine({data:catDailySeries(mk,catOpen,subOpen),color:'#9d8ad6',h:150});
+          }
+        }
+      }
     }
     $('catBreak').innerHTML=html;
   } else $('catBreak').innerHTML='';
