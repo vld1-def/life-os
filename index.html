@@ -8,6 +8,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="LIFE OS">
 <link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230a0c14'/%3E%3Ctext x='32' y='45' font-size='36' text-anchor='middle' font-family='sans-serif' fill='%235cc9dd'%3E%E2%9A%A1%3C/text%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230a0c14'/%3E%3Ctext x='32' y='45' font-size='36' text-anchor='middle' font-family='sans-serif' fill='%235cc9dd'%3E%E2%9A%A1%3C/text%3E%3C/svg%3E">
 <title>LIFE OS — мій дашборд</title>
 <style>
   :root{
@@ -145,9 +147,9 @@
 <div id="authScreen">
   <div class="glass auth-card">
     <h1>LIFE&nbsp;<span>OS</span></h1>
-    <p>Введи email — надішлемо посилання для входу. Паролі не потрібні.</p>
-    <input id="authEmail" type="email" placeholder="твій@email.com" autocomplete="email">
-    <button class="acc" onclick="sendMagicLink()">✉️ Надіслати посилання</button>
+    <p id="pinTitle">Введи PIN</p>
+    <input id="pinInput" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="● ● ● ●" autocomplete="off" style="letter-spacing:10px;text-align:center;font-size:26px" oninput="pinInputChange()" onkeydown="if(event.key==='Enter')pinSubmit()">
+    <button class="acc" id="pinBtn" onclick="pinSubmit()">Увійти</button>
     <p id="authMsg" style="margin-top:16px;min-height:18px"></p>
     <p class="muted" id="cfgWarn" style="margin-top:8px"></p>
   </div>
@@ -167,6 +169,13 @@
     </div>
   </div>
 </header>
+
+<div class="glass" id="dayBar" style="padding:9px 14px;margin-bottom:15px;display:flex;align-items:center;gap:10px;justify-content:center;flex-wrap:wrap">
+  <button class="sm" onclick="shiftDay(-1)">◀</button>
+  <span id="dayBarLabel" style="font-weight:700"></span>
+  <button class="sm" id="dayNext" onclick="shiftDay(1)">▶</button>
+  <button class="sm acc" id="dayToday" onclick="goToday()">Сьогодні</button>
+</div>
 
 <div class="layout">
  <div class="main">
@@ -328,8 +337,8 @@
       <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(this)">
     </div>
     <div class="muted" style="margin-top:8px">Дані й так зберігаються в хмарі. Це — додаткова копія на випадок.</div>
-    <div class="sec-title">Акаунт</div>
-    <button class="del" onclick="signOut()">Вийти з акаунта</button>
+    <div class="sec-title">Доступ (PIN)</div>
+    <div class="flex" style="flex-wrap:wrap"><button onclick="changePin()">🔑 Змінити PIN</button><button class="del" onclick="lockApp()">🔒 Заблокувати</button></div>
   </div>
 
   <div class="between" style="margin-top:24px">
@@ -378,50 +387,55 @@ const defaults={
 };
 let state=structuredClone(defaults);
 const cacheKey='lifeos_cache';
+const SOLO_ID='me';
+let serverState=null, pinMode='enter';
+let selDay=null; const activeDay=()=>selDay||todayKey();
 
 /* ===== АВТЕНТИФІКАЦІЯ ===== */
 async function boot(){
-  if(!configured){ $('cfgWarn').textContent='⚠️ Встав SUPABASE_URL і ANON_KEY у коді.'; $('authEmail').disabled=true; return; }
-  const {data}=await sb.auth.getSession();
-  session=data.session;
-  sb.auth.onAuthStateChange((_e,s)=>{session=s; if(s) onLogin(); else showAuth();});
-  if(session) onLogin(); else showAuth();
+  if(!configured){ $('cfgWarn').textContent='⚠️ Встав SUPABASE_URL і ANON_KEY у коді.'; return; }
+  await loadSolo();
 }
-function showAuth(){ $('authScreen').classList.remove('hidden'); $('app').classList.add('hidden'); }
-async function sendMagicLink(){
-  const email=$('authEmail').value.trim();
-  if(!email){$('authMsg').textContent='Введи email 🙂'; return;}
-  $('authMsg').textContent='Надсилаю...';
-  const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:location.href.split('#')[0]}});
-  $('authMsg').textContent=error?('❌ '+error.message):'✅ Перевір пошту й перейди за посиланням.';
+async function loadSolo(){
+  const {data,error}=await sb.from('solo').select('data').eq('id',SOLO_ID).maybeSingle();
+  if(error){ $('cfgWarn').textContent='⚠️ Створи таблицю solo (SQL є в чаті).'; }
+  serverState=(data&&data.data)?data.data:null;
+  showPin(serverState&&serverState.pin?'enter':'create');
 }
-async function signOut(){ await sb.auth.signOut(); settings.close(); location.reload(); }
-
-async function onLogin(){
+function showPin(mode){
+  pinMode=mode;
+  $('authScreen').classList.remove('hidden'); $('app').classList.add('hidden');
+  $('pinTitle').textContent=mode==='create'?'Придумай 4-значний PIN':'Введи PIN';
+  $('pinBtn').textContent=mode==='create'?'Створити':'Увійти';
+  $('pinInput').value=''; $('authMsg').textContent=''; setTimeout(()=>{try{$('pinInput').focus();}catch(e){}},150);
+}
+function pinInputChange(){ if($('pinInput').value.length>=4) pinSubmit(); }
+async function pinSubmit(){
+  const pin=$('pinInput').value.trim();
+  if(!/^\d{4}$/.test(pin)){ $('authMsg').textContent='Треба рівно 4 цифри'; return; }
+  if(pinMode==='enter'){
+    if(serverState&&serverState.pin===pin){ state=migrate(serverState); enterApp(); }
+    else { $('authMsg').textContent='Невірний PIN ❌'; $('pinInput').value=''; }
+  } else {
+    let base=structuredClone(defaults);
+    if(serverState&&serverState.settings) base=serverState;
+    else { const c=localStorage.getItem(cacheKey); if(c){try{base=JSON.parse(c);}catch(e){}} }
+    state=migrate(base); state.pin=pin;
+    setSync('busy'); await sb.from('solo').upsert({id:SOLO_ID,data:state,updated_at:new Date().toISOString()}); setSync('ok');
+    enterApp();
+  }
+}
+function enterApp(){
   $('authScreen').classList.add('hidden'); $('app').classList.remove('hidden');
-  const cached=localStorage.getItem(cacheKey);
-  if(cached){try{state=migrate(JSON.parse(cached));render();}catch(e){}}
-  await pullState();
-  loadExpenses();
-  loadSteam();
-  loadScreen();
-  initTip();
-  startReminders();
-}
-async function pullState(){
-  setSync('busy');
-  const {data,error}=await sb.from('app_state').select('data').eq('user_id',session.user.id).maybeSingle();
-  if(error){setSync('off'); toast('Помилка завантаження'); return;}
-  if(data&&data.data) state=migrate(data.data);
-  else await sb.from('app_state').insert({user_id:session.user.id,data:state});
   localStorage.setItem(cacheKey,JSON.stringify(state));
-  render(); setSync('ok');
+  render(); loadExpenses(); loadSteam(); loadScreen(); initTip(); startReminders();
 }
+function lockApp(){ settings.close(); location.reload(); }
+function changePin(){ const p=prompt('Новий 4-значний PIN:'); if(p==null)return; if(/^\d{4}$/.test(p.trim())){ state.pin=p.trim(); save(); toast('PIN змінено ✅'); } else toast('Треба 4 цифри'); }
 let saveTimer=null;
 function scheduleSync(){ localStorage.setItem(cacheKey,JSON.stringify(state)); setSync('busy'); clearTimeout(saveTimer); saveTimer=setTimeout(pushState,700); }
 async function pushState(){
-  if(!session){setSync('off');return;}
-  const {error}=await sb.from('app_state').upsert({user_id:session.user.id,data:state,updated_at:new Date().toISOString()});
+  const {error}=await sb.from('solo').upsert({id:SOLO_ID,data:state,updated_at:new Date().toISOString()});
   setSync(error?'off':'ok'); if(error)toast('Немає зв\'язку — збережу локально');
 }
 function setSync(s){const d=$('syncDot'); if(d)d.className='sync-dot'+(s==='busy'?' busy':s==='off'?' off':'');}
@@ -500,11 +514,11 @@ function getDay(k){if(!state.days[k])state.days[k]={water:0,exercises:{},limits:
 const _c={};
 function exTarget(ex,k){const ck=ex.id+'|'+k;if(_c[ck]!=null)return _c[ck];if(!state.days[prevKey(k)])return _c[ck]=ex.base;const p=prevKey(k),pt=exTarget(ex,p);const pd=(state.days[p].exercises&&state.days[p].exercises[ex.id])||0;return _c[ck]=(pd>=pt?ex.base:Math.round(pt*ex.penalty));}
 
-function addWater(n){const d=getDay(todayKey());d.water=Math.max(0,d.water+n);save();}
-function addEx(id,n){const d=getDay(todayKey());d.exercises[id]=Math.max(0,(d.exercises[id]||0)+n);save();}
-function setLimit(id,v){getDay(todayKey()).limits[id]=Math.max(0,+v||0);save();}
-function setCounter(id,v){getDay(todayKey()).counters[id]=Math.max(0,+v||0);save();}
-function saveNote(v){getDay(todayKey()).note=v;save();}
+function addWater(n){const d=getDay(activeDay());d.water=Math.max(0,d.water+n);save();}
+function addEx(id,n){const d=getDay(activeDay());d.exercises[id]=Math.max(0,(d.exercises[id]||0)+n);save();}
+function setLimit(id,v){getDay(activeDay()).limits[id]=Math.max(0,+v||0);save();}
+function setCounter(id,v){getDay(activeDay()).counters[id]=Math.max(0,+v||0);save();}
+function saveNote(v){getDay(activeDay()).note=v;save();}
 function addTask(){const t=$('taskInput').value.trim();if(!t)return;state.tasks.unshift({id:uid(),text:t,done:false});$('taskInput').value='';save();}
 function toggleTask(id){const t=state.tasks.find(x=>x.id===id);if(t)t.done=!t.done;save();}
 function delTask(id){state.tasks=state.tasks.filter(x=>x.id!==id);save();}
@@ -519,9 +533,17 @@ function weekMonday(d){const x=new Date(d);const dow=(x.getDay()+6)%7;x.setDate(
 function weekMondayKey(d){return dayKey(weekMonday(d));}
 function limitWeekQuota(l){const startK=l.startDate||weekMondayKey(new Date());const weeks=Math.max(0,Math.floor((weekMonday(new Date())-new Date(startK))/(7*86400000)));return Math.max(l.minPerWeek||1,(l.startPerWeek||7)-(l.stepPerWeek||1)*weeks);}
 function weekConsumed(id){const mon=weekMonday(new Date());let s=0;for(let i=0;i<7;i++){const dd=new Date(mon);dd.setDate(dd.getDate()+i);const day=state.days[dayKey(dd)];if(day&&day.limits)s+=day.limits[id]||0;}return s;}
-function addLimitToday(id,n){const d=getDay(todayKey());d.limits[id]=Math.max(0,(d.limits[id]||0)+n);save();}
+function addLimitToday(id,n){const d=getDay(activeDay());d.limits[id]=Math.max(0,(d.limits[id]||0)+n);save();}
 function computeStreak(){let s=0,d=new Date();for(let i=0;i<400;i++){const k=dayKey(d);if(state.restDays&&state.restDays[k]){s++;d.setDate(d.getDate()-1);continue;}const sc=dayScore(k);if(sc!=null&&sc>=70)s++;else if(k!==todayKey())break;d.setDate(d.getDate()-1);}return s;}
 function toggleRest(){if(!state.restDays)state.restDays={};const k=todayKey();if(state.restDays[k])delete state.restDays[k];else state.restDays[k]=true;save();}
+function renderDayBar(){const ad=activeDay(),isToday=ad===todayKey(),dt=new Date(ad+'T00:00:00');
+  $('dayBarLabel').innerHTML=(isToday?'📅 Сьогодні · ':'✏️ Редагуєш: ')+dt.toLocaleDateString('uk-UA',{weekday:'long',day:'numeric',month:'long'});
+  $('dayBar').style.borderColor=isToday?'':'rgba(227,189,104,.6)';
+  $('dayToday').style.display=isToday?'none':'';
+  $('dayNext').style.visibility=isToday?'hidden':'visible';}
+function shiftDay(n){const[y,m,dd]=activeDay().split('-').map(Number);const k=dayKey(new Date(y,m-1,dd+n));if(k>todayKey())return;selDay=(k===todayKey())?null:k;render();}
+function goToday(){selDay=null;render();}
+function selectDay(k){if(k>todayKey())return;selDay=(k===todayKey())?null:k;render();const dt=new Date(k+'T00:00:00');toast('Обрано '+dt.toLocaleDateString('uk-UA',{day:'numeric',month:'long'})+' — редагуй у картках');}
 
 function dayComponents(k){const d=state.days[k];if(!d)return null;const S=state.settings,a=[];
   a.push({label:'Вода',kind:'goal',ok:d.water>=S.waterGoal,pct:d.water/S.waterGoal,txt:(d.water/1000).toFixed(1)+'л / '+(S.waterGoal/1000)+'л'});
@@ -535,14 +557,15 @@ function dayTitle(k){const comps=dayComponents(k);if(!comps)return k+' — не�
 /* ===== РЕНДЕР ===== */
 function render(){
   Object.keys(_c).forEach(k=>delete _c[k]);
-  const tk=todayKey(),d=getDay(tk),S=state.settings;
+  const tk=todayKey(),ad=activeDay(),d=getDay(ad),S=state.settings;
+  renderDayBar();
   $('todayLabel').textContent=new Date().toLocaleDateString('uk-UA',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   $('waterCnt').textContent=(d.water/1000).toFixed(2);
   $('waterGoal').textContent=(S.waterGoal/1000).toFixed(1);
   $('waterMl').textContent=d.water+' мл';
   $('waterBar').style.width=Math.min(100,d.water/S.waterGoal*100)+'%';
 
-  $('exList').innerHTML=S.exercises.map(ex=>{const t=exTarget(ex,tk),done=d.exercises[ex.id]||0,pen=t>ex.base,ok=done>=t;
+  $('exList').innerHTML=S.exercises.map(ex=>{const t=exTarget(ex,ad),done=d.exercises[ex.id]||0,pen=t>ex.base,ok=done>=t;
     return `<div class="row"><div style="flex:1"><div class="between"><span>${ex.name} ${pen?`<span class="tag pen">штраф ×${ex.penalty}</span>`:''}</span><span class="muted cnt">${done} / ${t}${ok?' ✅':''}</span></div><div class="bar"><i class="g-green" style="width:${Math.min(100,done/t*100)}%"></i></div></div><div class="flex" style="margin-left:10px"><button class="sm" onclick="addEx('${ex.id}',-5)">−5</button><button class="sm" onclick="addEx('${ex.id}',5)">+5</button><button class="${ok?'done':'acc'} sm" onclick="addEx('${ex.id}',${t-done})">✓</button></div></div>`;
   }).join('')||'<div class="empty">Додай вправи в налаштуваннях</div>';
 
@@ -663,11 +686,11 @@ function renderMonth(){
     const start=(new Date(y,mo,1).getDay()+6)%7;
     const head=['Пн','Вт','Ср','Чт','Пт','Сб','Нд'].map(h=>`<div class="hd">${h}</div>`).join('');
     let cells='';for(let i=0;i<start;i++)cells+='<div></div>';
-    for(let dd=1;dd<=days;dd++){const k=dayKey(new Date(y,mo,dd)),t=k===todayKey(),rest=!!(state.restDays&&state.restDays[k]);const tip=((rest?'🛡 Вихідний\n':'')+dayTitle(k)).replace(/"/g,'&quot;').replace(/\n/g,'¶');const num=dd+(rest?' 🛡':'');
+    for(let dd=1;dd<=days;dd++){const k=dayKey(new Date(y,mo,dd)),t=k===todayKey(),rest=!!(state.restDays&&state.restDays[k]);const tip=((rest?'🛡 Вихідний\n':'')+dayTitle(k)).replace(/"/g,'&quot;').replace(/\n/g,'¶');const num=dd+(rest?' 🛡':'');const ol=t?'outline:2px solid var(--cyan);outline-offset:1px':(k===selDay?'outline:2px solid var(--yellow);outline-offset:1px':'');
       if(mt.id==='all'){const comps=dayComponents(k);const dots=comps?`<div class="mdots">${comps.map(c=>`<i style="background:${compColor(c)}"></i>`).join('')}</div>`:'';
-        cells+=`<div class="d" data-tip="${tip}" style="${t?'outline:2px solid var(--cyan);outline-offset:1px':''}"><b>${num}</b>${dots}</div>`;
+        cells+=`<div class="d" data-tip="${tip}" onclick="selectDay('${k}')" style="cursor:pointer;${ol}"><b>${num}</b>${dots}</div>`;
       } else {const r=metricDay(mt,k),c=metricColor(mt,r);
-        cells+=`<div class="d" data-tip="${tip}" style="background:${c.bg};color:${c.col};${t?'outline:2px solid var(--cyan);outline-offset:1px':''}"><b>${num}</b>${r.has?`<small>${metricValTxt(mt,r.v)}</small>`:''}</div>`;}
+        cells+=`<div class="d" data-tip="${tip}" onclick="selectDay('${k}')" style="cursor:pointer;background:${c.bg};color:${c.col};${ol}"><b>${num}</b>${r.has?`<small>${metricValTxt(mt,r.v)}</small>`:''}</div>`;}
     }
     $('monthBody').innerHTML=`<div class="calbig">${head}</div><div class="calbig">${cells}</div>`;
     $('monthLegend').textContent=mt.id==='all'?'Кожна крапка = один пункт дня (🟢 виконано · 🟡 частково · 🔴 ні). Наведи на день — побачиш деталі й нотатку.':(mt.kind==='limit'?'🟩 в межах ліміту · 🟥 перебір · ▫️ немає даних':'🟩 ціль виконана · 🟨 частково · 🟥 мало · ▫️ немає даних');
@@ -803,7 +826,7 @@ function addCounter(){state.settings.counters.push({id:uid(),name:'Лічиль�
 function addLoan(){state.settings.loans.push({id:uid(),name:'Кредит'});rl('setLoans',state.settings.loans,'loan');}
 function delItem(type,i){const map={ex:'exercises',lim:'limitHabits',cnt:'counters',loan:'loans'},el={ex:'setExercises',lim:'setLimits',cnt:'setCounters',loan:'setLoans'};state.settings[map[type]].splice(i,1);rl(el[type],state.settings[map[type]],type);}
 function saveSettings(){const S=state.settings,keep=(a,o)=>a.map((n,i)=>o[i]?{...n,id:o[i].id}:n);S.exercises=keep(readL('setExercises','ex'),S.exercises);S.limitHabits=readL('setLimits','lim').map((n,i)=>{const o=S.limitHabits[i];if(!o)return n;return {...n,id:o.id,startDate:(n.mode==='week'?(o.mode==='week'&&o.startDate?o.startDate:n.startDate):undefined)};});S.counters=keep(readL('setCounters','cnt'),S.counters);S.loans=keep(readL('setLoans','loan'),S.loans);S.waterGoal=+$('setWaterGoal').value||2000;S.currency=$('setCurrency').value||'₴';S.reminders={on:$('remOn').checked,everyMin:Math.max(15,+$('remEvery').value||120),from:Math.min(23,Math.max(0,+$('remFrom').value||9)),to:Math.min(24,Math.max(1,+$('remTo').value||21))};settings.close();save();startReminders();}
-function resetAll(){if(confirm('Скинути ВСІ дані?')){localStorage.removeItem(cacheKey);state=structuredClone(defaults);if(session&&sb)sb.from('app_state').upsert({user_id:session.user.id,data:state,updated_at:new Date().toISOString()});settings.close();render();}}
+function resetAll(){if(confirm('Скинути ВСІ дані?')){const p=state.pin;localStorage.removeItem(cacheKey);state=structuredClone(defaults);state.pin=p;if(sb)sb.from('solo').upsert({id:SOLO_ID,data:state,updated_at:new Date().toISOString()});settings.close();render();}}
 
 function exportData(){const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='lifeos-backup-'+todayKey()+'.json';a.click();}
 function importData(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=e=>{try{const dt=JSON.parse(e.target.result);if(!dt.settings)throw 0;state=migrate(dt);save();toast('Дані завантажено ✅');settings.close();}catch(err){toast('Не вдалося прочитати файл ❌');}};r.readAsText(f);inp.value='';}
