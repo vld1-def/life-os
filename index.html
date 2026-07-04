@@ -55,6 +55,16 @@
 
   #app{max-width:1180px; margin:0 auto}
   .card{padding:20px}
+  @keyframes appear{from{opacity:0; transform:translateY(14px)} to{opacity:1; transform:none}}
+  .card{animation:appear .5s cubic-bezier(.2,.7,.3,1) both}
+  .main .card:nth-child(2){animation-delay:.05s}
+  .main .card:nth-child(3){animation-delay:.1s}
+  .main .card:nth-child(4){animation-delay:.15s}
+  .side .card:nth-child(1){animation-delay:.06s}
+  .side .card:nth-child(2){animation-delay:.11s}
+  .side .card:nth-child(3){animation-delay:.16s}
+  .side .card:nth-child(4){animation-delay:.21s}
+  @media(prefers-reduced-motion:reduce){.card{animation:none}}
   .layout{display:flex; gap:15px; align-items:flex-start}
   .main{flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:15px}
   .side{flex:0 0 340px; width:340px; display:flex; flex-direction:column; gap:15px}
@@ -165,6 +175,7 @@
     <div class="flex">
       <div class="glass pill" style="min-width:auto;padding:11px" title="Синхронізація: зелений — збережено, жовтий — зберігаю, червоний — немає зв'язку"><span class="sync-dot" id="syncDot"></span></div>
       <button class="acc" onclick="openNotifs()" style="position:relative">🔔<span id="notifBadge">0</span></button>
+      <button class="acc" id="langBtn" onclick="setLang(lang==='en'?'uk':'en')">EN</button>
       <button class="acc" onclick="openSettings()">⚙️</button>
     </div>
   </div>
@@ -319,7 +330,7 @@
     <label class="flex" style="margin-bottom:10px"><input type="checkbox" id="remOn" style="width:auto"> <span>Увімкнути нагадування</span></label>
     <div class="settings-item"><span class="muted" style="min-width:110px">Кожні (хв)</span><input type="number" id="remEvery" min="15" step="15" style="max-width:100px"></div>
     <div class="settings-item"><span class="muted" style="min-width:110px">З години</span><input type="number" id="remFrom" min="0" max="23" style="max-width:80px"><span class="muted">до</span><input type="number" id="remTo" min="1" max="24" style="max-width:80px"></div>
-    <button class="sm" onclick="enableNotif()">🔔 Дозволити сповіщення</button>
+    <div class="flex" style="flex-wrap:wrap"><button class="sm" onclick="enableNotif()">🔔 Дозволити сповіщення</button><button class="sm acc" onclick="testPush()">📨 Тест сповіщення</button></div>
     <div class="muted" style="margin-top:8px">Працює, поки застосунок відкрито (вкладка або встановлений PWA на телефоні).</div>
   </div>
   <div class="tabpane" id="tab-data">
@@ -366,8 +377,52 @@ const todayKey=()=>dayKey(new Date());
 const monthKey=()=>todayKey().slice(0,7);
 const prevKey=k=>{const[y,m,d]=k.split('-').map(Number);return dayKey(new Date(y,m-1,d-1));};
 const prevMonth=k=>{const[y,m]=k.split('-').map(Number);return dayKey(new Date(y,m-2,1)).slice(0,7);};
-const fmt=n=>Number(n||0).toLocaleString('uk-UA');
+const fmt=n=>Number(n||0).toLocaleString(LOC());
 const $=id=>document.getElementById(id);
+
+/* ===== I18N (UA/EN) ===== */
+let lang=localStorage.getItem('lifeos_lang')||'uk';
+const LOC=()=>lang==='en'?'en-US':'uk-UA';
+const EN={
+'🔥 серія':'🔥 streak','⭐ бал дня':'⭐ day score','💳 борг':'💳 debt',
+'Мій прогрес':'My progress','Активність':'Activity','Вода':'Water','Ліміти':'Limits','Лічильники':'Counters','Нотатка дня':'Day note','Мої цілі / таски':'My goals / tasks','Тиждень — останні 7 днів':'Week — last 7 days','Фінанси (Влад) —':'Finances (Vlad) —',
+'🗓 Календар':'🗓 Calendar','📈 Графік':'📈 Chart','По місяцях':'By month','По днях':'By day','Нова ціль...':'New goal...','+ 💧':'+ 💧',
+'Витрати цього місяця':'Spent this month','Загальний борг зараз':'Total debt now','Витрати':'Spending','Куди йдуть гроші':'Where money goes','(тисни категорію → графік по днях)':'(tap a category → daily chart)','💳 Кредити — впиши поточний борг (зберігається на сьогодні)':'💳 Loans — enter current debt (saved for today)','📉 Борг':'📉 Debt','Підкатегорії:':'Subcategories:',
+'цього місяця витрат ще немає':'no spending this month yet','немає підкатегорій':'no subcategories','завантаження витрат...':'loading spending...','почни вписувати борг — і тут з\'явиться графік':'start entering debt — a chart will appear here','Додай кредити в налаштуваннях':'Add loans in settings','впиши поточний борг →':'enter current debt →','🎉 закрито!':'🎉 closed!','= як минулого':'= same as last','немає даних':'no data',
+'Хороші дні':'Good days','Сер. бал':'Avg score','Вода ✓':'Water ✓','Витрачено':'Spent',
+'Додай вправи в налаштуваннях':'Add exercises in settings','Додай ліміти':'Add limits','Додай лічильники':'Add counters','Постав собі перші цілі 🎯':'Set your first goals 🎯',
+'Усі':'All','Бал дня':'Day score',
+'Кожна крапка = один пункт дня (🟢 виконано · 🟡 частково · 🔴 ні). Наведи на день — побачиш деталі й нотатку.':'Each dot = one item of the day (🟢 done · 🟡 partial · 🔴 no). Hover a day for details & note.',
+'🟩 в межах ліміту · 🟥 перебір · ▫️ немає даних':'🟩 within limit · 🟥 over · ▫️ no data','🟩 ціль виконана · 🟨 частково · 🟥 мало · ▫️ немає даних':'🟩 goal met · 🟨 partial · 🟥 low · ▫️ no data',
+'Окремі лінії по соцмережах — видно, де більше часу.':'Separate lines per social app — see where you spend more.','Значення по днях; зелена пунктирна — ліміт.':'Values by day; green dashed — limit.','Значення по днях; зелена пунктирна — ціль.':'Values by day; green dashed — goal.',
+'🔔 Сповіщення':'🔔 Notifications','📋 Зробити сьогодні':'📋 To do today','⚠️ Перевищені ліміти':'⚠️ Limits exceeded','🔥 Активні штрафи':'🔥 Active penalties','усе виконано 🎉':'all done 🎉','лімітів не перевищено 👍':'no limits exceeded 👍','штрафів немає':'no penalties',
+'⚙️ Налаштування':'⚙️ Settings','Загальне':'General','Кредити':'Loans','Нагадування':'Reminders','Дані':'Data',
+'💧 Ціль по воді (мл/день)':'💧 Water goal (ml/day)','💱 Валюта':'💱 Currency','💪 Вправи (норма · множник штрафу · зростання/день)':'💪 Exercises (norm · penalty × · growth/day)','+ вправа':'+ exercise','🎮 Ліміти «не переборщи»':'🎮 Limits «don\'t overdo»','+ ліміт':'+ limit','🔢 Кастомні лічильники':'🔢 Custom counters','+ лічильник':'+ counter','💳 Кредити / борги':'💳 Loans / debts','+ кредит':'+ loan',
+'⏰ Нагадування пити воду / рухатись':'⏰ Reminders to drink water / move','Увімкнути нагадування':'Enable reminders','Кожні (хв)':'Every (min)','З години':'From hour','до':'to','🔔 Дозволити сповіщення':'🔔 Allow notifications','Працює, поки застосунок відкрито (вкладка або встановлений PWA на телефоні).':'Works while the app is open (tab or installed PWA on phone).',
+'💾 Резервна копія':'💾 Backup','⬇ Експорт у файл':'⬇ Export to file','⬆ Імпорт із файлу':'⬆ Import from file','Дані й так зберігаються в хмарі. Це — додаткова копія на випадок.':'Data is already saved in the cloud. This is an extra backup just in case.','Доступ (PIN)':'Access (PIN)','🔑 Змінити PIN':'🔑 Change PIN','🔒 Заблокувати':'🔒 Lock','Скинути все':'Reset all','Скасувати':'Cancel','💾 Зберегти':'💾 Save',
+'на день':'per day','на тиждень ↓':'per week ↓','поле':'field','кнопки ±':'buttons ±','Назва':'Name','од.':'unit','Назва кредиту':'Loan name',
+'Введи PIN':'Enter PIN','Придумай 4-значний PIN':'Create a 4-digit PIN','Увійти':'Log in','Створити':'Create','Треба рівно 4 цифри':'Need exactly 4 digits','Невірний PIN ❌':'Wrong PIN ❌',
+'PIN змінено ✅':'PIN changed ✅','Треба 4 цифри':'Need 4 digits','Дані завантажено ✅':'Data loaded ✅','Не вдалося прочитати файл ❌':'Could not read file ❌','Сповіщення увімкнено ✅':'Notifications enabled ✅','Сповіщення заблоковані':'Notifications blocked','Браузер не підтримує сповіщення':'Browser doesn\'t support notifications','Сьогодні':'Today',
+'Назва звички':'Habit name',
+'📨 Тест сповіщення':'📨 Test notification','Надіслано ✅':'Sent ✅','Не вдалося показати':'Could not show','Немає зв\'язку — збережу локально':'No connection — saved locally','Обрано':'Selected','Помилка завантаження':'Load error',
+'зростання/день':'growth/day','норма':'norm'
+};
+const UAL='а-яіїєґА-ЯІЇЄҐ';
+const R=(w,v)=>[new RegExp('(?<!['+UAL+'])'+w+'(?!['+UAL+'])','g'),v];
+const TOK=[R('мл','ml'),R('хв','min'),R('год','h'),R('чашок','cups'),R('чашки','cups'),R('чашка','cup'),R('кроків','steps'),
+R('макс','max'),R('норма','norm'),R('борг','debt'),R('перебір','over'),R('ок','ok'),R('сьогодні','today'),R('лишилось','left'),R('погасив','paid'),R('виріс','grew'),R('днів','days'),R('день','day'),R('Вода','Water'),R('штраф','penalty'),
+[/на тиждень/g,'per week'],[/за міс/g,'/mo'],[/до кінця тижня/g,'until week end'],[/наступний тиждень/g,'next week'],[/\/день/g,'/day'],[/борг:/g,'debt:'],[/(?<=\d)л(?!['+UAL+'])/g,'L']];
+function trStr(s){if(lang!=='en'||s==null)return s;const k=String(s).trim();if(EN[k]!=null)return String(s).replace(k,EN[k]);let r=String(s);TOK.forEach(([re,v])=>r=r.replace(re,v));return r;}
+const _orig=new Map();
+function applyLang(){
+  document.documentElement.lang=lang;
+  ['app','settings','notifs','authScreen'].forEach(id=>{const root=$(id);if(!root)return;
+    const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,{acceptNode:n=>{const p=n.parentNode&&n.parentNode.nodeName;return(p==='TEXTAREA'||p==='INPUT'||p==='SCRIPT'||p==='STYLE')?NodeFilter.FILTER_REJECT:NodeFilter.FILTER_ACCEPT;}});let n;while(n=w.nextNode()){if(!n.nodeValue.trim())continue;if(!_orig.has(n))_orig.set(n,n.nodeValue);const o=_orig.get(n);n.nodeValue=lang==='en'?trStr(o):o;}
+    root.querySelectorAll('[placeholder],[title]').forEach(el=>{['placeholder','title'].forEach(a=>{if(!el.hasAttribute(a))return;el._o=el._o||{};if(el._o[a]==null)el._o[a]=el.getAttribute(a);el.setAttribute(a,lang==='en'?trStr(el._o[a]):el._o[a]);});});
+  });
+  const b=$('langBtn');if(b)b.textContent=lang==='en'?'UA':'EN';
+}
+function setLang(l){lang=l;localStorage.setItem('lifeos_lang',l);render();applyLang();}
 
 const defaults={
   settings:{waterGoal:2000,currency:'₴',
@@ -407,7 +462,7 @@ function showPin(mode){
   $('authScreen').classList.remove('hidden'); $('app').classList.add('hidden');
   $('pinTitle').textContent=mode==='create'?'Придумай 4-значний PIN':'Введи PIN';
   $('pinBtn').textContent=mode==='create'?'Створити':'Увійти';
-  $('pinInput').value=''; $('authMsg').textContent=''; setTimeout(()=>{try{$('pinInput').focus();}catch(e){}},150);
+  $('pinInput').value=''; $('authMsg').textContent=''; applyLang(); setTimeout(()=>{try{$('pinInput').focus();}catch(e){}},150);
 }
 function pinInputChange(){ if($('pinInput').value.length>=4) pinSubmit(); }
 async function pinSubmit(){
@@ -430,6 +485,7 @@ function enterApp(){
   $('authScreen').classList.add('hidden'); $('app').classList.remove('hidden');
   localStorage.setItem(cacheKey,JSON.stringify(state));
   render(); loadExpenses(); loadSteam(); loadScreen(); initTip(); startReminders();
+  if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
 function lockApp(){ localStorage.removeItem('lifeos_pin'); settings.close(); location.reload(); }
 function changePin(){ const p=prompt('Новий 4-значний PIN:'); if(p==null)return; if(/^\d{4}$/.test(p.trim())){ state.pin=p.trim(); localStorage.setItem('lifeos_pin',p.trim()); save(); toast('PIN змінено ✅'); } else toast('Треба 4 цифри'); }
@@ -440,7 +496,7 @@ async function pushState(){
   setSync(error?'off':'ok'); if(error)toast('Немає зв\'язку — збережу локально');
 }
 function setSync(s){const d=$('syncDot'); if(d)d.className='sync-dot'+(s==='busy'?' busy':s==='off'?' off':'');}
-function toast(m){const t=$('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200);}
+function toast(m){const t=$('toast'); t.textContent=lang==='en'?trStr(m):m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200);}
 
 function migrate(s){
   s=Object.assign(structuredClone(defaults),s);
@@ -466,7 +522,7 @@ async function loadExpenses(){
 }
 function monthTotal(ym){return (expRows||[]).reduce((s,r)=>s+(r.ym===ym?r.sum:0),0);}
 function catOf(ym){const o={};(expRows||[]).forEach(r=>{if(r.ym===ym)o[r.cat]=(o[r.cat]||0)+r.sum;});return o;}
-function monthlySeries(n){const arr=[],now=new Date();for(let i=n-1;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);const ym=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');arr.push({x:d.toLocaleDateString('uk-UA',{month:'short'}),y:Math.round(monthTotal(ym))});}return arr;}
+function monthlySeries(n){const arr=[],now=new Date();for(let i=n-1;i>=0;i--){const d=new Date(now.getFullYear(),now.getMonth()-i,1);const ym=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');arr.push({x:d.toLocaleDateString(LOC(),{month:'short'}),y:Math.round(monthTotal(ym))});}return arr;}
 function dailySeries(ym){const[y,mm]=ym.split('-').map(Number);const days=new Date(y,mm,0).getDate();const last=ym===monthKey()?new Date().getDate():days;const per={};(expRows||[]).forEach(r=>{if(r.ym===ym)per[r.day]=(per[r.day]||0)+r.sum;});const arr=[];for(let d=1;d<=last;d++)arr.push({x:d,y:Math.round(per[d]||0)});return arr;}
 
 /* ===== STEAM (час гри з бази steam_playtime) ===== */
@@ -508,7 +564,7 @@ function loanValAt(id,dateStr){const log=state.loanLog[id];if(!log)return null;c
 function loanLatest(id){return loanValAt(id,todayKey());}
 function totalDebtNow(){return state.settings.loans.reduce((s,l)=>s+(loanLatest(l.id)||0),0);}
 function monthEndKey(off){const n=new Date();const d=new Date(n.getFullYear(),n.getMonth()-off+1,0);return dayKey(d);}
-function debtMonthlySeries(n){const arr=[],now=new Date();for(let i=n-1;i>=0;i--){const ek=monthEndKey(i);let tot=0;state.settings.loans.forEach(l=>{const v=loanValAt(l.id,ek);if(v!=null)tot+=v;});const lbl=new Date(now.getFullYear(),now.getMonth()-i,1).toLocaleDateString('uk-UA',{month:'short'});arr.push({x:lbl,y:Math.round(tot)});}return arr;}
+function debtMonthlySeries(n){const arr=[],now=new Date();for(let i=n-1;i>=0;i--){const ek=monthEndKey(i);let tot=0;state.settings.loans.forEach(l=>{const v=loanValAt(l.id,ek);if(v!=null)tot+=v;});const lbl=new Date(now.getFullYear(),now.getMonth()-i,1).toLocaleDateString(LOC(),{month:'short'});arr.push({x:lbl,y:Math.round(tot)});}return arr;}
 
 /* ===== ДНІ ===== */
 function getDay(k){if(!state.days[k])state.days[k]={water:0,exercises:{},limits:{},counters:{},note:''};const d=state.days[k];d.counters=d.counters||{};d.limits=d.limits||{};d.exercises=d.exercises||{};d.note=d.note??'';return d;}
@@ -536,7 +592,7 @@ function weekConsumed(id){const mon=weekMonday(new Date());let s=0;for(let i=0;i
 function addLimitToday(id,n){const d=getDay(activeDay());d.limits[id]=Math.max(0,(d.limits[id]||0)+n);save();}
 function computeStreak(){let s=0,d=new Date();for(let i=0;i<400;i++){const k=dayKey(d);if(state.restDays&&state.restDays[k]){s++;d.setDate(d.getDate()-1);continue;}const sc=dayScore(k);if(sc!=null&&sc>=70)s++;else if(k!==todayKey())break;d.setDate(d.getDate()-1);}return s;}
 function toggleRest(){if(!state.restDays)state.restDays={};const k=todayKey();if(state.restDays[k])delete state.restDays[k];else state.restDays[k]=true;save();}
-function selectDay(k){if(k>todayKey())return;selDay=(k===todayKey())?null:k;render();const dt=new Date(k+'T00:00:00');toast(k===todayKey()?'Сьогодні':('✏️ Редагуєш '+dt.toLocaleDateString('uk-UA',{day:'numeric',month:'long'})+' — тапни сьогоднішній день, щоб повернутись'));}
+function selectDay(k){if(k>todayKey())return;selDay=(k===todayKey())?null:k;render();const dt=new Date(k+'T00:00:00');toast(k===todayKey()?'Сьогодні':('✏️ Редагуєш '+dt.toLocaleDateString(LOC(),{day:'numeric',month:'long'})+' — тапни сьогоднішній день, щоб повернутись'));}
 
 function dayComponents(k){const d=state.days[k];if(!d)return null;const S=state.settings,a=[];
   a.push({label:'Вода',kind:'goal',ok:d.water>=S.waterGoal,pct:d.water/S.waterGoal,txt:(d.water/1000).toFixed(1)+'л / '+(S.waterGoal/1000)+'л'});
@@ -551,7 +607,7 @@ function dayTitle(k){const comps=dayComponents(k);if(!comps)return k+' — не�
 function render(){
   Object.keys(_c).forEach(k=>delete _c[k]);
   const tk=todayKey(),ad=activeDay(),d=getDay(ad),S=state.settings;
-  $('todayLabel').textContent=new Date().toLocaleDateString('uk-UA',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  $('todayLabel').textContent=new Date().toLocaleDateString(LOC(),{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   $('waterCnt').textContent=(d.water/1000).toFixed(2);
   $('waterGoal').textContent=(S.waterGoal/1000).toFixed(1);
   $('waterMl').textContent=d.water+' мл';
@@ -586,10 +642,11 @@ function render(){
   $('streakVal').textContent=computeStreak();
   $('debtVal').textContent=fmt(Math.round(totalDebtNow()));
   renderNotifBadge();
+  applyLang();
 }
 function buildNotifs(){const tk=todayKey(),d=getDay(tk),S=state.settings;const todo=[],over=[],pen=[];
   if(d.water<S.waterGoal)todo.push(`💧 Вода — лишилось ${S.waterGoal-d.water} мл`);
-  S.exercises.forEach(ex=>{const t=exTarget(ex,tk),v=d.exercises[ex.id]||0;if(v<t)todo.push(`💪 ${ex.name}: ${v}/${t}`);if(t>ex.base)pen.push(`${ex.name}: ціль ${t} замість ${ex.base} (штраф ×${ex.penalty} — вчора не закрив)`);});
+  S.exercises.forEach(ex=>{const t=exTarget(ex,tk),v=d.exercises[ex.id]||0;if(v<t)todo.push(`💪 ${ex.name}: ${v}/${t}`);if((ex.grow||0)===0&&t>ex.base)pen.push(`${ex.name}: ціль ${t} замість ${ex.base} (штраф ×${ex.penalty} — вчора не закрив)`);});
   S.counters.forEach(c=>{const v=d.counters[c.id]||0;if(v<c.goal)todo.push(`🔢 ${c.name}: ${fmt(v)}/${fmt(c.goal)} ${c.unit}`);});
   S.limitHabits.forEach(l=>{if(l.mode==='week'){const q=limitWeekQuota(l),cons=weekConsumed(l.id);if(cons>q)over.push(`☕ ${l.name}: ${cons} > ${q} на тиждень — перебір`);return;}const v=d.limits[l.id]||0;if(v>l.max)over.push(`🎮 ${l.name}: ${v} > ${l.max} ${l.unit||''} — перебір`);});
   return{todo,over,pen};}
@@ -597,7 +654,7 @@ function notifCount(){const n=buildNotifs();return n.todo.length+n.over.length+n
 function renderNotifBadge(){const b=$('notifBadge');if(!b)return;const c=notifCount();b.textContent=c;b.style.display=c?'flex':'none';}
 function openNotifs(){const n=buildNotifs();const sec=(t,arr,empty)=>`<div class="sec-title">${t}</div>`+(arr.length?arr.map(x=>`<div class="row" style="padding:7px 0">${x}</div>`).join(''):`<div class="empty">${empty}</div>`);
   $('notifBody').innerHTML=sec('📋 Зробити сьогодні',n.todo,'усе виконано 🎉')+sec('⚠️ Перевищені ліміти',n.over,'лімітів не перевищено 👍')+sec('🔥 Активні штрафи',n.pen,'штрафів немає');
-  notifs.showModal();}
+  applyLang(); notifs.showModal();}
 
 /* ===== ГРАФІК ===== */
 function svgLine({data,w=800,h=150,color='#5cc9dd',goal=null,goalLabel=''}){
@@ -689,7 +746,7 @@ function renderMonth(){
     $('monthLegend').textContent=mt.id==='all'?'Кожна крапка = один пункт дня (🟢 виконано · 🟡 частково · 🔴 ні). Наведи на день — побачиш деталі й нотатку.':(mt.kind==='limit'?'🟩 в межах ліміту · 🟥 перебір · ▫️ немає даних':'🟩 ціль виконана · 🟨 частково · 🟥 мало · ▫️ немає даних');
   } else {
     const gm=mt.id==='all'?metricList().find(m=>m.id==='score'):mt;
-    const msh=now.toLocaleDateString('uk-UA',{month:'short'});
+    const msh=now.toLocaleDateString(LOC(),{month:'short'});
     const lastDay=new Date().getDate();
     const socId=screenLimitId();
     if(gm.kind==='limit'&&gm.ref&&socId&&gm.ref.id===socId&&Object.keys(screenApps).length){
@@ -747,9 +804,17 @@ function startReminders(){clearInterval(remTimer);const r=state.settings.reminde
 function remTick(){const r=state.settings.reminders;if(!r||!r.on)return;const h=new Date().getHours();if(h<r.from||h>=r.to)return;if(Date.now()-lastRemMs>=r.everyMin*60000){lastRemMs=Date.now();notify('LIFE OS','💧 Час випити води і трохи порухатись!');}}
 function notify(title,body){if('Notification'in window&&Notification.permission==='granted')new Notification(title,{body});}
 async function enableNotif(){if(!('Notification'in window)){toast('Браузер не підтримує сповіщення');return;}const p=await Notification.requestPermission();toast(p==='granted'?'Сповіщення увімкнено ✅':'Сповіщення заблоковані');}
+async function testPush(){
+  if(!('Notification'in window)){toast('Браузер не підтримує сповіщення');return;}
+  let p=Notification.permission; if(p!=='granted') p=await Notification.requestPermission();
+  if(p!=='granted'){toast('Сповіщення заблоковані');return;}
+  try{const reg=await navigator.serviceWorker.ready; await reg.showNotification('LIFE OS',{body:'✅ Тестове сповіщення працює!',icon:'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2214%22 fill=%22%230a0c14%22/%3E%3Ctext x=%2232%22 y=%2245%22 font-size=%2236%22 text-anchor=%22middle%22 fill=%22%235cc9dd%22%3E%E2%9A%A1%3C/text%3E%3C/svg%3E'});}
+  catch(e){try{new Notification('LIFE OS',{body:'✅ Тест'});}catch(_){toast('Не вдалося показати');return;}}
+  toast('Надіслано ✅');
+}
 function renderFinance(){
   const mk=monthKey(),pmk=prevMonth(mk),cur=state.settings.currency;
-  $('finMonthLabel').textContent=new Date().toLocaleDateString('uk-UA',{month:'long',year:'numeric'});
+  $('finMonthLabel').textContent=new Date().toLocaleDateString(LOC(),{month:'long',year:'numeric'});
   const have=!!expRows;
   const exp=have?monthTotal(mk):0, pexp=have?monthTotal(pmk):0;
   $('finExpenses').textContent=(have?fmt(Math.round(exp)):'—')+' '+cur;
@@ -801,7 +866,7 @@ function renderFinance(){
 
 /* ===== НАЛАШТУВАННЯ ===== */
 function setTab(name){['gen','act','lim','cnt','loan','rem','data'].forEach(t=>$('tab-'+t).classList.toggle('on',t===name));[...$('setTabs').children].forEach(b=>b.className='sm'+(b.getAttribute('onclick').includes("'"+name+"'")?' acc':''));}
-function openSettings(){const S=state.settings,R=S.reminders||{};$('setWaterGoal').value=S.waterGoal;$('setCurrency').value=S.currency;$('remOn').checked=!!R.on;$('remEvery').value=R.everyMin||120;$('remFrom').value=R.from??9;$('remTo').value=R.to??21;rl('setExercises',S.exercises,'ex');rl('setLimits',S.limitHabits,'lim');rl('setCounters',S.counters,'cnt');rl('setLoans',S.loans,'loan');setTab('gen');settings.showModal();}
+function openSettings(){const S=state.settings,R=S.reminders||{};$('setWaterGoal').value=S.waterGoal;$('setCurrency').value=S.currency;$('remOn').checked=!!R.on;$('remEvery').value=R.everyMin||120;$('remFrom').value=R.from??9;$('remTo').value=R.to??21;rl('setExercises',S.exercises,'ex');rl('setLimits',S.limitHabits,'lim');rl('setCounters',S.counters,'cnt');rl('setLoans',S.loans,'loan');setTab('gen');applyLang();settings.showModal();}
 function rl(elId,arr,type){$(elId).innerHTML=arr.map((it,i)=>{const del=`<button class="del" onclick="delItem('${type}',${i})">✕</button>`;
   if(type==='ex')return `<div class="settings-item"><input value="${it.name}" data-f="name" placeholder="Назва"><input type="number" value="${it.base}" data-f="base" style="width:66px" title="норма"><input type="number" value="${it.penalty}" data-f="penalty" step="0.5" style="width:58px" title="штраф ×"><input type="number" value="${it.grow||0}" data-f="grow" style="width:58px" title="зростання/день">${del}</div>`;
   if(type==='lim')return `<div class="settings-item"><input value="${it.name}" data-f="name" placeholder="Назва" style="min-width:90px"><select data-f="mode" style="width:auto"><option value="day"${it.mode!=='week'?' selected':''}>на день</option><option value="week"${it.mode==='week'?' selected':''}>на тиждень ↓</option></select><select data-f="entry" style="width:auto" title="як вводити значення"><option value="input"${it.entry!=='buttons'?' selected':''}>поле</option><option value="buttons"${it.entry==='buttons'?' selected':''}>кнопки ±</option></select><input type="number" value="${it.max??2}" data-f="max" step="0.5" style="width:56px" title="макс на день"><input type="number" value="${it.startPerWeek??5}" data-f="startPerWeek" style="width:48px" title="старт: скільки на тиждень"><input type="number" value="${it.stepPerWeek??1}" data-f="stepPerWeek" style="width:44px" title="мінус за тиждень"><input type="number" value="${it.minPerWeek??2}" data-f="minPerWeek" style="width:44px" title="мінімум на тиждень"><input value="${it.unit||''}" data-f="unit" style="width:56px" placeholder="од.">${del}</div>`;
