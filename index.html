@@ -170,13 +170,6 @@
   </div>
 </header>
 
-<div class="glass" id="dayBar" style="padding:9px 14px;margin-bottom:15px;display:flex;align-items:center;gap:10px;justify-content:center;flex-wrap:wrap">
-  <button class="sm" onclick="shiftDay(-1)">◀</button>
-  <span id="dayBarLabel" style="font-weight:700"></span>
-  <button class="sm" id="dayNext" onclick="shiftDay(1)">▶</button>
-  <button class="sm acc" id="dayToday" onclick="goToday()">Сьогодні</button>
-</div>
-
 <div class="layout">
  <div class="main">
   <!-- ПРОГРЕС -->
@@ -397,9 +390,16 @@ async function boot(){
   await loadSolo();
 }
 async function loadSolo(){
+  const saved=localStorage.getItem('lifeos_pin');
   const {data,error}=await sb.from('solo').select('data').eq('id',SOLO_ID).maybeSingle();
-  if(error){ $('cfgWarn').textContent='⚠️ Створи таблицю solo (SQL є в чаті).'; }
+  if(error){
+    $('cfgWarn').textContent='⚠️ Немає зв\'язку з базою (або створи таблицю solo).';
+    const c=localStorage.getItem(cacheKey);
+    if(saved&&c){try{state=migrate(JSON.parse(c));enterApp();setSync('off');return;}catch(e){}}
+    serverState=null; showPin('create'); return;
+  }
   serverState=(data&&data.data)?data.data:null;
+  if(serverState&&serverState.pin&&saved&&saved===serverState.pin){ state=migrate(serverState); enterApp(); return; }
   showPin(serverState&&serverState.pin?'enter':'create');
 }
 function showPin(mode){
@@ -414,13 +414,14 @@ async function pinSubmit(){
   const pin=$('pinInput').value.trim();
   if(!/^\d{4}$/.test(pin)){ $('authMsg').textContent='Треба рівно 4 цифри'; return; }
   if(pinMode==='enter'){
-    if(serverState&&serverState.pin===pin){ state=migrate(serverState); enterApp(); }
+    if(serverState&&serverState.pin===pin){ state=migrate(serverState); localStorage.setItem('lifeos_pin',pin); enterApp(); }
     else { $('authMsg').textContent='Невірний PIN ❌'; $('pinInput').value=''; }
   } else {
     let base=structuredClone(defaults);
     if(serverState&&serverState.settings) base=serverState;
     else { const c=localStorage.getItem(cacheKey); if(c){try{base=JSON.parse(c);}catch(e){}} }
     state=migrate(base); state.pin=pin;
+    localStorage.setItem('lifeos_pin',pin);
     setSync('busy'); await sb.from('solo').upsert({id:SOLO_ID,data:state,updated_at:new Date().toISOString()}); setSync('ok');
     enterApp();
   }
@@ -430,8 +431,8 @@ function enterApp(){
   localStorage.setItem(cacheKey,JSON.stringify(state));
   render(); loadExpenses(); loadSteam(); loadScreen(); initTip(); startReminders();
 }
-function lockApp(){ settings.close(); location.reload(); }
-function changePin(){ const p=prompt('Новий 4-значний PIN:'); if(p==null)return; if(/^\d{4}$/.test(p.trim())){ state.pin=p.trim(); save(); toast('PIN змінено ✅'); } else toast('Треба 4 цифри'); }
+function lockApp(){ localStorage.removeItem('lifeos_pin'); settings.close(); location.reload(); }
+function changePin(){ const p=prompt('Новий 4-значний PIN:'); if(p==null)return; if(/^\d{4}$/.test(p.trim())){ state.pin=p.trim(); localStorage.setItem('lifeos_pin',p.trim()); save(); toast('PIN змінено ✅'); } else toast('Треба 4 цифри'); }
 let saveTimer=null;
 function scheduleSync(){ localStorage.setItem(cacheKey,JSON.stringify(state)); setSync('busy'); clearTimeout(saveTimer); saveTimer=setTimeout(pushState,700); }
 async function pushState(){
@@ -536,14 +537,7 @@ function weekConsumed(id){const mon=weekMonday(new Date());let s=0;for(let i=0;i
 function addLimitToday(id,n){const d=getDay(activeDay());d.limits[id]=Math.max(0,(d.limits[id]||0)+n);save();}
 function computeStreak(){let s=0,d=new Date();for(let i=0;i<400;i++){const k=dayKey(d);if(state.restDays&&state.restDays[k]){s++;d.setDate(d.getDate()-1);continue;}const sc=dayScore(k);if(sc!=null&&sc>=70)s++;else if(k!==todayKey())break;d.setDate(d.getDate()-1);}return s;}
 function toggleRest(){if(!state.restDays)state.restDays={};const k=todayKey();if(state.restDays[k])delete state.restDays[k];else state.restDays[k]=true;save();}
-function renderDayBar(){const ad=activeDay(),isToday=ad===todayKey(),dt=new Date(ad+'T00:00:00');
-  $('dayBarLabel').innerHTML=(isToday?'📅 Сьогодні · ':'✏️ Редагуєш: ')+dt.toLocaleDateString('uk-UA',{weekday:'long',day:'numeric',month:'long'});
-  $('dayBar').style.borderColor=isToday?'':'rgba(227,189,104,.6)';
-  $('dayToday').style.display=isToday?'none':'';
-  $('dayNext').style.visibility=isToday?'hidden':'visible';}
-function shiftDay(n){const[y,m,dd]=activeDay().split('-').map(Number);const k=dayKey(new Date(y,m-1,dd+n));if(k>todayKey())return;selDay=(k===todayKey())?null:k;render();}
-function goToday(){selDay=null;render();}
-function selectDay(k){if(k>todayKey())return;selDay=(k===todayKey())?null:k;render();const dt=new Date(k+'T00:00:00');toast('Обрано '+dt.toLocaleDateString('uk-UA',{day:'numeric',month:'long'})+' — редагуй у картках');}
+function selectDay(k){if(k>todayKey())return;selDay=(k===todayKey())?null:k;render();const dt=new Date(k+'T00:00:00');toast(k===todayKey()?'Сьогодні':('✏️ Редагуєш '+dt.toLocaleDateString('uk-UA',{day:'numeric',month:'long'})+' — тапни сьогоднішній день, щоб повернутись'));}
 
 function dayComponents(k){const d=state.days[k];if(!d)return null;const S=state.settings,a=[];
   a.push({label:'Вода',kind:'goal',ok:d.water>=S.waterGoal,pct:d.water/S.waterGoal,txt:(d.water/1000).toFixed(1)+'л / '+(S.waterGoal/1000)+'л'});
@@ -558,7 +552,6 @@ function dayTitle(k){const comps=dayComponents(k);if(!comps)return k+' — не�
 function render(){
   Object.keys(_c).forEach(k=>delete _c[k]);
   const tk=todayKey(),ad=activeDay(),d=getDay(ad),S=state.settings;
-  renderDayBar();
   $('todayLabel').textContent=new Date().toLocaleDateString('uk-UA',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   $('waterCnt').textContent=(d.water/1000).toFixed(2);
   $('waterGoal').textContent=(S.waterGoal/1000).toFixed(1);
