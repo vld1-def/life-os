@@ -1,0 +1,39 @@
+name: Push reminders
+
+on:
+  schedule:
+    - cron: '0 11 * * *'   # 14:00 за Києвом (літній час, UTC+3)
+    - cron: '0 17 * * *'   # 20:00 за Києвом
+  workflow_dispatch:
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send web push
+        env:
+          SB_URL: ${{ secrets.SB_URL }}
+          SB_KEY: ${{ secrets.SB_KEY }}
+          VAPID_PUBLIC: ${{ secrets.VAPID_PUBLIC }}
+          VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}
+        run: |
+          npm i web-push@3 --no-save --silent
+          node <<'EOF'
+          const webpush=require('web-push');
+          const https=require('https');
+          const get=u=>new Promise((res,rej)=>{https.get(u,{headers:{apikey:process.env.SB_KEY,Authorization:'Bearer '+process.env.SB_KEY}},r=>{let d='';r.on('data',c=>d+=c);r.on('end',()=>res(d));}).on('error',rej);});
+          const del=ep=>new Promise(res=>{const u=new URL(process.env.SB_URL+'/rest/v1/push_subs?endpoint=eq.'+encodeURIComponent(ep));const rq=https.request(u,{method:'DELETE',headers:{apikey:process.env.SB_KEY,Authorization:'Bearer '+process.env.SB_KEY}},r=>{r.on('data',()=>{});r.on('end',res);});rq.on('error',res);rq.end();});
+          (async()=>{
+            webpush.setVapidDetails('mailto:brovladay@gmail.com',process.env.VAPID_PUBLIC,process.env.VAPID_PRIVATE);
+            const rows=JSON.parse(await get(process.env.SB_URL+'/rest/v1/push_subs?select=sub,endpoint'));
+            const h=new Date(Date.now()+3*3600*1000).getHours();
+            const body=h<17?'🍽 Обід! Перевір, чи все виконав сьогодні — вода, активність, ліміти.':'🌙 Вечір! Підбий підсумки дня: що ще не закрив?';
+            const payload=JSON.stringify({title:'LIFE OS',body});
+            let ok=0,gone=0;
+            for(const r of rows){
+              try{ await webpush.sendNotification(r.sub,payload); ok++; }
+              catch(e){ if(e.statusCode===404||e.statusCode===410){ await del(r.endpoint); gone++; } else console.log('err',e.statusCode); }
+            }
+            console.log('total',rows.length,'sent',ok,'removed',gone);
+          })().catch(e=>{console.error(e);process.exit(1);});
+          EOF

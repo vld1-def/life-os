@@ -175,7 +175,7 @@
     <div class="flex">
       <div class="glass pill" style="min-width:auto;padding:11px" title="Синхронізація: зелений — збережено, жовтий — зберігаю, червоний — немає зв'язку"><span class="sync-dot" id="syncDot"></span></div>
       <button class="acc" onclick="openNotifs()" style="position:relative">🔔<span id="notifBadge">0</span></button>
-      <button class="acc" id="langBtn" onclick="setLang(lang==='en'?'uk':'en')">EN</button>
+      <button class="acc" id="langBtn" onclick="toggleLang()">EN</button>
       <button class="acc" onclick="openSettings()">⚙️</button>
     </div>
   </div>
@@ -265,7 +265,6 @@
   <div class="glass card">
     <h2><span class="dot" style="background:var(--blue)"></span>Нотатка дня</h2>
     <textarea id="noteInput" placeholder="Як пройшов день? Що завадило / що вдалось..." onchange="saveNote(this.value)"></textarea>
-    <div class="muted" style="margin-top:6px">Старі нотатки видно при наведенні на день у календарі 👆</div>
   </div>
 
   <!-- ТАСКИ -->
@@ -365,6 +364,7 @@
 const SUPABASE_URL      = 'https://xezhbqcteaihrlrykbkr.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_qNcUyFxMlWAWAry3uSHndg_ADVMCE3a';
 const ME = 'Влад';
+const VAPID_PUBLIC = 'BLU4b-G-QN6oy65vpXJgVkgN_TErcAGOw5m9FgMyDpcKzEgFyiktzbfxwFvjsBKraPNQyj991dQ5FN7enprMNfk';
 /* ==================== */
 
 const configured = !SUPABASE_URL.includes('ВСТАВ') && !SUPABASE_ANON_KEY.includes('ВСТАВ');
@@ -405,7 +405,10 @@ const EN={
 'PIN змінено ✅':'PIN changed ✅','Треба 4 цифри':'Need 4 digits','Дані завантажено ✅':'Data loaded ✅','Не вдалося прочитати файл ❌':'Could not read file ❌','Сповіщення увімкнено ✅':'Notifications enabled ✅','Сповіщення заблоковані':'Notifications blocked','Браузер не підтримує сповіщення':'Browser doesn\'t support notifications','Сьогодні':'Today',
 'Назва звички':'Habit name',
 '📨 Тест сповіщення':'📨 Test notification','Надіслано ✅':'Sent ✅','Не вдалося показати':'Could not show','Немає зв\'язку — збережу локально':'No connection — saved locally','Обрано':'Selected','Помилка завантаження':'Load error',
-'зростання/день':'growth/day','норма':'norm'
+'зростання/день':'growth/day','норма':'norm',
+'Віджимання':'Push-ups','Присідання':'Squats','Кроки':'Steps','Ігри':'Games','Кредит':'Loan','Кава (цукор)':'Coffee (sugar)','📱 Соцмережі':'📱 Social media',
+'Як пройшов день? Що завадило / що вдалось...':'How was your day? What got in the way / what worked out...',
+'Нова вправа':'New exercise','Новий ліміт':'New limit','Лічильник':'Counter','Ліміт':'Limit','Вправа':'Exercise'
 };
 const UAL='а-яіїєґА-ЯІЇЄҐ';
 const R=(w,v)=>[new RegExp('(?<!['+UAL+'])'+w+'(?!['+UAL+'])','g'),v];
@@ -423,6 +426,7 @@ function applyLang(){
   const b=$('langBtn');if(b)b.textContent=lang==='en'?'UA':'EN';
 }
 function setLang(l){lang=l;localStorage.setItem('lifeos_lang',l);render();applyLang();}
+function toggleLang(){setLang(lang==='en'?'uk':'en');}
 
 const defaults={
   settings:{waterGoal:2000,currency:'₴',
@@ -803,11 +807,20 @@ let remTimer=null,lastRemMs=0;
 function startReminders(){clearInterval(remTimer);const r=state.settings.reminders;if(!r||!r.on)return;remTimer=setInterval(remTick,60000);}
 function remTick(){const r=state.settings.reminders;if(!r||!r.on)return;const h=new Date().getHours();if(h<r.from||h>=r.to)return;if(Date.now()-lastRemMs>=r.everyMin*60000){lastRemMs=Date.now();notify('LIFE OS','💧 Час випити води і трохи порухатись!');}}
 function notify(title,body){if('Notification'in window&&Notification.permission==='granted')new Notification(title,{body});}
-async function enableNotif(){if(!('Notification'in window)){toast('Браузер не підтримує сповіщення');return;}const p=await Notification.requestPermission();toast(p==='granted'?'Сповіщення увімкнено ✅':'Сповіщення заблоковані');}
+function urlB64ToUint8(s){const pad='='.repeat((4-s.length%4)%4);const b=(s+pad).replace(/-/g,'+').replace(/_/g,'/');const raw=atob(b);return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));}
+async function subscribePush(){
+  if(!('serviceWorker'in navigator)||!('PushManager'in window)||!sb)return false;
+  try{const reg=await navigator.serviceWorker.ready;let sub=await reg.pushManager.getSubscription();
+    if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlB64ToUint8(VAPID_PUBLIC)});
+    await sb.from('push_subs').upsert({endpoint:sub.endpoint,sub:sub.toJSON(),updated_at:new Date().toISOString()},{onConflict:'endpoint'});
+    return true;}catch(e){return false;}
+}
+async function enableNotif(){if(!('Notification'in window)){toast('Браузер не підтримує сповіщення');return;}const p=await Notification.requestPermission();if(p!=='granted'){toast('Сповіщення заблоковані');return;}const ok=await subscribePush();toast(ok?'Пуш увімкнено ✅':'Сповіщення увімкнено (пуш не підтримується)');}
 async function testPush(){
   if(!('Notification'in window)){toast('Браузер не підтримує сповіщення');return;}
   let p=Notification.permission; if(p!=='granted') p=await Notification.requestPermission();
   if(p!=='granted'){toast('Сповіщення заблоковані');return;}
+  subscribePush();
   try{const reg=await navigator.serviceWorker.ready; await reg.showNotification('LIFE OS',{body:'✅ Тестове сповіщення працює!',icon:'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2214%22 fill=%22%230a0c14%22/%3E%3Ctext x=%2232%22 y=%2245%22 font-size=%2236%22 text-anchor=%22middle%22 fill=%22%235cc9dd%22%3E%E2%9A%A1%3C/text%3E%3C/svg%3E'});}
   catch(e){try{new Notification('LIFE OS',{body:'✅ Тест'});}catch(_){toast('Не вдалося показати');return;}}
   toast('Надіслано ✅');
