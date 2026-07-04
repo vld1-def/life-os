@@ -289,7 +289,7 @@
     <input id="setCurrency" style="max-width:120px" placeholder="₴">
   </div>
   <div class="tabpane" id="tab-act">
-    <div class="sec-title">💪 Вправи (норма + множник штрафу за пропуск)</div>
+    <div class="sec-title">💪 Вправи (норма · множник штрафу · зростання/день)</div>
     <div id="setExercises"></div><button class="sm" onclick="addExercise()">+ вправа</button>
   </div>
   <div class="tabpane" id="tab-lim">
@@ -513,7 +513,8 @@ function debtMonthlySeries(n){const arr=[],now=new Date();for(let i=n-1;i>=0;i--
 /* ===== ДНІ ===== */
 function getDay(k){if(!state.days[k])state.days[k]={water:0,exercises:{},limits:{},counters:{},note:''};const d=state.days[k];d.counters=d.counters||{};d.limits=d.limits||{};d.exercises=d.exercises||{};d.note=d.note??'';return d;}
 const _c={};
-function exTarget(ex,k){const ck=ex.id+'|'+k;if(_c[ck]!=null)return _c[ck];if(!state.days[prevKey(k)])return _c[ck]=ex.base;const p=prevKey(k),pt=exTarget(ex,p);const pd=(state.days[p].exercises&&state.days[p].exercises[ex.id])||0;return _c[ck]=(pd>=pt?ex.base:Math.round(pt*ex.penalty));}
+function exTarget(ex,k){const ck=ex.id+'|'+k;if(_c[ck]!=null)return _c[ck];if(!state.days[prevKey(k)])return _c[ck]=ex.base;const p=prevKey(k),pt=exTarget(ex,p);const pd=(state.days[p].exercises&&state.days[p].exercises[ex.id])||0;const g=ex.grow||0;if(pd>=pt)return _c[ck]=Math.round(g?pt+g:ex.base);return _c[ck]=Math.round(pt*ex.penalty);}
+function setExGrow(id,v){const ex=state.settings.exercises.find(e=>e.id===id);if(ex){ex.grow=Math.max(0,+v||0);save();}}
 
 function addWater(n){const d=getDay(activeDay());d.water=Math.max(0,d.water+n);save();}
 function addEx(id,n){const d=getDay(activeDay());d.exercises[id]=Math.max(0,(d.exercises[id]||0)+n);save();}
@@ -558,8 +559,9 @@ function render(){
   $('waterMl').textContent=d.water+' мл';
   $('waterBar').style.width=Math.min(100,d.water/S.waterGoal*100)+'%';
 
-  $('exList').innerHTML=S.exercises.map(ex=>{const t=exTarget(ex,ad),done=d.exercises[ex.id]||0,pen=t>ex.base,ok=done>=t;
-    return `<div class="row"><div style="flex:1"><div class="between"><span>${ex.name} ${pen?`<span class="tag pen">штраф ×${ex.penalty}</span>`:''}</span><span class="muted cnt">${done} / ${t}${ok?' ✅':''}</span></div><div class="bar"><i class="g-green" style="width:${Math.min(100,done/t*100)}%"></i></div></div><div class="flex" style="margin-left:10px"><button class="sm" onclick="addEx('${ex.id}',-5)">−5</button><button class="sm" onclick="addEx('${ex.id}',5)">+5</button><button class="${ok?'done':'acc'} sm" onclick="addEx('${ex.id}',${t-done})">✓</button></div></div>`;
+  $('exList').innerHTML=S.exercises.map(ex=>{const t=exTarget(ex,ad),done=d.exercises[ex.id]||0,grow=ex.grow||0,pen=grow===0&&t>ex.base,ok=done>=t;
+    const tag=pen?`<span class="tag pen">штраф ×${ex.penalty}</span>`:(grow>0?`<span class="tag ok">↑ +${grow}/день</span>`:'');
+    return `<div class="row"><div style="flex:1"><div class="between"><span>${ex.name} ${tag}</span><span class="muted cnt">${done} / ${t}${ok?' ✅':''}</span></div><div class="bar"><i class="g-green" style="width:${Math.min(100,done/t*100)}%"></i></div><div class="muted" style="margin-top:5px;display:flex;align-items:center;gap:6px">зростання/день: <input type="number" value="${grow}" min="0" step="1" style="width:54px;padding:3px 7px;font-size:12px" onchange="setExGrow('${ex.id}',this.value)"></div></div><div class="flex" style="margin-left:10px"><button class="sm" onclick="addEx('${ex.id}',-5)">−5</button><button class="sm" onclick="addEx('${ex.id}',5)">+5</button><button class="${ok?'done':'acc'} sm" onclick="addEx('${ex.id}',${t-done})">✓</button></div></div>`;
   }).join('')||'<div class="empty">Додай вправи в налаштуваннях</div>';
 
   $('limitList').innerHTML=S.limitHabits.map(l=>{
@@ -803,17 +805,17 @@ function renderFinance(){
 function setTab(name){['gen','act','lim','cnt','loan','rem','data'].forEach(t=>$('tab-'+t).classList.toggle('on',t===name));[...$('setTabs').children].forEach(b=>b.className='sm'+(b.getAttribute('onclick').includes("'"+name+"'")?' acc':''));}
 function openSettings(){const S=state.settings,R=S.reminders||{};$('setWaterGoal').value=S.waterGoal;$('setCurrency').value=S.currency;$('remOn').checked=!!R.on;$('remEvery').value=R.everyMin||120;$('remFrom').value=R.from??9;$('remTo').value=R.to??21;rl('setExercises',S.exercises,'ex');rl('setLimits',S.limitHabits,'lim');rl('setCounters',S.counters,'cnt');rl('setLoans',S.loans,'loan');setTab('gen');settings.showModal();}
 function rl(elId,arr,type){$(elId).innerHTML=arr.map((it,i)=>{const del=`<button class="del" onclick="delItem('${type}',${i})">✕</button>`;
-  if(type==='ex')return `<div class="settings-item"><input value="${it.name}" data-f="name" placeholder="Назва"><input type="number" value="${it.base}" data-f="base" style="width:74px" title="норма"><input type="number" value="${it.penalty}" data-f="penalty" step="0.5" style="width:64px" title="штраф ×">${del}</div>`;
+  if(type==='ex')return `<div class="settings-item"><input value="${it.name}" data-f="name" placeholder="Назва"><input type="number" value="${it.base}" data-f="base" style="width:66px" title="норма"><input type="number" value="${it.penalty}" data-f="penalty" step="0.5" style="width:58px" title="штраф ×"><input type="number" value="${it.grow||0}" data-f="grow" style="width:58px" title="зростання/день">${del}</div>`;
   if(type==='lim')return `<div class="settings-item"><input value="${it.name}" data-f="name" placeholder="Назва" style="min-width:90px"><select data-f="mode" style="width:auto"><option value="day"${it.mode!=='week'?' selected':''}>на день</option><option value="week"${it.mode==='week'?' selected':''}>на тиждень ↓</option></select><select data-f="entry" style="width:auto" title="як вводити значення"><option value="input"${it.entry!=='buttons'?' selected':''}>поле</option><option value="buttons"${it.entry==='buttons'?' selected':''}>кнопки ±</option></select><input type="number" value="${it.max??2}" data-f="max" step="0.5" style="width:56px" title="макс на день"><input type="number" value="${it.startPerWeek??5}" data-f="startPerWeek" style="width:48px" title="старт: скільки на тиждень"><input type="number" value="${it.stepPerWeek??1}" data-f="stepPerWeek" style="width:44px" title="мінус за тиждень"><input type="number" value="${it.minPerWeek??2}" data-f="minPerWeek" style="width:44px" title="мінімум на тиждень"><input value="${it.unit||''}" data-f="unit" style="width:56px" placeholder="од.">${del}</div>`;
   if(type==='cnt')return `<div class="settings-item"><input value="${it.name}" data-f="name" placeholder="Назва"><input type="number" value="${it.goal}" data-f="goal" style="width:84px" title="ціль"><input value="${it.unit}" data-f="unit" style="width:64px" placeholder="од.">${del}</div>`;
   if(type==='loan')return `<div class="settings-item"><input value="${it.name}" data-f="name" placeholder="Назва кредиту">${del}</div>`;
 }).join('');}
 function readL(elId,type){return [...$(elId).querySelectorAll('.settings-item')].map(r=>{const g=f=>r.querySelector(`[data-f="${f}"]`)?.value;
-  if(type==='ex')return{id:uid(),name:g('name')||'Вправа',base:+g('base')||10,penalty:+g('penalty')||2};
+  if(type==='ex')return{id:uid(),name:g('name')||'Вправа',base:+g('base')||10,penalty:+g('penalty')||2,grow:+g('grow')||0};
   if(type==='lim'){const mode=g('mode')||'day';const o={id:uid(),name:g('name')||'Ліміт',mode,entry:g('entry')||'input',unit:g('unit')||'',max:+g('max')||1};if(mode==='week'){o.startPerWeek=+g('startPerWeek')||5;o.stepPerWeek=+g('stepPerWeek')||1;o.minPerWeek=+g('minPerWeek')||1;o.startDate=weekMondayKey(new Date());}return o;}
   if(type==='cnt')return{id:uid(),name:g('name')||'Лічильник',goal:+g('goal')||1,unit:g('unit')||''};
   if(type==='loan')return{id:uid(),name:g('name')||'Кредит'};});}
-function addExercise(){state.settings.exercises.push({id:uid(),name:'Нова вправа',base:10,penalty:2});rl('setExercises',state.settings.exercises,'ex');}
+function addExercise(){state.settings.exercises.push({id:uid(),name:'Нова вправа',base:10,penalty:2,grow:0});rl('setExercises',state.settings.exercises,'ex');}
 function addLimit(){state.settings.limitHabits.push({id:uid(),name:'Новий ліміт',max:1,unit:'год'});rl('setLimits',state.settings.limitHabits,'lim');}
 function addCounter(){state.settings.counters.push({id:uid(),name:'Лічильник',goal:100,unit:''});rl('setCounters',state.settings.counters,'cnt');}
 function addLoan(){state.settings.loans.push({id:uid(),name:'Кредит'});rl('setLoans',state.settings.loans,'loan');}
