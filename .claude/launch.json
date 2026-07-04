@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "buyer-static",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "5599", "--directory", "C:\\Users\\User\\Desktop\\dashboard_buyer"],
+      "port": 5599
+    }
+  ]
+}

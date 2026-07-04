@@ -154,17 +154,6 @@
 <body>
 <div class="blobs"><i></i><i></i><i></i></div>
 
-<div id="authScreen">
-  <div class="glass auth-card">
-    <h1>LIFE&nbsp;<span>OS</span></h1>
-    <p id="pinTitle">Введи PIN</p>
-    <input id="pinInput" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="● ● ● ●" autocomplete="off" style="letter-spacing:10px;text-align:center;font-size:26px" oninput="pinInputChange()" onkeydown="if(event.key==='Enter')pinSubmit()">
-    <button class="acc" id="pinBtn" onclick="pinSubmit()">Увійти</button>
-    <p id="authMsg" style="margin-top:16px;min-height:18px"></p>
-    <p class="muted" id="cfgWarn" style="margin-top:8px"></p>
-  </div>
-</div>
-
 <div id="app" class="hidden">
 <header>
   <div><h1>LIFE&nbsp;<span>OS</span></h1><div class="sub" id="todayLabel"></div></div>
@@ -340,8 +329,6 @@
       <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(this)">
     </div>
     <div class="muted" style="margin-top:8px">Дані й так зберігаються в хмарі. Це — додаткова копія на випадок.</div>
-    <div class="sec-title">Доступ (PIN)</div>
-    <div class="flex" style="flex-wrap:wrap"><button onclick="changePin()">🔑 Змінити PIN</button><button class="del" onclick="lockApp()">🔒 Заблокувати</button></div>
   </div>
 
   <div class="between" style="margin-top:24px">
@@ -440,64 +427,36 @@ const defaults={
 let state=structuredClone(defaults);
 const cacheKey='lifeos_cache';
 const SOLO_ID='me';
-let serverState=null, pinMode='enter';
 let selDay=null; const activeDay=()=>selDay||todayKey();
 
 /* ===== АВТЕНТИФІКАЦІЯ ===== */
 async function boot(){
-  if(!configured){ $('cfgWarn').textContent='⚠️ Встав SUPABASE_URL і ANON_KEY у коді.'; return; }
-  await loadSolo();
-}
-async function loadSolo(){
-  const saved=localStorage.getItem('lifeos_pin');
-  const {data,error}=await sb.from('solo').select('data').eq('id',SOLO_ID).maybeSingle();
-  if(error){
-    $('cfgWarn').textContent='⚠️ Немає зв\'язку з базою (або створи таблицю solo).';
-    const c=localStorage.getItem(cacheKey);
-    if(saved&&c){try{state=migrate(JSON.parse(c));enterApp();setSync('off');return;}catch(e){}}
-    serverState=null; showPin('create'); return;
-  }
-  serverState=(data&&data.data)?data.data:null;
-  if(serverState&&serverState.pin&&saved&&saved===serverState.pin){ state=migrate(serverState); enterApp(); return; }
-  showPin(serverState&&serverState.pin?'enter':'create');
-}
-function showPin(mode){
-  pinMode=mode;
-  $('authScreen').classList.remove('hidden'); $('app').classList.add('hidden');
-  $('pinTitle').textContent=mode==='create'?'Придумай 4-значний PIN':'Введи PIN';
-  $('pinBtn').textContent=mode==='create'?'Створити':'Увійти';
-  $('pinInput').value=''; $('authMsg').textContent=''; applyLang(); setTimeout(()=>{try{$('pinInput').focus();}catch(e){}},150);
-}
-function pinInputChange(){ if($('pinInput').value.length>=4) pinSubmit(); }
-async function pinSubmit(){
-  const pin=$('pinInput').value.trim();
-  if(!/^\d{4}$/.test(pin)){ $('authMsg').textContent='Треба рівно 4 цифри'; return; }
-  if(pinMode==='enter'){
-    if(serverState&&serverState.pin===pin){ state=migrate(serverState); localStorage.setItem('lifeos_pin',pin); enterApp(); }
-    else { $('authMsg').textContent='Невірний PIN ❌'; $('pinInput').value=''; }
-  } else {
-    let base=structuredClone(defaults);
-    if(serverState&&serverState.settings) base=serverState;
-    else { const c=localStorage.getItem(cacheKey); if(c){try{base=JSON.parse(c);}catch(e){}} }
-    state=migrate(base); state.pin=pin;
-    localStorage.setItem('lifeos_pin',pin);
-    setSync('busy'); await sb.from('solo').upsert({id:SOLO_ID,data:state,updated_at:new Date().toISOString()}); setSync('ok');
-    enterApp();
-  }
+  if(!configured) return;
+  let started=false;
+  const start=()=>{if(started)return;started=true;enterApp();};
+  const cache=localStorage.getItem(cacheKey);
+  if(cache){ try{ state=migrate(JSON.parse(cache)); start(); }catch(e){} }
+  setSync('busy');
+  try{
+    const {data,error}=await sb.from('solo').select('data').eq('id',SOLO_ID).maybeSingle();
+    if(error) throw error;
+    if(data&&data.data){
+      if(!dirty && JSON.stringify(data.data)!==localStorage.getItem(cacheKey)){ state=migrate(data.data); localStorage.setItem(cacheKey,JSON.stringify(state)); if(started) render(); }
+    } else { await sb.from('solo').upsert({id:SOLO_ID,data:state}); localStorage.setItem(cacheKey,JSON.stringify(state)); }
+    start(); render(); setSync('ok');
+  }catch(e){ start(); setSync('off'); }
 }
 function enterApp(){
-  $('authScreen').classList.add('hidden'); $('app').classList.remove('hidden');
+  $('app').classList.remove('hidden');
   localStorage.setItem(cacheKey,JSON.stringify(state));
   render(); loadExpenses(); loadSteam(); loadScreen(); initTip(); startReminders();
   if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
-function lockApp(){ localStorage.removeItem('lifeos_pin'); settings.close(); location.reload(); }
-function changePin(){ const p=prompt('Новий 4-значний PIN:'); if(p==null)return; if(/^\d{4}$/.test(p.trim())){ state.pin=p.trim(); localStorage.setItem('lifeos_pin',p.trim()); save(); toast('PIN змінено ✅'); } else toast('Треба 4 цифри'); }
-let saveTimer=null;
-function scheduleSync(){ localStorage.setItem(cacheKey,JSON.stringify(state)); setSync('busy'); clearTimeout(saveTimer); saveTimer=setTimeout(pushState,700); }
+let saveTimer=null, dirty=false;
+function scheduleSync(){ dirty=true; localStorage.setItem(cacheKey,JSON.stringify(state)); setSync('busy'); clearTimeout(saveTimer); saveTimer=setTimeout(pushState,700); }
 async function pushState(){
   const {error}=await sb.from('solo').upsert({id:SOLO_ID,data:state,updated_at:new Date().toISOString()});
-  setSync(error?'off':'ok'); if(error)toast('Немає зв\'язку — збережу локально');
+  if(!error)dirty=false; setSync(error?'off':'ok'); if(error)toast('Немає зв\'язку — збережу локально');
 }
 function setSync(s){const d=$('syncDot'); if(d)d.className='sync-dot'+(s==='busy'?' busy':s==='off'?' off':'');}
 function toast(m){const t=$('toast'); t.textContent=lang==='en'?trStr(m):m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200);}
@@ -897,7 +856,7 @@ function addCounter(){state.settings.counters.push({id:uid(),name:'Лічиль�
 function addLoan(){state.settings.loans.push({id:uid(),name:'Кредит'});rl('setLoans',state.settings.loans,'loan');}
 function delItem(type,i){const map={ex:'exercises',lim:'limitHabits',cnt:'counters',loan:'loans'},el={ex:'setExercises',lim:'setLimits',cnt:'setCounters',loan:'setLoans'};state.settings[map[type]].splice(i,1);rl(el[type],state.settings[map[type]],type);}
 function saveSettings(){const S=state.settings,keep=(a,o)=>a.map((n,i)=>o[i]?{...n,id:o[i].id}:n);S.exercises=keep(readL('setExercises','ex'),S.exercises);S.limitHabits=readL('setLimits','lim').map((n,i)=>{const o=S.limitHabits[i];if(!o)return n;return {...n,id:o.id,startDate:(n.mode==='week'?(o.mode==='week'&&o.startDate?o.startDate:n.startDate):undefined)};});S.counters=keep(readL('setCounters','cnt'),S.counters);S.loans=keep(readL('setLoans','loan'),S.loans);S.waterGoal=+$('setWaterGoal').value||2000;S.currency=$('setCurrency').value||'₴';S.reminders={on:$('remOn').checked,everyMin:Math.max(15,+$('remEvery').value||120),from:Math.min(23,Math.max(0,+$('remFrom').value||9)),to:Math.min(24,Math.max(1,+$('remTo').value||21))};settings.close();save();startReminders();}
-function resetAll(){if(confirm('Скинути ВСІ дані?')){const p=state.pin;localStorage.removeItem(cacheKey);state=structuredClone(defaults);state.pin=p;if(sb)sb.from('solo').upsert({id:SOLO_ID,data:state,updated_at:new Date().toISOString()});settings.close();render();}}
+function resetAll(){if(confirm('Скинути ВСІ дані?')){localStorage.removeItem(cacheKey);state=structuredClone(defaults);if(sb)sb.from('solo').upsert({id:SOLO_ID,data:state,updated_at:new Date().toISOString()});settings.close();render();}}
 
 function exportData(){const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='lifeos-backup-'+todayKey()+'.json';a.click();}
 function importData(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=e=>{try{const dt=JSON.parse(e.target.result);if(!dt.settings)throw 0;state=migrate(dt);save();toast('Дані завантажено ✅');settings.close();}catch(err){toast('Не вдалося прочитати файл ❌');}};r.readAsText(f);inp.value='';}

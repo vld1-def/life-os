@@ -17,7 +17,12 @@
       "Bash(node -e ' *)",
       "Bash(node --check sw.js)",
       "Bash(node -e 'const UAL=\"а-яіїєґА-ЯІЇЄҐ\";const r=new RegExp\\(\"\\(?<![\"+UAL+\"]\\)мл\\(?![\"+UAL+\"]\\)\",\"g\"\\);console.log\\(\"lookbehind ok:\", \"лишилось 500 мл\".replace\\(r,\"ml\"\\), \"|\", \"сьогодні\".replace\\(new RegExp\\(\"\\(?<![\"+UAL+\"]\\)год\\(?![\"+UAL+\"]\\)\",\"g\"\\),\"h\"\\)\\);')",
-      "Bash(gh secret *)"
+      "Bash(gh secret *)",
+      "PowerShell(gh repo list --limit 100)",
+      "Bash(gh api *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"https://vld1-def.github.io/dashboard_buyer/Form.html\")",
+      "Bash(curl -s \"https://vld1-def.github.io/dashboard_buyer/Form.html\")",
+      "Bash(xargs echo \"має вкладку База \\(кнопка знайдена, к-сть\\):\")"
     ]
   }
 }
