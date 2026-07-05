@@ -22,7 +22,17 @@
       "Bash(gh api *)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"https://vld1-def.github.io/dashboard_buyer/Form.html\")",
       "Bash(curl -s \"https://vld1-def.github.io/dashboard_buyer/Form.html\")",
-      "Bash(xargs echo \"має вкладку База \\(кнопка знайдена, к-сть\\):\")"
+      "Bash(xargs echo \"має вкладку База \\(кнопка знайдена, к-сть\\):\")",
+      "Bash(curl -s \"https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=C3C22A053C50BE2A3CE1F0733B5264A5&steamid=76561199040923067&include_played_free_games=1&include_appinfo=1&format=json\" -o s.json)",
+      "Bash(python -c ' *)",
+      "Bash(curl -s '__TRACKED_VAR__/steam_playtime?select=date,total_minutes&order=date.desc&limit=4' -H 'apikey: __TRACKED_VAR__' -H 'Authorization: Bearer __TRACKED_VAR__')",
+      "Bash(curl -s 'https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=__TRACKED_VAR__&steamids=__TRACKED_VAR__' -o sum.json)",
+      "Bash(curl -s 'https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v1/?appid=730&key=__TRACKED_VAR__&steamid=__TRACKED_VAR__' -o ach.json)",
+      "Bash(cd \"C:/Users/User/Desktop/Active Live\")",
+      "Bash(echo \"=== steam_playtime \\(усі знімки\\) ===\")",
+      "Bash(curl -s '__TRACKED_VAR__/steam_playtime?select=date,total_minutes&order=date.desc' -H 'apikey: __TRACKED_VAR__' -H 'Authorization: Bearer __TRACKED_VAR__')",
+      "Bash(echo \"\")",
+      "Bash(echo \"=== запуски steam-sync ===\")"
     ]
   }
 }

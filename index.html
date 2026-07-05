@@ -498,7 +498,7 @@ async function loadSteam(){
   for(let i=0;i<data.length-1;i++){const delta=data[i+1].total_minutes-data[i].total_minutes;steamPlay[data[i].date]=Math.max(0,delta);}
   applySteam(); render();
 }
-function gamesLimitId(){const l=state.settings.limitHabits.find(x=>/гра|ігр|steam/i.test(x.name));return l?l.id:null;}
+function gamesLimitId(){const l=state.settings.limitHabits.find(x=>/гра|ігр|steam|cs/i.test(x.name));return l?l.id:null;}
 function applySteam(){const gid=gamesLimitId();if(!gid)return;Object.keys(steamPlay).forEach(dk=>{getDay(dk).limits[gid]=Math.round(steamPlay[dk]);});}
 
 /* ===== SCREEN TIME (айфон → таблиця screen_time) ===== */
