@@ -471,7 +471,7 @@ async function boot(){
 function enterApp(){
   $('app').classList.remove('hidden');
   localStorage.setItem(cacheKey,JSON.stringify(state));
-  render(); loadExpenses(); loadSteam(); loadScreen(); initTip(); startReminders();
+  render(); loadExpenses(); loadSteam(); loadScreen(); loadSleepDB(); initTip(); startReminders();
   if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
 let saveTimer=null, dirty=false;
@@ -561,7 +561,10 @@ function setLimit(id,v){getDay(activeDay()).limits[id]=Math.max(0,+v||0);save();
 function setCounter(id,v){getDay(activeDay()).counters[id]=Math.max(0,+v||0);save();}
 function saveNote(v){getDay(activeDay()).note=v;save();}
 function setSleep(f,v){const d=getDay(activeDay());d.sleep=d.sleep||{};d.sleep[f]=v;save();}
-function sleepHours(k){const d=state.days[k];if(!d||!d.sleep||!d.sleep.b||!d.sleep.w)return 0;const tm=t=>{const[h,m]=t.split(':').map(Number);return h*60+m;};let diff=tm(d.sleep.w)-tm(d.sleep.b);if(diff<0)diff+=1440;return Math.round(diff/60*10)/10;}
+function sleepHours(k){const d=state.days[k];if(!d||!d.sleep)return 0;const s=d.sleep;if(s.h!=null&&s.h!=='')return Math.round((+s.h)*10)/10;if(!s.b||!s.w)return 0;const tm=t=>{const[h,m]=t.split(':').map(Number);return h*60+m;};let diff=tm(s.w)-tm(s.b);if(diff<0)diff+=1440;return Math.round(diff/60*10)/10;}
+let sleepDB={};
+async function loadSleepDB(){ if(!sb)return; const {data,error}=await sb.from('sleep').select('date,bed,wake,hours').limit(2000); if(error||!data)return; sleepDB={}; data.forEach(r=>{sleepDB[r.date]={b:r.bed||'',w:r.wake||'',h:(r.hours==null?null:r.hours)};}); applySleepDB(); render(); }
+function applySleepDB(){ Object.keys(sleepDB).forEach(dk=>{ const s=sleepDB[dk]; getDay(dk).sleep={b:s.b,w:s.w,h:s.h}; }); }
 function addTask(){const t=$('taskInput').value.trim();if(!t)return;state.tasks.unshift({id:uid(),text:t,done:false});$('taskInput').value='';save();}
 function toggleTask(id){const t=state.tasks.find(x=>x.id===id);if(t)t.done=!t.done;save();}
 function delTask(id){state.tasks=state.tasks.filter(x=>x.id!==id);save();}
@@ -593,7 +596,7 @@ function dayTitle(k){const comps=dayComponents(k);if(!comps)return k+' — не�
 /* ===== РЕНДЕР ===== */
 function render(){
   Object.keys(_c).forEach(k=>delete _c[k]);
-  applySteam(); applyScreen();
+  applySteam(); applyScreen(); applySleepDB();
   const tk=todayKey(),ad=activeDay(),d=getDay(ad),S=state.settings;
   $('todayLabel').textContent=new Date().toLocaleDateString(LOC(),{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   $('waterCnt').textContent=(d.water/1000).toFixed(2);
