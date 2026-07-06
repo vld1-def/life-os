@@ -190,7 +190,7 @@
 
   <!-- ТИЖДЕНЬ -->
   <div class="glass card">
-    <h2><span class="dot" style="background:var(--yellow)"></span>Тиждень — останні 7 днів</h2>
+    <h2><span class="dot" style="background:var(--yellow)"></span>Тиждень <span id="weekRange" style="text-transform:none;letter-spacing:0;color:var(--muted);font-weight:600"></span></h2>
     <div id="weekBody"></div>
   </div>
 
@@ -250,6 +250,17 @@
     <div id="counterList"></div>
   </div>
 
+  <!-- СОН -->
+  <div class="glass card">
+    <h2><span class="dot" style="background:var(--purple)"></span>Сон</h2>
+    <div class="flex" style="gap:12px">
+      <label class="muted" style="flex:1;font-size:12px">Заснув<input type="time" id="sleepBed" onchange="setSleep('b',this.value)" style="margin-top:4px"></label>
+      <label class="muted" style="flex:1;font-size:12px">Прокинувся<input type="time" id="sleepWake" onchange="setSleep('w',this.value)" style="margin-top:4px"></label>
+    </div>
+    <div class="between" style="margin-top:10px"><span class="muted">Тривалість</span><span class="cnt" id="sleepDur">—</span></div>
+    <div class="bar"><i class="g-purple" id="sleepBar" style="width:0%"></i></div>
+  </div>
+
   <!-- НОТАТКА -->
   <div class="glass card">
     <h2><span class="dot" style="background:var(--blue)"></span>Нотатка дня</h2>
@@ -293,6 +304,8 @@
   <div class="tabpane on" id="tab-gen">
     <div class="sec-title">💧 Ціль по воді (мл/день)</div>
     <input type="number" id="setWaterGoal" min="100" step="100" style="max-width:160px">
+    <div class="sec-title">😴 Ціль сну (год)</div>
+    <input type="number" id="setSleepGoal" min="1" max="14" step="0.5" style="max-width:120px">
     <div class="sec-title">💱 Валюта</div>
     <input id="setCurrency" style="max-width:120px" placeholder="₴">
   </div>
@@ -381,7 +394,7 @@ let lang=localStorage.getItem('lifeos_lang')||'uk';
 const LOC=()=>lang==='en'?'en-US':'uk-UA';
 const EN={
 '🔥 серія':'🔥 streak','⭐ бал дня':'⭐ day score','💳 борг':'💳 debt',
-'Мій прогрес':'My progress','Активність':'Activity','Вода':'Water','Ліміти':'Limits','Лічильники':'Counters','Нотатка дня':'Day note','Мої цілі / таски':'My goals / tasks','Тиждень — останні 7 днів':'Week — last 7 days','Фінанси (Влад) —':'Finances (Vlad) —',
+'Мій прогрес':'My progress','Активність':'Activity','Вода':'Water','Ліміти':'Limits','Лічильники':'Counters','Нотатка дня':'Day note','Мої цілі / таски':'My goals / tasks','Тиждень':'Week','Сон':'Sleep','Заснув':'Fell asleep','Прокинувся':'Woke up','Тривалість':'Duration','😴 Ціль сну (год)':'😴 Sleep goal (h)','Фінанси (Влад) —':'Finances (Vlad) —',
 '🗓 Календар':'🗓 Calendar','📈 Графік':'📈 Chart','По місяцях':'By month','По днях':'By day','Нова ціль...':'New goal...','+ 💧':'+ 💧',
 'Витрати цього місяця':'Spent this month','Загальний борг зараз':'Total debt now','Витрати':'Spending','Куди йдуть гроші':'Where money goes','(тисни категорію → графік по днях)':'(tap a category → daily chart)','💳 Кредити — впиши поточний борг (зберігається на сьогодні)':'💳 Loans — enter current debt (saved for today)','📉 Борг':'📉 Debt','Підкатегорії:':'Subcategories:',
 'цього місяця витрат ще немає':'no spending this month yet','немає підкатегорій':'no subcategories','завантаження витрат...':'loading spending...','почни вписувати борг — і тут з\'явиться графік':'start entering debt — a chart will appear here','Додай кредити в налаштуваннях':'Add loans in settings','впиши поточний борг →':'enter current debt →','🎉 закрито!':'🎉 closed!','= як минулого':'= same as last','немає даних':'no data',
@@ -425,7 +438,7 @@ function setLang(l){lang=l;localStorage.setItem('lifeos_lang',l);render();applyL
 function toggleLang(){setLang(lang==='en'?'uk':'en');}
 
 const defaults={
-  settings:{waterGoal:2000,currency:'₴',
+  settings:{waterGoal:2000,sleepGoal:8,currency:'₴',
     exercises:[{id:uid(),name:'Віджимання',base:10,penalty:2},{id:uid(),name:'Присідання',base:20,penalty:2}],
     limitHabits:[{id:uid(),name:'Ігри',max:2,unit:'год'}],
     counters:[{id:uid(),name:'Кроки',goal:8000,unit:''}],
@@ -547,6 +560,8 @@ function addEx(id,n){const d=getDay(activeDay());d.exercises[id]=Math.max(0,(d.e
 function setLimit(id,v){getDay(activeDay()).limits[id]=Math.max(0,+v||0);save();}
 function setCounter(id,v){getDay(activeDay()).counters[id]=Math.max(0,+v||0);save();}
 function saveNote(v){getDay(activeDay()).note=v;save();}
+function setSleep(f,v){const d=getDay(activeDay());d.sleep=d.sleep||{};d.sleep[f]=v;save();}
+function sleepHours(k){const d=state.days[k];if(!d||!d.sleep||!d.sleep.b||!d.sleep.w)return 0;const tm=t=>{const[h,m]=t.split(':').map(Number);return h*60+m;};let diff=tm(d.sleep.w)-tm(d.sleep.b);if(diff<0)diff+=1440;return Math.round(diff/60*10)/10;}
 function addTask(){const t=$('taskInput').value.trim();if(!t)return;state.tasks.unshift({id:uid(),text:t,done:false});$('taskInput').value='';save();}
 function toggleTask(id){const t=state.tasks.find(x=>x.id===id);if(t)t.done=!t.done;save();}
 function delTask(id){state.tasks=state.tasks.filter(x=>x.id!==id);save();}
@@ -606,6 +621,8 @@ function render(){
   $('counterList').innerHTML=S.counters.map(c=>{const v=d.counters[c.id]||0,ok=v>=c.goal;return `<div class="row"><div style="flex:1"><div class="between"><span>${c.name} ${ok?'✅':''}</span><span class="muted cnt">${fmt(v)} / ${fmt(c.goal)} ${c.unit}</span></div><div class="bar"><i class="g-purple" style="width:${Math.min(100,v/c.goal*100)}%"></i></div></div><div class="flex" style="margin-left:10px"><input type="number" style="width:80px" value="${v}" onchange="setCounter('${c.id}',this.value)"></div></div>`;}).join('')||'<div class="empty">Додай лічильники</div>';
 
   $('noteInput').value=d.note||'';
+  const slp=d.sleep||{}; $('sleepBed').value=slp.b||''; $('sleepWake').value=slp.w||'';
+  const sh=sleepHours(ad); $('sleepDur').textContent=sh?sh+' год':'—'; $('sleepBar').style.width=Math.min(100,sh/(S.sleepGoal||8)*100)+'%';
   $('taskList').innerHTML=state.tasks.map(t=>`<div class="todo ${t.done?'done':''}"><div class="check ${t.done?'on':''}" onclick="toggleTask('${t.id}')">${t.done?'✓':''}</div><span style="flex:1">${t.text}</span><button class="del sm" onclick="delTask('${t.id}')">✕</button></div>`).join('')||'<div class="empty">Постав собі перші цілі 🎯</div>';
 
   renderFinance();
@@ -683,12 +700,13 @@ function svgMultiLine({series,labels,w=800,h=190,unit=''}){
 let metricSel='all', monthView='cal';
 function setMetric(id){metricSel=id;renderMonth();}
 function setMonthView(v){monthView=v;renderMonth();}
-function metricList(){const S=state.settings;const a=[{id:'all',label:'Усі',kind:'all'},{id:'score',label:'Бал дня',unit:'%',kind:'score'},{id:'water',label:'Вода',unit:'мл',kind:'goal'}];S.counters.forEach(c=>a.push({id:'cnt:'+c.id,label:c.name,unit:c.unit,kind:'goal',ref:c}));S.limitHabits.forEach(l=>{if(l.mode==='week')return;a.push({id:'lim:'+l.id,label:l.name,unit:l.unit,kind:'limit',ref:l});});return a;}
+function metricList(){const S=state.settings;const a=[{id:'all',label:'Усі',kind:'all'},{id:'score',label:'Бал дня',unit:'%',kind:'score'},{id:'water',label:'Вода',unit:'мл',kind:'goal'},{id:'sleep',label:'Сон',unit:'год',kind:'sleep'}];S.counters.forEach(c=>a.push({id:'cnt:'+c.id,label:c.name,unit:c.unit,kind:'goal',ref:c}));S.limitHabits.forEach(l=>{if(l.mode==='week')return;a.push({id:'lim:'+l.id,label:l.name,unit:l.unit,kind:'limit',ref:l});});return a;}
 function curMetric(){return metricList().find(m=>m.id===metricSel)||metricList()[0];}
-function metricGoal(mt){if(mt.id==='water')return state.settings.waterGoal;if(mt.id==='score')return 70;if(mt.kind==='goal')return mt.ref.goal;if(mt.kind==='limit')return mt.ref.max;return null;}
+function metricGoal(mt){if(mt.id==='water')return state.settings.waterGoal;if(mt.id==='sleep')return state.settings.sleepGoal||8;if(mt.id==='score')return 70;if(mt.kind==='goal')return mt.ref.goal;if(mt.kind==='limit')return mt.ref.max;return null;}
 function metricDay(mt,k){const d=state.days[k];if(!d)return{has:false};
   if(mt.id==='score'){const sc=dayScore(k);return{v:sc,goal:100,ok:sc>=70,has:sc!=null};}
   if(mt.id==='water'){return{v:d.water||0,goal:state.settings.waterGoal,ok:(d.water||0)>=state.settings.waterGoal,has:true};}
+  if(mt.id==='sleep'){const h=sleepHours(k),g=state.settings.sleepGoal||8;return{v:h,goal:g,ok:h>=g,has:h>0};}
   if(mt.kind==='goal'){const v=(d.counters&&d.counters[mt.ref.id])||0;return{v,goal:mt.ref.goal,ok:v>=mt.ref.goal,has:true};}
   const v=(d.limits&&d.limits[mt.ref.id])||0;return{v,goal:mt.ref.max,ok:v<=mt.ref.max,has:true};}
 function metricColor(mt,r){if(!r.has)return{bg:'rgba(255,255,255,.05)',col:'var(--muted)'};
@@ -697,7 +715,7 @@ function metricColor(mt,r){if(!r.has)return{bg:'rgba(255,255,255,.05)',col:'var(
   if(r.ok||pct>=1)return{bg:'rgba(79,197,150,.82)',col:'#04140d'};
   if(pct>=.5)return{bg:'rgba(227,189,104,.78)',col:'#2a1e02'};
   return{bg:'rgba(229,107,123,.72)',col:'#2a0708'};}
-function metricValTxt(mt,v){if(mt.id==='water')return(v/1000).toFixed(1)+'л';if(mt.id==='score')return v+'%';return fmt(v)+(mt.unit?(' '+mt.unit):'');}
+function metricValTxt(mt,v){if(mt.id==='water')return(v/1000).toFixed(1)+'л';if(mt.id==='sleep')return v+'г';if(mt.id==='score')return v+'%';return fmt(v)+(mt.unit?(' '+mt.unit):'');}
 function renderMonth(){
   $('metricBar').innerHTML=metricList().map(m=>`<button class="sm ${m.id===metricSel?'acc':''}" onclick="setMetric('${m.id}')">${m.label}</button>`).join('');
   $('btnCal').className='sm '+(monthView==='cal'?'acc':'');
@@ -748,11 +766,13 @@ function catDailySeries(ym,cat,sub){const[y,mm]=ym.split('-').map(Number);const 
 function debtDailySeries(ym){const[y,mm]=ym.split('-').map(Number);const days=new Date(y,mm,0).getDate();const last=ym===monthKey()?new Date().getDate():days;const arr=[];for(let dd=1;dd<=last;dd++){const ds=ym+'-'+String(dd).padStart(2,'0');let tot=0;state.settings.loans.forEach(l=>{const v=loanValAt(l.id,ds);if(v!=null)tot+=v;});arr.push({x:dd,y:Math.round(tot)});}return arr;}
 
 /* тижневий підсумок */
-function weekStats(){const set=new Set();for(let i=0;i<7;i++){const d=new Date();d.setDate(d.getDate()-i);set.add(dayKey(d));}
+function weekStats(){const mon=weekMonday(new Date());const set=new Set();for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(d.getDate()+i);set.add(dayKey(d));}
   let scSum=0,scN=0,good=0,waterOk=0;set.forEach(k=>{const sc=dayScore(k);if(sc!=null){scSum+=sc;scN++;if(sc>=70||state.restDays[k])good++;}const d=state.days[k];if(d&&d.water>=state.settings.waterGoal)waterOk++;});
   let spent=0;(expRows||[]).forEach(r=>{const ds=r.ym+'-'+String(r.day).padStart(2,'0');if(set.has(ds))spent+=r.sum;});
   return{good,avg:scN?Math.round(scSum/scN):0,waterOk,spent};}
 function renderWeek(){const w=weekStats(),cur=state.settings.currency;
+  const _mon=weekMonday(new Date()),_sun=new Date(_mon);_sun.setDate(_sun.getDate()+6);
+  const _wr=$('weekRange'); if(_wr)_wr.textContent='· '+_mon.toLocaleDateString(LOC(),{day:'numeric',month:'short'})+' – '+_sun.toLocaleDateString(LOC(),{day:'numeric',month:'short'});
   const wl=state.settings.limitHabits.filter(l=>l.mode==='week');
   let extra='';
   if(wl.length){extra='<div style="margin-top:12px">'+wl.map(l=>{const q=limitWeekQuota(l),c=weekConsumed(l.id),over=c>q,left=Math.max(0,q-c);
@@ -848,7 +868,7 @@ function renderFinance(){
 
 /* ===== НАЛАШТУВАННЯ ===== */
 function setTab(name){['gen','act','lim','cnt','loan','rem','data'].forEach(t=>$('tab-'+t).classList.toggle('on',t===name));[...$('setTabs').children].forEach(b=>b.className='sm'+(b.getAttribute('onclick').includes("'"+name+"'")?' acc':''));}
-function openSettings(){const S=state.settings,R=S.reminders||{};$('setWaterGoal').value=S.waterGoal;$('setCurrency').value=S.currency;$('remOn').checked=!!R.on;$('remEvery').value=R.everyMin||120;$('remFrom').value=R.from??9;$('remTo').value=R.to??21;rl('setExercises',S.exercises,'ex');rl('setLimits',S.limitHabits,'lim');rl('setCounters',S.counters,'cnt');rl('setLoans',S.loans,'loan');setTab('gen');applyLang();settings.showModal();}
+function openSettings(){const S=state.settings,R=S.reminders||{};$('setWaterGoal').value=S.waterGoal;$('setSleepGoal').value=S.sleepGoal||8;$('setCurrency').value=S.currency;$('remOn').checked=!!R.on;$('remEvery').value=R.everyMin||120;$('remFrom').value=R.from??9;$('remTo').value=R.to??21;rl('setExercises',S.exercises,'ex');rl('setLimits',S.limitHabits,'lim');rl('setCounters',S.counters,'cnt');rl('setLoans',S.loans,'loan');setTab('gen');applyLang();settings.showModal();}
 function rl(elId,arr,type){$(elId).innerHTML=arr.map((it,i)=>{const del=`<button class="del" onclick="delItem('${type}',${i})">✕</button>`;
   if(type==='ex')return `<div class="settings-item"><input value="${it.name}" data-f="name" placeholder="Назва"><input type="number" value="${it.base}" data-f="base" style="width:66px" title="норма"><input type="number" value="${it.penalty}" data-f="penalty" step="0.5" style="width:58px" title="штраф ×"><input type="number" value="${it.grow||0}" data-f="grow" style="width:58px" title="зростання/день">${del}</div>`;
   if(type==='lim')return `<div class="settings-item"><input value="${it.name}" data-f="name" placeholder="Назва" style="min-width:90px"><select data-f="mode" style="width:auto"><option value="day"${it.mode!=='week'?' selected':''}>на день</option><option value="week"${it.mode==='week'?' selected':''}>на тиждень ↓</option></select><select data-f="entry" style="width:auto" title="як вводити значення"><option value="input"${it.entry!=='buttons'?' selected':''}>поле</option><option value="buttons"${it.entry==='buttons'?' selected':''}>кнопки ±</option></select><input type="number" value="${it.max??2}" data-f="max" step="0.5" style="width:56px" title="макс на день"><input type="number" value="${it.startPerWeek??5}" data-f="startPerWeek" style="width:48px" title="старт: скільки на тиждень"><input type="number" value="${it.stepPerWeek??1}" data-f="stepPerWeek" style="width:44px" title="мінус за тиждень"><input type="number" value="${it.minPerWeek??2}" data-f="minPerWeek" style="width:44px" title="мінімум на тиждень"><input value="${it.unit||''}" data-f="unit" style="width:56px" placeholder="од.">${del}</div>`;
@@ -865,7 +885,7 @@ function addLimit(){state.settings.limitHabits.push({id:uid(),name:'Новий �
 function addCounter(){state.settings.counters.push({id:uid(),name:'Лічильник',goal:100,unit:''});rl('setCounters',state.settings.counters,'cnt');}
 function addLoan(){state.settings.loans.push({id:uid(),name:'Кредит'});rl('setLoans',state.settings.loans,'loan');}
 function delItem(type,i){const map={ex:'exercises',lim:'limitHabits',cnt:'counters',loan:'loans'},el={ex:'setExercises',lim:'setLimits',cnt:'setCounters',loan:'setLoans'};state.settings[map[type]].splice(i,1);rl(el[type],state.settings[map[type]],type);}
-function saveSettings(){const S=state.settings,keep=(a,o)=>a.map((n,i)=>o[i]?{...n,id:o[i].id}:n);S.exercises=keep(readL('setExercises','ex'),S.exercises);S.limitHabits=readL('setLimits','lim').map((n,i)=>{const o=S.limitHabits[i];if(!o)return n;return {...n,id:o.id,startDate:(n.mode==='week'?(o.mode==='week'&&o.startDate?o.startDate:n.startDate):undefined)};});S.counters=keep(readL('setCounters','cnt'),S.counters);S.loans=keep(readL('setLoans','loan'),S.loans);S.waterGoal=+$('setWaterGoal').value||2000;S.currency=$('setCurrency').value||'₴';S.reminders={on:$('remOn').checked,everyMin:Math.max(15,+$('remEvery').value||120),from:Math.min(23,Math.max(0,+$('remFrom').value||9)),to:Math.min(24,Math.max(1,+$('remTo').value||21))};settings.close();save();startReminders();}
+function saveSettings(){const S=state.settings,keep=(a,o)=>a.map((n,i)=>o[i]?{...n,id:o[i].id}:n);S.exercises=keep(readL('setExercises','ex'),S.exercises);S.limitHabits=readL('setLimits','lim').map((n,i)=>{const o=S.limitHabits[i];if(!o)return n;return {...n,id:o.id,startDate:(n.mode==='week'?(o.mode==='week'&&o.startDate?o.startDate:n.startDate):undefined)};});S.counters=keep(readL('setCounters','cnt'),S.counters);S.loans=keep(readL('setLoans','loan'),S.loans);S.waterGoal=+$('setWaterGoal').value||2000;S.sleepGoal=+$('setSleepGoal').value||8;S.currency=$('setCurrency').value||'₴';S.reminders={on:$('remOn').checked,everyMin:Math.max(15,+$('remEvery').value||120),from:Math.min(23,Math.max(0,+$('remFrom').value||9)),to:Math.min(24,Math.max(1,+$('remTo').value||21))};settings.close();save();startReminders();}
 function resetAll(){if(confirm('Скинути ВСІ дані?')){localStorage.removeItem(cacheKey);state=structuredClone(defaults);if(sb)sb.from('solo').upsert({id:SOLO_ID,data:state,updated_at:new Date().toISOString()});settings.close();render();}}
 
 function exportData(){const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='lifeos-backup-'+todayKey()+'.json';a.click();}
