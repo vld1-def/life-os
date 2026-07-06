@@ -194,6 +194,12 @@
     <div id="weekBody"></div>
   </div>
 
+  <!-- МІСЯЧНИЙ ОГЛЯД -->
+  <div class="glass card">
+    <h2><span class="dot" style="background:var(--red)"></span>🔥 Місячний огляд <span id="monthOvLabel" style="text-transform:none;letter-spacing:0;color:var(--muted);font-weight:600"></span></h2>
+    <div id="monthOverview"></div>
+  </div>
+
   <!-- АКТИВНІСТЬ -->
   <div class="glass card">
     <h2><span class="dot" style="background:var(--green)"></span>Активність</h2>
@@ -394,7 +400,8 @@ let lang=localStorage.getItem('lifeos_lang')||'uk';
 const LOC=()=>lang==='en'?'en-US':'uk-UA';
 const EN={
 '🔥 серія':'🔥 streak','⭐ бал дня':'⭐ day score','💳 борг':'💳 debt',
-'Мій прогрес':'My progress','Активність':'Activity','Вода':'Water','Ліміти':'Limits','Лічильники':'Counters','Нотатка дня':'Day note','Мої цілі / таски':'My goals / tasks','Тиждень':'Week','Сон':'Sleep','Заснув':'Fell asleep','Прокинувся':'Woke up','Тривалість':'Duration','😴 Ціль сну (год)':'😴 Sleep goal (h)','Фінанси (Влад) —':'Finances (Vlad) —',
+'Мій прогрес':'My progress','Активність':'Activity','Вода':'Water','Ліміти':'Limits','Лічильники':'Counters','Нотатка дня':'Day note','Мої цілі / таски':'My goals / tasks','Тиждень':'Week','Сон':'Sleep','Заснув':'Fell asleep','Прокинувся':'Woke up','Тривалість':'Duration','😴 Ціль сну (год)':'😴 Sleep goal (h)',
+'🔥 Місячний огляд':'🔥 Monthly overview','Сер. сон':'Avg sleep','🎮 Ігри':'🎮 Games','Планка (сек)':'Plank (sec)','Фінанси (Влад) —':'Finances (Vlad) —',
 '🗓 Календар':'🗓 Calendar','📈 Графік':'📈 Chart','По місяцях':'By month','По днях':'By day','Нова ціль...':'New goal...','+ 💧':'+ 💧',
 'Витрати цього місяця':'Spent this month','Загальний борг зараз':'Total debt now','Витрати':'Spending','Куди йдуть гроші':'Where money goes','(тисни категорію → графік по днях)':'(tap a category → daily chart)','💳 Кредити — впиши поточний борг (зберігається на сьогодні)':'💳 Loans — enter current debt (saved for today)','📉 Борг':'📉 Debt','Підкатегорії:':'Subcategories:',
 'цього місяця витрат ще немає':'no spending this month yet','немає підкатегорій':'no subcategories','завантаження витрат...':'loading spending...','почни вписувати борг — і тут з\'явиться графік':'start entering debt — a chart will appear here','Додай кредити в налаштуваннях':'Add loans in settings','впиши поточний борг →':'enter current debt →','🎉 закрито!':'🎉 closed!','= як минулого':'= same as last','немає даних':'no data',
@@ -492,6 +499,7 @@ function migrate(s){
   s.settings.limitHabits.forEach(l=>{if(l.name==='☕ Кава (цукор)')l.name='Кава (цукор)';});
   if(!s.settings.limitHabits.some(l=>/кав|coffee/i.test(l.name))) s.settings.limitHabits.push({id:uid(),name:'Кава (цукор)',mode:'week',entry:'buttons',startPerWeek:5,stepPerWeek:1,minPerWeek:2,max:99,unit:'чашок',startDate:weekMondayKey(new Date())});
   if(!s.settings.limitHabits.some(l=>/соц|екран|screen|мереж/i.test(l.name))) s.settings.limitHabits.push({id:uid(),name:'📱 Соцмережі',mode:'day',max:60,unit:'хв'});
+  if(!s.settings.exercises.some(e=>/планк|plank/i.test(e.name))) s.settings.exercises.push({id:uid(),name:'Планка (сек)',base:60,penalty:1,grow:0});
   return s;
 }
 function save(){ render(); scheduleSync(); }
@@ -631,6 +639,7 @@ function render(){
   renderFinance();
   renderMonth();
   renderWeek();
+  renderMonthOverview();
   $('scoreVal').textContent=(dayScore(tk)??0)+'%';
   $('streakVal').textContent=computeStreak();
   $('debtVal').textContent=fmt(Math.round(totalDebtNow()));
@@ -786,6 +795,30 @@ function renderWeek(){const w=weekStats(),cur=state.settings.currency;
     <div class="fin-box"><div class="lbl">Вода ✓</div><div class="big-num">${w.waterOk}/7</div></div>
     <div class="fin-box"><div class="lbl">Витрачено</div><div class="big-num neon-red">${fmt(Math.round(w.spent))} ${cur}</div></div>
   </div>`+extra;}
+
+function monthStats(){
+  const mk=monthKey(),[y,m]=mk.split('-').map(Number),daysIn=new Date(y,m,0).getDate();
+  const elapsed=(mk===monthKey()&&y===new Date().getFullYear()&&m===new Date().getMonth()+1)?new Date().getDate():daysIn;
+  let good=0,scSum=0,scN=0,waterOk=0,slpSum=0,slpN=0,exDone=0,gamesMin=0;
+  for(let dd=1;dd<=elapsed;dd++){const k=mk+'-'+String(dd).padStart(2,'0');const sc=dayScore(k);
+    if(sc!=null){scSum+=sc;scN++;if(sc>=70||state.restDays[k])good++;}
+    const day=state.days[k];if(day&&day.water>=state.settings.waterGoal)waterOk++;
+    const sh=sleepHours(k);if(sh>0){slpSum+=sh;slpN++;}
+    if(steamPlay[k])gamesMin+=steamPlay[k];}
+  return{elapsed,good,avg:scN?Math.round(scSum/scN):0,waterOk,avgSleep:slpN?Math.round(slpSum/slpN*10)/10:0,spent:monthTotal(mk),gamesH:Math.round(gamesMin/60*10)/10};
+}
+function renderMonthOverview(){
+  const s=monthStats(),cur=state.settings.currency;
+  const lbl=$('monthOvLabel'); if(lbl)lbl.textContent='· '+new Date().toLocaleDateString(LOC(),{month:'long'});
+  $('monthOverview').innerHTML=`<div class="week-grid" style="grid-template-columns:repeat(3,1fr)">
+    <div class="fin-box"><div class="lbl">Хороші дні</div><div class="big-num neon-green">${s.good}/${s.elapsed}</div></div>
+    <div class="fin-box"><div class="lbl">Сер. бал</div><div class="big-num neon-cyan">${s.avg}%</div></div>
+    <div class="fin-box"><div class="lbl">Вода ✓</div><div class="big-num">${s.waterOk}/${s.elapsed}</div></div>
+    <div class="fin-box"><div class="lbl">Сер. сон</div><div class="big-num neon-purple">${s.avgSleep} год</div></div>
+    <div class="fin-box"><div class="lbl">🎮 Ігри</div><div class="big-num">${s.gamesH} год</div></div>
+    <div class="fin-box"><div class="lbl">Витрачено</div><div class="big-num neon-red">${fmt(Math.round(s.spent))} ${cur}</div></div>
+  </div>`;
+}
 
 /* тултіп календаря (миттєвий) */
 function initTip(){if(document.body._tip)return;document.body._tip=1;const tip=$('tip');
