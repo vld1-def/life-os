@@ -1,7 +1,7 @@
 // LIFE OS service worker — кеш оболонки (швидкий старт) + сповіщення
-const CACHE = 'lifeos-v2';
+const CACHE = 'lifeos-v3';
 const CDN = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
-const SHELL = ['./', './index.html', './manifest.json', CDN];
+const SHELL = ['./', './index.html', './game.html', './manifest.json', CDN];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL).catch(() => {})));
@@ -20,12 +20,12 @@ self.addEventListener('fetch', e => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
 
-  // Навігація (відкриття застосунку): миттєво з кешу, оновлення у фоні
+  // Навігація: віддаємо САМЕ запитану сторінку з кешу (index.html або game.html), оновлення у фоні
   if (req.mode === 'navigate') {
     e.respondWith(caches.open(CACHE).then(async c => {
-      const net = fetch(req).then(r => { if (r && r.status === 200) c.put('./index.html', r.clone()); return r; }).catch(() => null);
-      const cached = await c.match('./index.html');
-      return cached || net || fetch(req);
+      const cached = await c.match(req, { ignoreSearch: true });
+      const net = fetch(req).then(r => { if (r && r.status === 200) c.put(req, r.clone()); return r; }).catch(() => null);
+      return cached || net || (await c.match('./index.html')) || fetch(req);
     }));
     return;
   }
