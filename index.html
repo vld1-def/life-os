@@ -560,7 +560,7 @@ function selectDay(k){if(k>todayKey())return;selDay=(k===todayKey())?null:k;rend
 function dayComponents(k){const d=state.days[k];if(!d)return null;const S=state.settings,a=[];
   a.push({label:'Вода',kind:'goal',ok:d.water>=S.waterGoal,pct:d.water/S.waterGoal,txt:(d.water/1000).toFixed(1)+'л / '+(S.waterGoal/1000)+'л'});
   S.exercises.forEach(ex=>{const t=exTarget(ex,k),v=d.exercises[ex.id]||0;a.push({label:ex.name,kind:'goal',ok:v>=t,pct:t?v/t:0,txt:v+' / '+t});});
-  S.limitHabits.forEach(l=>{if(l.mode==='week')return;const v=d.limits[l.id]||0;a.push({label:l.name,kind:'limit',ok:v<=l.max,pct:0,txt:v+' / '+l.max+(l.unit?(' '+l.unit):'')});});
+  S.limitHabits.forEach(l=>{if(l.mode==='week')return;const v=d.limits[l.id]||0;a.push({label:l.name,kind:'limit',ok:v<=l.max,pct:0,txt:v+' < '+l.max+(l.unit?(' '+l.unit):'')});});
   S.counters.forEach(c=>{const v=d.counters[c.id]||0;a.push({label:c.name,kind:'goal',ok:v>=c.goal,pct:c.goal?v/c.goal:0,txt:fmt(v)+' / '+fmt(c.goal)});});
   return a;}
 function compColor(c){if(c.ok)return 'var(--green)';if(c.kind!=='limit'&&c.pct>=.5)return 'var(--yellow)';return 'var(--red)';}
@@ -569,6 +569,7 @@ function dayTitle(k){const comps=dayComponents(k);if(!comps)return k+' — не�
 /* ===== РЕНДЕР ===== */
 function render(){
   Object.keys(_c).forEach(k=>delete _c[k]);
+  applySteam(); applyScreen();
   const tk=todayKey(),ad=activeDay(),d=getDay(ad),S=state.settings;
   $('todayLabel').textContent=new Date().toLocaleDateString(LOC(),{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   $('waterCnt').textContent=(d.water/1000).toFixed(2);
