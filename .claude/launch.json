@@ -12,6 +12,12 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "5601", "--directory", "C:\\Users\\User\\Desktop\\ai-ofm-dashboard"],
       "port": 5601
+    },
+    {
+      "name": "life-os",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "5610", "--directory", "C:\\Users\\User\\Desktop\\Active Live"],
+      "port": 5610
     }
   ]
 }

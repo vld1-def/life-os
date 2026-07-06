@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0a0c14">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230a0c14'/%3E%3Ctext x='32' y='45' font-size='36' text-anchor='middle'%3E%F0%9F%8F%83%3C/text%3E%3C/svg%3E">
+<title>LIFE OS — Раннер</title>
+<style>
+  :root{--bg:#0a0c14;--cyan:#5cc9dd;--purple:#9d8ad6;--green:#4fc596;--red:#e56b7b;--yellow:#e3bd68;--text:#e9edf6;--muted:#7d859c;--stroke:rgba(255,255,255,.12)}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+  html,body{margin:0;height:100%}
+  body{font-family:'Inter','Segoe UI',system-ui,sans-serif;color:var(--text);background:
+    radial-gradient(800px 400px at 20% -10%,rgba(157,138,214,.18),transparent 60%),
+    radial-gradient(700px 400px at 100% 0,rgba(92,201,221,.15),transparent 55%),var(--bg);
+    min-height:100%;display:flex;flex-direction:column;align-items:center;padding:14px;padding-top:calc(14px + env(safe-area-inset-top))}
+  .top{width:100%;max-width:820px;display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+  a.back,.btn{color:var(--text);text-decoration:none;background:rgba(255,255,255,.07);border:1px solid var(--stroke);border-radius:12px;padding:8px 14px;font-size:14px;font-weight:600;cursor:pointer}
+  h1{font-size:18px;margin:0;letter-spacing:.5px;font-weight:800}
+  h1 span{background:linear-gradient(90deg,var(--cyan),var(--purple));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .hud{width:100%;max-width:820px;display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;font-variant-numeric:tabular-nums}
+  .hud .pts{font-size:22px;font-weight:800}
+  .hud .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .lives{font-size:22px;letter-spacing:2px}
+  .best{font-size:12px;color:var(--muted)}
+  .wrap{width:100%;max-width:820px;position:relative;border:1px solid var(--stroke);border-radius:18px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.4)}
+  canvas{display:block;width:100%;height:auto;background:linear-gradient(180deg,#0d1020,#0a0c14 70%)}
+  .mult{position:absolute;top:10px;left:10px;background:rgba(92,201,221,.16);border:1px solid rgba(92,201,221,.5);color:var(--cyan);font-weight:800;padding:5px 12px;border-radius:20px;font-size:13px;display:none;align-items:center;gap:8px}
+  .mult .bar{width:52px;height:5px;background:rgba(255,255,255,.15);border-radius:4px;overflow:hidden}
+  .mult .bar i{display:block;height:100%;background:var(--cyan)}
+  .overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:rgba(6,8,14,.72);backdrop-filter:blur(4px);text-align:center;padding:20px}
+  .overlay h2{margin:0;font-size:26px}
+  .overlay p{margin:0;color:var(--muted);font-size:14px;line-height:1.5}
+  .play{background:linear-gradient(90deg,var(--cyan),var(--purple));color:#06121a;border:none;border-radius:14px;padding:13px 26px;font-size:17px;font-weight:800;cursor:pointer}
+  .hint{margin-top:10px;color:var(--muted);font-size:12px}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;font-size:12px;color:var(--muted);margin-top:8px}
+</style>
+</head>
+<body>
+<div class="top">
+  <a class="back" href="./index.html">← Назад</a>
+  <h1>LIFE&nbsp;<span>RUN</span></h1>
+  <div class="best" id="best">рекорд: 0</div>
+</div>
+
+<div class="hud">
+  <div><div class="pts" id="score">0</div><div class="lbl">👟 кроки</div></div>
+  <div class="lives" id="lives">❤️❤️❤️</div>
+</div>
+
+<div class="wrap">
+  <canvas id="c" width="820" height="340"></canvas>
+  <div class="mult" id="mult">×2 <div class="bar"><i id="multBar"></i></div></div>
+  <div class="overlay" id="overlay">
+    <h2 id="ovTitle">🏃 Раннер</h2>
+    <p id="ovText">Стрибай через перешкоди, лови 🪙 (+50), хапай 💧 для ×2, і не втрать ❤️.</p>
+    <button class="play" id="playBtn">▶ Грати</button>
+    <div class="hint">Тап по екрану / Пробіл / ↑ — стрибок</div>
+  </div>
+</div>
+<div class="legend">👟 кроки · 🪙 +50 · 💧 ×2 (5с) · ❤️ життя (з'являється коли &lt;3)</div>
+
+<script>
+const cv=document.getElementById('c'),ctx=cv.getContext('2d');
+const W=cv.width,H=cv.height,GROUND=H-52;
+const $=id=>document.getElementById(id);
+let best=+(localStorage.getItem('run_best')||0); $('best').textContent='рекорд: '+best;
+
+const player={x:110,y:GROUND,w:38,h:46,vy:0,onGround:true};
+let state='ready', speed, points, lives, mult, multT, inv, frame;
+let obstacles,coins,bottles,hearts, bgx1,bgx2, obsT,coinT,botT,heartT;
+const GRAV=0.9, JUMP=-15.4;
+
+function reset(){
+  speed=6.2; points=0; lives=3; mult=1; multT=0; inv=0; frame=0;
+  player.y=GROUND; player.vy=0; player.onGround=true;
+  obstacles=[]; coins=[]; bottles=[]; hearts=[];
+  obsT=60; coinT=90; botT=700; heartT=500; bgx1=0; bgx2=0;
+  updHUD();
+}
+function start(){ reset(); state='playing'; $('overlay').style.display='none'; }
+function gameOver(){
+  state='over';
+  best=Math.max(best,Math.floor(points)); localStorage.setItem('run_best',best); $('best').textContent='рекорд: '+best;
+  $('ovTitle').textContent='💀 Кінець';
+  $('ovText').innerHTML='Ти набрав <b>'+Math.floor(points)+'</b> 👟 кроків.<br>Рекорд: '+best;
+  $('playBtn').textContent='↻ Ще раз';
+  $('overlay').style.display='flex';
+}
+function jump(){ if(state!=='playing')return; if(player.onGround){ player.vy=JUMP; player.onGround=false; } }
+
+function updHUD(){ const L=Math.max(0,Math.min(3,lives)); $('score').textContent=Math.floor(points); $('lives').textContent='❤️'.repeat(L)+'🤍'.repeat(3-L); }
+
+function rand(a,b){return a+Math.random()*(b-a);}
+function hit(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y-a.h<b.y&&a.y>b.y-b.h;}
+
+function spawnObstacle(){ const h=rand(26,52); obstacles.push({x:W+20,y:GROUND,w:rand(22,34),h,e:Math.random()<.5?'🌵':'📦'}); }
+function spawnCoins(){ const n=Math.floor(rand(3,6)); const hi=Math.random()<.5; const baseY=hi?GROUND-rand(90,140):GROUND-rand(30,55);
+  for(let i=0;i<n;i++) coins.push({x:W+20+i*34,y:baseY-Math.sin(i/n*Math.PI)*22,w:22,h:22,got:false}); }
+function spawnBottle(){ bottles.push({x:W+20,y:GROUND-rand(60,120),w:26,h:30}); }
+function spawnHeart(){ if(lives<3) hearts.push({x:W+20,y:GROUND-rand(60,120),w:26,h:26}); }
+
+function step(){
+  frame++;
+  speed+=0.0016;
+  // фон-паралакс
+  bgx1=(bgx1-speed*0.3)%W; bgx2=(bgx2-speed*0.6)%W;
+
+  // спавни
+  if(--obsT<=0){ spawnObstacle(); obsT=rand(58,104)*(6/speed)+22; }
+  if(--coinT<=0){ spawnCoins(); coinT=rand(120,240); }
+  if(--botT<=0){ spawnBottle(); botT=rand(650,1050); }
+  if(--heartT<=0){ spawnHeart(); heartT=rand(520,900); }
+
+  // фізика гравця
+  player.vy+=GRAV; player.y+=player.vy;
+  if(player.y>=GROUND){ player.y=GROUND; player.vy=0; player.onGround=true; }
+  if(inv>0)inv--;
+
+  // рух і колізії
+  const pr={x:player.x,y:player.y,w:player.w,h:player.h};
+  obstacles.forEach(o=>o.x-=speed);
+  coins.forEach(o=>o.x-=speed);
+  bottles.forEach(o=>o.x-=speed);
+  hearts.forEach(o=>o.x-=speed);
+
+  obstacles=obstacles.filter(o=>o.x+o.w>-10);
+  coins=coins.filter(o=>o.x+o.w>-10&&!o.got);
+  bottles=bottles.filter(o=>o.x+o.w>-10);
+  hearts=hearts.filter(o=>o.x+o.w>-10);
+
+  obstacles.forEach(o=>{ if(inv<=0&&hit(pr,o)){ lives--; inv=80; updHUD(); if(lives<=0)gameOver(); } });
+  coins.forEach(o=>{ if(!o.got&&hit(pr,{x:o.x,y:o.y,w:o.w,h:o.h})){ o.got=true; points+=50*mult; pop(o.x,o.y,'+'+(50*mult)); } });
+  bottles.forEach((o,i)=>{ if(hit(pr,{x:o.x,y:o.y,w:o.w,h:o.h})){ mult=2; multT=300; bottles.splice(i,1); pop(o.x,o.y,'×2!'); } });
+  hearts.forEach((o,i)=>{ if(hit(pr,{x:o.x,y:o.y,w:o.w,h:o.h})){ if(lives<3)lives++; hearts.splice(i,1); updHUD(); pop(o.x,o.y,'+❤️'); } });
+
+  // множник
+  if(multT>0){ multT--; if(multT<=0){ mult=1; } }
+
+  // очки за біг
+  points+=0.14*speed*mult;
+  if(frame%4===0)updHUD();
+}
+
+// спливаючі надписи
+let pops=[];
+function pop(x,y,t){ pops.push({x,y,t,life:40}); }
+
+function drawEmoji(e,x,y,size){ ctx.font=size+'px serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(e,x,y); }
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  // зорі/пагорби фон
+  ctx.globalAlpha=.5;
+  for(let i=0;i<W;i+=90){ ctx.fillStyle='#161a2e'; const bx=(i+bgx2+W)%W; ctx.beginPath(); ctx.ellipse(bx,GROUND+8,70,40,0,Math.PI,0,true); ctx.fill(); }
+  ctx.globalAlpha=1;
+  ctx.fillStyle='#8890b8';
+  for(let i=0;i<W;i+=53){ const sx=(i*1.7+bgx1*0.5+W*3)%W; ctx.globalAlpha=.35; ctx.fillRect(sx, 30+(i%70), 2,2); }
+  ctx.globalAlpha=1;
+
+  // земля
+  ctx.strokeStyle='#2a3352'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(0,GROUND+2); ctx.lineTo(W,GROUND+2); ctx.stroke();
+  ctx.fillStyle='#5cc9dd'; ctx.globalAlpha=.7;
+  for(let i=0;i<W;i+=40){ const dx=(i+bgx2*2%40+W)%W; ctx.fillRect(dx,GROUND+6,18,2); }
+  ctx.globalAlpha=1;
+
+  // об'єкти
+  bottles.forEach(o=>drawEmoji('💧',o.x+o.w/2,o.y-o.h/2,30));
+  hearts.forEach(o=>drawEmoji('❤️',o.x+o.w/2,o.y-o.h/2,26));
+  coins.forEach(o=>{ if(!o.got){ const bob=Math.sin((frame+o.x)/12)*3; drawEmoji('🪙',o.x+o.w/2,o.y-o.h/2+bob,24);} });
+  obstacles.forEach(o=>{ ctx.font=(o.h+14)+'px serif'; ctx.textAlign='center'; ctx.textBaseline='alphabetic'; ctx.fillText(o.e,o.x+o.w/2,o.y+4); });
+
+  // гравець (блимає при невразливості)
+  if(!(inv>0&&Math.floor(frame/5)%2)){
+    const py=player.y-player.h/2 - (player.onGround?0:0);
+    ctx.save(); ctx.translate(player.x+player.w/2,py); ctx.scale(-1,1); // дзеркалимо, щоб дивився вправо
+    drawEmoji('🏃',0,0,46); ctx.restore();
+  }
+
+  // спливаючі
+  pops=pops.filter(p=>p.life>0);
+  pops.forEach(p=>{ p.y-=1; p.life--; ctx.globalAlpha=Math.max(0,p.life/40); ctx.fillStyle='#ffd76b'; ctx.font='bold 18px Inter,sans-serif'; ctx.textAlign='center'; ctx.fillText(p.t,p.x,p.y-14); ctx.globalAlpha=1; });
+
+  // множник HUD
+  const m=$('mult'); if(multT>0){ m.style.display='flex'; $('multBar').style.width=(multT/300*100)+'%'; } else m.style.display='none';
+}
+
+function loop(){ if(state==='playing') step(); draw(); requestAnimationFrame(loop); }
+
+// керування
+function press(e){ if(state==='playing'){ jump(); } e.preventDefault(); }
+window.addEventListener('keydown',e=>{ if(e.code==='Space'||e.code==='ArrowUp'){ if(state==='playing')jump(); e.preventDefault(); } });
+cv.addEventListener('pointerdown',press);
+$('playBtn').addEventListener('click',e=>{ e.stopPropagation(); start(); });
+
+reset(); loop();
+</script>
+</body>
+</html>

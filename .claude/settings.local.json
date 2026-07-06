@@ -38,7 +38,10 @@
       "Bash(node --check server/server.js)",
       "Bash(echo \"=== знімки ===\")",
       "Bash(curl -s '__TRACKED_VAR__/steam_playtime?select=date,total_minutes&order=date.desc&limit=6' -H 'apikey: __TRACKED_VAR__' -H 'Authorization: Bearer __TRACKED_VAR__')",
-      "Bash(python -c \"import json,sys;print\\('total хв зараз:',sum\\(g.get\\('playtime_forever',0\\) for g in json.load\\(sys.stdin\\)['response']['games']\\)\\)\")"
+      "Bash(python -c \"import json,sys;print\\('total хв зараз:',sum\\(g.get\\('playtime_forever',0\\) for g in json.load\\(sys.stdin\\)['response']['games']\\)\\)\")",
+      "Bash(node --check server/login.js)",
+      "Bash(node --check _g.js)",
+      "Bash(rm -f _g.js)"
     ]
   }
 }
