@@ -561,7 +561,7 @@ function debtMonthlySeries(n){const arr=[],now=new Date();for(let i=n-1;i>=0;i--
 /* ===== ДНІ ===== */
 function getDay(k){if(!state.days[k])state.days[k]={water:0,exercises:{},limits:{},counters:{},note:''};const d=state.days[k];d.counters=d.counters||{};d.limits=d.limits||{};d.exercises=d.exercises||{};d.note=d.note??'';return d;}
 const _c={};
-function exTarget(ex,k){const ck=ex.id+'|'+k;if(_c[ck]!=null)return _c[ck];if(!state.days[prevKey(k)])return _c[ck]=ex.base;const p=prevKey(k),pt=exTarget(ex,p);const pd=(state.days[p].exercises&&state.days[p].exercises[ex.id])||0;const g=ex.grow||0;if(pd>=pt)return _c[ck]=Math.round(g?pt+g:ex.base);return _c[ck]=Math.round(pt*ex.penalty);}
+function exTarget(ex,k){const ck=ex.id+'|'+k;if(_c[ck]!=null)return _c[ck];if(!state.days[prevKey(k)])return _c[ck]=ex.base;const p=prevKey(k),pt=exTarget(ex,p);const pd=(state.days[p].exercises&&state.days[p].exercises[ex.id])||0;const g=ex.grow||0;if(pd>=pt)return _c[ck]=Math.round(g?pt+g:ex.base);return _c[ck]=Math.max(ex.base,Math.round(pt*ex.penalty));}
 function addWater(n){const d=getDay(activeDay());d.water=Math.max(0,d.water+n);save();}
 function addEx(id,n){const d=getDay(activeDay());d.exercises[id]=Math.max(0,(d.exercises[id]||0)+n);save();}
 function setLimit(id,v){getDay(activeDay()).limits[id]=Math.max(0,+v||0);save();}
@@ -920,7 +920,7 @@ function rl(elId,arr,type){$(elId).innerHTML=arr.map((it,i)=>{const del=`<button
   if(type==='loan')return `<div class="settings-item"><input value="${it.name}" data-f="name" placeholder="Назва кредиту">${del}</div>`;
 }).join('');}
 function readL(elId,type){return [...$(elId).querySelectorAll('.settings-item')].map(r=>{const g=f=>r.querySelector(`[data-f="${f}"]`)?.value;
-  if(type==='ex')return{id:uid(),name:g('name')||'Вправа',base:+g('base')||10,penalty:+g('penalty')||2,grow:+g('grow')||0};
+  if(type==='ex'){const num=(v,d)=>{const n=parseFloat(v);return isNaN(n)?d:n;};return{id:uid(),name:g('name')||'Вправа',base:num(g('base'),10)||10,penalty:num(g('penalty'),2),grow:num(g('grow'),0)};}
   if(type==='lim'){const mode=g('mode')||'day';const o={id:uid(),name:g('name')||'Ліміт',mode,entry:g('entry')||'input',unit:g('unit')||'',max:+g('max')||1};if(mode==='week'){o.startPerWeek=+g('startPerWeek')||5;o.stepPerWeek=+g('stepPerWeek')||1;o.minPerWeek=+g('minPerWeek')||1;o.startDate=weekMondayKey(new Date());}return o;}
   if(type==='cnt')return{id:uid(),name:g('name')||'Лічильник',goal:+g('goal')||1,unit:g('unit')||''};
   if(type==='loan')return{id:uid(),name:g('name')||'Кредит'};});}

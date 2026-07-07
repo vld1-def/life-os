@@ -50,27 +50,29 @@
 </div>
 
 <div class="wrap">
-  <canvas id="c" width="820" height="340"></canvas>
+  <canvas id="c" width="640" height="300"></canvas>
   <div class="mult" id="mult">×2 <div class="bar"><i id="multBar"></i></div></div>
   <div class="overlay" id="overlay">
     <h2 id="ovTitle">🏃 Раннер за 30 сек</h2>
-    <p id="ovText">Набери якнайбільше 👟! Стрибай через конуси 🚧 та перестрибуй ями. Лови 🪙 (+50) і 💧 (×2 на 5с). <b>Кожна втрата життя дає +5 секунд</b>, а ❤️ повертає життя.</p>
+    <p id="ovText">Набери якнайбільше 👟! Стрибай через конуси 🚧 та перестрибуй ями. Лови 🪙 (+50) і 💧 (×2 на 5с). Втрата ❤️ = +5 секунд. <b>Витримаєш усі 30 с — очки ×2!</b></p>
     <button class="play" id="playBtn">▶ Грати</button>
     <div class="hint">Тап по екрану / Пробіл / ↑ — стрибок</div>
   </div>
 </div>
-<div class="legend">⏱ 30с · втрата ❤️ = +5с · 🪙 +50 · 💧 ×2 · 🚧 конуси + ⬛ ями</div>
+<div class="legend">⏱ 30с · витримав = ×2 · втрата ❤️ = +5с · 🪙 +50 · 💧 ×2 · ❤️ рідко</div>
 
 <script>
 const cv=document.getElementById('c'),ctx=cv.getContext('2d');
 const W=cv.width,H=cv.height,GROUND=H-54;
 const $=id=>document.getElementById(id);
-let best=+(localStorage.getItem('run_best2')||0); $('best').textContent='рекорд: '+best;
+let best={p:0,t:0}; try{const b=JSON.parse(localStorage.getItem('run_best3'));if(b&&typeof b.p==='number')best=b;}catch(e){}
+function showBest(){ $('best').textContent='рекорд: '+best.p+(best.t?(' · '+best.t+'с'):''); }
+showBest();
 
 const BASE_SPEED=5.0, SPEED_RATE=0.09, GRAV=0.9, JUMP=-15, START_TIME=30;
-const player={x:120,y:GROUND,w:26,h:44,vy:0,onGround:true};
+const player={x:100,y:GROUND,w:30,h:50,vy:0,onGround:true};
 let state='ready', speed, points, lives, mult, multT, invT, elapsed, timeLeft, runPhase;
-let hazards,coins,bottles,hearts,pops,dust, bgx1,bgx2, dHaz,nHaz,dCoin,nCoin,dBot,nBot, heartClock, last;
+let hazards,coins,bottles,hearts,pops,dust, bgx1,bgx2, dHaz,nHaz,dCoin,nCoin,dBot,nBot,dHeart,nHeart, roadX, last;
 
 function rand(a,b){return a+Math.random()*(b-a);}
 function overlap(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x;}
@@ -80,15 +82,17 @@ function reset(){
   elapsed=0; timeLeft=START_TIME; speed=BASE_SPEED; points=0; lives=3; mult=1; multT=0; invT=0; runPhase=0;
   player.y=GROUND; player.vy=0; player.onGround=true;
   hazards=[];coins=[];bottles=[];hearts=[];pops=[];dust=[];
-  dHaz=0; nHaz=rand(240,380); dCoin=0; nCoin=rand(150,300); dBot=0; nBot=rand(1700,2700);
-  heartClock=0; bgx1=0; bgx2=0; last=0; updHUD();
+  dHaz=0; nHaz=rand(240,380); dCoin=0; nCoin=rand(150,300); dBot=0; nBot=rand(1700,2700); dHeart=0; nHeart=rand(2500,6500);
+  bgx1=0; bgx2=0; roadX=0; last=0; updHUD();
 }
 function start(){ reset(); state='playing'; $('overlay').style.display='none'; }
-function gameOver(){
+function gameOver(won){
   if(state==='over')return; state='over';
-  best=Math.max(best,Math.floor(points)); localStorage.setItem('run_best2',best); $('best').textContent='рекорд: '+best;
-  $('ovTitle').textContent='⏱ Гру завершено!';
-  $('ovText').innerHTML='Ти набрав <b>'+Math.floor(points)+'</b> 👟 кроків за <b>'+elapsed.toFixed(1)+' с</b>.<br>Рекорд: '+best;
+  if(won) points*=2;
+  const fp=Math.floor(points), ft=Math.round(elapsed);
+  if(fp>best.p){ best={p:fp,t:ft}; localStorage.setItem('run_best3',JSON.stringify(best)); showBest(); }
+  $('ovTitle').textContent=won?'🏆 Ти витримав!':'💀 Не дожив';
+  $('ovText').innerHTML=(won?'<b style="color:#5cc9dd">×2 за витримку!</b> ':'')+'Набрав <b>'+fp+'</b> 👟 за <b>'+ft+' с</b>.<br>Рекорд: '+best.p+' · '+best.t+'с';
   $('playBtn').textContent='↻ Ще раз'; $('overlay').style.display='flex';
 }
 function jump(){ if(state==='playing'&&player.onGround){ player.vy=JUMP; player.onGround=false; } }
@@ -106,25 +110,23 @@ function spawnHazard(){
 }
 function spawnCoin(){ const high=Math.random()<.5; const bottom=high?GROUND-rand(66,116):GROUND-rand(6,22); coins.push({x:W+20,y:bottom,w:22,h:22,got:false}); }
 function spawnBottle(){ bottles.push({x:W+20,y:GROUND-rand(60,108),w:26,h:30}); }
-function spawnHeart(){ if(lives<3) hearts.push({x:W+20,y:GROUND-rand(60,108),w:26,h:26}); }
+function spawnHeart(){ hearts.push({x:W+20,y:GROUND-rand(60,108),w:28,h:28}); }
 function pop(x,y,t,col){ pops.push({x,y,t,life:42,col:col||'#ffd76b'}); }
-function loseLife(){ invT=1.3; heartClock=0; lives--; if(lives<=0){ updHUD(); gameOver(); } else { timeLeft+=5; pop(player.x,player.y-46,'+5с','#5cc9dd'); updHUD(); } }
+function loseLife(){ invT=1.3; lives--; if(lives<=0){ updHUD(); gameOver(false); } else { timeLeft+=5; pop(player.x,player.y-46,'+5с','#5cc9dd'); updHUD(); } }
 
 function step(dt){
   const ds=dt/60;
   elapsed+=ds; timeLeft-=ds;
-  if(timeLeft<=0){ timeLeft=0; updHUD(); return gameOver(); }
+  if(timeLeft<=0){ timeLeft=0; updHUD(); return gameOver(true); }
   speed=BASE_SPEED+elapsed*SPEED_RATE;
   const mv=speed*dt;
-  bgx1=(bgx1-mv*0.3)%W; bgx2=(bgx2-mv*0.6)%W;
+  bgx1=(bgx1-mv*0.3)%W; bgx2=(bgx2-mv*0.6)%W; roadX=(roadX-mv)%40;
   if(player.onGround) runPhase+=mv*0.055;
 
   dHaz+=mv; if(dHaz>=nHaz){ spawnHazard(); dHaz=0; nHaz=rand(300,720); }
   dCoin+=mv; if(dCoin>=nCoin){ spawnCoin(); dCoin=0; nCoin=rand(190,440); }
   dBot+=mv; if(dBot>=nBot){ spawnBottle(); dBot=0; nBot=rand(2200,4200); }
-
-  heartClock+=ds;
-  if(lives<3 && heartClock>=lives*5 && hearts.length===0){ spawnHeart(); heartClock=0; }
+  dHeart+=mv; if(dHeart>=nHeart){ spawnHeart(); dHeart=0; nHeart=rand(3500,8000); }
 
   player.vy+=GRAV*dt; player.y+=player.vy*dt;
   if(player.y>=GROUND){ player.y=GROUND; player.vy=0; player.onGround=true; }
@@ -148,7 +150,7 @@ function step(dt){
   });
   coins.forEach(o=>{ if(!o.got&&hitBox(pr,{x:o.x,y:o.y,w:o.w,h:o.h})){ o.got=true; points+=50*mult; pop(o.x,o.y,'+'+(50*mult)); } });
   bottles.forEach((o,i)=>{ if(hitBox(pr,{x:o.x,y:o.y,w:o.w,h:o.h})){ mult=2; multT=5; bottles.splice(i,1); pop(o.x,o.y,'×2!','#5cc9dd'); } });
-  hearts.forEach((o,i)=>{ if(hitBox(pr,{x:o.x,y:o.y,w:o.w,h:o.h})){ if(lives<3)lives++; heartClock=0; hearts.splice(i,1); updHUD(); pop(o.x,o.y,'+❤️','#e56b7b'); } });
+  hearts.forEach((o,i)=>{ if(hitBox(pr,{x:o.x,y:o.y,w:o.w,h:o.h})){ if(lives<3){lives++;pop(o.x,o.y,'+❤️','#e56b7b');}else{points+=100;pop(o.x,o.y,'+100','#e56b7b');} hearts.splice(i,1); updHUD(); } });
 
   points+=2*ds*mult;
   updHUD();
@@ -181,7 +183,7 @@ function draw(){
   ctx.fillStyle='#171d33'; ctx.fillRect(0,GROUND+3,W,H-GROUND);
   ctx.strokeStyle='#33406a'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(0,GROUND+2); ctx.lineTo(W,GROUND+2); ctx.stroke();
   ctx.fillStyle='#5cc9dd'; ctx.globalAlpha=.5;
-  for(let i=0;i<W;i+=40){ const dx=((i+bgx2*2)%W+W)%W; ctx.fillRect(dx,GROUND+7,16,2); }
+  const ro=((roadX%40)+40)%40; for(let i=-40;i<W+40;i+=40){ ctx.fillRect(i+ro,GROUND+7,16,2); }
   ctx.globalAlpha=1;
   // ями (діри в землі)
   hazards.filter(o=>o.t==='pit').forEach(o=>{
@@ -206,9 +208,9 @@ function draw(){
     ctx.fillStyle='#c25e1c'; ctx.fillRect(o.x-6,base-3,o.w+12,4);
   });
   // бонуси
-  bottles.forEach(o=>drawEmoji('💧',o.x+o.w/2,o.y-o.h/2,30));
-  hearts.forEach(o=>drawEmoji('❤️',o.x+o.w/2,o.y-o.h/2,26));
-  coins.forEach(o=>{ if(!o.got){ const bob=Math.sin(elapsed*10+o.x/20)*3; drawEmoji('🪙',o.x+o.w/2,o.y-o.h/2+bob,24);} });
+  bottles.forEach(o=>drawEmoji('💧',o.x+o.w/2,o.y-o.h/2,34));
+  hearts.forEach(o=>drawEmoji('❤️',o.x+o.w/2,o.y-o.h/2,30));
+  coins.forEach(o=>{ if(!o.got){ const bob=Math.sin(elapsed*10+o.x/20)*3; drawEmoji('🪙',o.x+o.w/2,o.y-o.h/2+bob,28);} });
   // пил
   dust.forEach(d=>{ ctx.globalAlpha=Math.max(0,d.life/16)*.5; ctx.fillStyle='#8f98b8'; ctx.beginPath(); ctx.arc(d.x,d.y,d.r,0,7); ctx.fill(); }); ctx.globalAlpha=1;
   // бігун
