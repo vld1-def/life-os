@@ -188,16 +188,13 @@
     <div class="muted" id="monthLegend" style="margin-top:10px"></div>
   </div>
 
-  <!-- ТИЖДЕНЬ -->
+  <!-- ОГЛЯД (тиждень/місяць) -->
   <div class="glass card">
-    <h2><span class="dot" style="background:var(--yellow)"></span>Тиждень <span id="weekRange" style="text-transform:none;letter-spacing:0;color:var(--muted);font-weight:600"></span></h2>
-    <div id="weekBody"></div>
-  </div>
-
-  <!-- МІСЯЧНИЙ ОГЛЯД -->
-  <div class="glass card">
-    <h2><span class="dot" style="background:var(--red)"></span>🔥 Місячний огляд <span id="monthOvLabel" style="text-transform:none;letter-spacing:0;color:var(--muted);font-weight:600"></span></h2>
-    <div id="monthOverview"></div>
+    <div class="between" style="flex-wrap:wrap;gap:8px">
+      <h2 style="margin:0"><span class="dot" style="background:var(--yellow)"></span>Огляд <span id="ovRange" style="text-transform:none;letter-spacing:0;color:var(--muted);font-weight:600"></span></h2>
+      <div class="flex"><button class="sm" id="ovWeekBtn" onclick="setOverview('week')">Тиждень</button><button class="sm" id="ovMonthBtn" onclick="setOverview('month')">Місяць</button></div>
+    </div>
+    <div id="ovBody" style="margin-top:12px"></div>
   </div>
 
   <!-- АКТИВНІСТЬ -->
@@ -401,7 +398,7 @@ const LOC=()=>lang==='en'?'en-US':'uk-UA';
 const EN={
 '🔥 серія':'🔥 streak','⭐ бал дня':'⭐ day score','💳 борг':'💳 debt',
 'Мій прогрес':'My progress','Активність':'Activity','Вода':'Water','Ліміти':'Limits','Лічильники':'Counters','Нотатка дня':'Day note','Мої цілі / таски':'My goals / tasks','Тиждень':'Week','Сон':'Sleep','Заснув':'Fell asleep','Прокинувся':'Woke up','Тривалість':'Duration','😴 Ціль сну (год)':'😴 Sleep goal (h)',
-'🔥 Місячний огляд':'🔥 Monthly overview','Сер. сон':'Avg sleep','🎮 Ігри':'🎮 Games','Планка (сек)':'Plank (sec)','Фінанси (Влад) —':'Finances (Vlad) —',
+'Огляд':'Overview','Місяць':'Month','Сер. сон':'Avg sleep','🎮 Ігри':'🎮 Games','Планка (сек)':'Plank (sec)','Фінанси (Влад) —':'Finances (Vlad) —',
 '🗓 Календар':'🗓 Calendar','📈 Графік':'📈 Chart','По місяцях':'By month','По днях':'By day','Нова ціль...':'New goal...','+ 💧':'+ 💧',
 'Витрати цього місяця':'Spent this month','Загальний борг зараз':'Total debt now','Витрати':'Spending','Куди йдуть гроші':'Where money goes','(тисни категорію → графік по днях)':'(tap a category → daily chart)','💳 Кредити — впиши поточний борг (зберігається на сьогодні)':'💳 Loans — enter current debt (saved for today)','📉 Борг':'📉 Debt','Підкатегорії:':'Subcategories:',
 'цього місяця витрат ще немає':'no spending this month yet','немає підкатегорій':'no subcategories','завантаження витрат...':'loading spending...','почни вписувати борг — і тут з\'явиться графік':'start entering debt — a chart will appear here','Додай кредити в налаштуваннях':'Add loans in settings','впиши поточний борг →':'enter current debt →','🎉 закрито!':'🎉 closed!','= як минулого':'= same as last','немає даних':'no data',
@@ -638,8 +635,7 @@ function render(){
 
   renderFinance();
   renderMonth();
-  renderWeek();
-  renderMonthOverview();
+  renderOverview();
   $('scoreVal').textContent=(dayScore(tk)??0)+'%';
   $('streakVal').textContent=computeStreak();
   $('debtVal').textContent=fmt(Math.round(totalDebtNow()));
@@ -782,42 +778,48 @@ function weekStats(){const mon=weekMonday(new Date());const set=new Set();for(le
   let scSum=0,scN=0,good=0,waterOk=0;set.forEach(k=>{const sc=dayScore(k);if(sc!=null){scSum+=sc;scN++;if(sc>=70||state.restDays[k])good++;}const d=state.days[k];if(d&&d.water>=state.settings.waterGoal)waterOk++;});
   let spent=0;(expRows||[]).forEach(r=>{const ds=r.ym+'-'+String(r.day).padStart(2,'0');if(set.has(ds))spent+=r.sum;});
   return{good,avg:scN?Math.round(scSum/scN):0,waterOk,spent};}
-function renderWeek(){const w=weekStats(),cur=state.settings.currency;
-  const _mon=weekMonday(new Date()),_sun=new Date(_mon);_sun.setDate(_sun.getDate()+6);
-  const _wr=$('weekRange'); if(_wr)_wr.textContent='· '+_mon.toLocaleDateString(LOC(),{day:'numeric',month:'short'})+' – '+_sun.toLocaleDateString(LOC(),{day:'numeric',month:'short'});
-  const wl=state.settings.limitHabits.filter(l=>l.mode==='week');
-  let extra='';
-  if(wl.length){extra='<div style="margin-top:12px">'+wl.map(l=>{const q=limitWeekQuota(l),c=weekConsumed(l.id),over=c>q,left=Math.max(0,q-c);
-    return `<div class="row"><div style="flex:1"><div>${l.name} <span class="tag ${over?'warn':'ok'}">${c}/${q} ${l.unit}</span></div><div class="muted">лишилось ${left} ${l.unit} до кінця тижня · наступний тиждень: ${Math.max(l.minPerWeek||1,q-(l.stepPerWeek||1))}</div><div class="bar" style="height:6px"><i style="width:${Math.min(100,c/q*100)}%;background:${over?'linear-gradient(90deg,#dc2626,#e56b7b)':'linear-gradient(90deg,#2f8b66,#4fc596)'}"></i></div></div></div>`;}).join('')+'</div>';}
-  $('weekBody').innerHTML=`<div class="week-grid">
-    <div class="fin-box"><div class="lbl">Хороші дні</div><div class="big-num neon-green">${w.good}/7</div></div>
-    <div class="fin-box"><div class="lbl">Сер. бал</div><div class="big-num neon-cyan">${w.avg}%</div></div>
-    <div class="fin-box"><div class="lbl">Вода ✓</div><div class="big-num">${w.waterOk}/7</div></div>
-    <div class="fin-box"><div class="lbl">Витрачено</div><div class="big-num neon-red">${fmt(Math.round(w.spent))} ${cur}</div></div>
-  </div>`+extra;}
-
+let overviewMode='week';
+function setOverview(m){overviewMode=m;renderOverview();}
 function monthStats(){
   const mk=monthKey(),[y,m]=mk.split('-').map(Number),daysIn=new Date(y,m,0).getDate();
-  const elapsed=(mk===monthKey()&&y===new Date().getFullYear()&&m===new Date().getMonth()+1)?new Date().getDate():daysIn;
-  let good=0,scSum=0,scN=0,waterOk=0,slpSum=0,slpN=0,exDone=0,gamesMin=0;
+  const elapsed=(y===new Date().getFullYear()&&m===new Date().getMonth()+1)?new Date().getDate():daysIn;
+  let good=0,scSum=0,scN=0,waterOk=0,slpSum=0,slpN=0,gamesMin=0;
   for(let dd=1;dd<=elapsed;dd++){const k=mk+'-'+String(dd).padStart(2,'0');const sc=dayScore(k);
     if(sc!=null){scSum+=sc;scN++;if(sc>=70||state.restDays[k])good++;}
     const day=state.days[k];if(day&&day.water>=state.settings.waterGoal)waterOk++;
     const sh=sleepHours(k);if(sh>0){slpSum+=sh;slpN++;}
     if(steamPlay[k])gamesMin+=steamPlay[k];}
-  return{elapsed,good,avg:scN?Math.round(scSum/scN):0,waterOk,avgSleep:slpN?Math.round(slpSum/slpN*10)/10:0,spent:monthTotal(mk),gamesH:Math.round(gamesMin/60*10)/10};
+  return{daysIn,elapsed,good,avg:scN?Math.round(scSum/scN):0,waterOk,avgSleep:slpN?Math.round(slpSum/slpN*10)/10:0,spent:monthTotal(mk),gamesH:Math.round(gamesMin/60*10)/10};
 }
-function renderMonthOverview(){
-  const s=monthStats(),cur=state.settings.currency;
-  const lbl=$('monthOvLabel'); if(lbl)lbl.textContent='· '+new Date().toLocaleDateString(LOC(),{month:'long'});
-  $('monthOverview').innerHTML=`<div class="week-grid" style="grid-template-columns:repeat(3,1fr)">
-    <div class="fin-box"><div class="lbl">Хороші дні</div><div class="big-num neon-green">${s.good}/${s.elapsed}</div></div>
-    <div class="fin-box"><div class="lbl">Сер. бал</div><div class="big-num neon-cyan">${s.avg}%</div></div>
-    <div class="fin-box"><div class="lbl">Вода ✓</div><div class="big-num">${s.waterOk}/${s.elapsed}</div></div>
-    <div class="fin-box"><div class="lbl">Сер. сон</div><div class="big-num neon-purple">${s.avgSleep} год</div></div>
-    <div class="fin-box"><div class="lbl">🎮 Ігри</div><div class="big-num">${s.gamesH} год</div></div>
-    <div class="fin-box"><div class="lbl">Витрачено</div><div class="big-num neon-red">${fmt(Math.round(s.spent))} ${cur}</div></div>
-  </div>`;
+function renderOverview(){
+  const cur=state.settings.currency;
+  $('ovWeekBtn').className='sm '+(overviewMode==='week'?'acc':'');
+  $('ovMonthBtn').className='sm '+(overviewMode==='month'?'acc':'');
+  if(overviewMode==='week'){
+    const w=weekStats(),mon=weekMonday(new Date()),sun=new Date(mon);sun.setDate(sun.getDate()+6);
+    $('ovRange').textContent='· Пн–Нд · '+mon.toLocaleDateString(LOC(),{day:'numeric',month:'short'})+' – '+sun.toLocaleDateString(LOC(),{day:'numeric',month:'short'});
+    const wl=state.settings.limitHabits.filter(l=>l.mode==='week');
+    let extra='';
+    if(wl.length){extra='<div style="margin-top:12px">'+wl.map(l=>{const q=limitWeekQuota(l),c=weekConsumed(l.id),over=c>q,left=Math.max(0,q-c);
+      return `<div class="row"><div style="flex:1"><div>${l.name} <span class="tag ${over?'warn':'ok'}">${c}/${q} ${l.unit}</span></div><div class="muted">лишилось ${left} ${l.unit} до кінця тижня · наступний тиждень: ${Math.max(l.minPerWeek||1,q-(l.stepPerWeek||1))}</div><div class="bar" style="height:6px"><i style="width:${Math.min(100,c/q*100)}%;background:${over?'linear-gradient(90deg,#dc2626,#e56b7b)':'linear-gradient(90deg,#2f8b66,#4fc596)'}"></i></div></div></div>`;}).join('')+'</div>';}
+    $('ovBody').innerHTML=`<div class="week-grid">
+      <div class="fin-box"><div class="lbl">Хороші дні</div><div class="big-num neon-green">${w.good}/7</div></div>
+      <div class="fin-box"><div class="lbl">Сер. бал</div><div class="big-num neon-cyan">${w.avg}%</div></div>
+      <div class="fin-box"><div class="lbl">Вода ✓</div><div class="big-num">${w.waterOk}/7</div></div>
+      <div class="fin-box"><div class="lbl">Витрачено</div><div class="big-num neon-red">${fmt(Math.round(w.spent))} ${cur}</div></div>
+    </div>`+extra;
+  } else {
+    const s=monthStats();
+    $('ovRange').textContent='· '+new Date().toLocaleDateString(LOC(),{month:'long'});
+    $('ovBody').innerHTML=`<div class="week-grid" style="grid-template-columns:repeat(3,1fr)">
+      <div class="fin-box"><div class="lbl">Хороші дні</div><div class="big-num neon-green">${s.good}/${s.daysIn}</div></div>
+      <div class="fin-box"><div class="lbl">Сер. бал</div><div class="big-num neon-cyan">${s.avg}%</div></div>
+      <div class="fin-box"><div class="lbl">Вода ✓</div><div class="big-num">${s.waterOk}/${s.daysIn}</div></div>
+      <div class="fin-box"><div class="lbl">Сер. сон</div><div class="big-num neon-purple">${s.avgSleep} год</div></div>
+      <div class="fin-box"><div class="lbl">🎮 Ігри</div><div class="big-num">${s.gamesH} год</div></div>
+      <div class="fin-box"><div class="lbl">Витрачено</div><div class="big-num neon-red">${fmt(Math.round(s.spent))} ${cur}</div></div>
+    </div>`;
+  }
 }
 
 /* тултіп календаря (миттєвий) */
