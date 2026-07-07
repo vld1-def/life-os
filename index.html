@@ -256,6 +256,8 @@
   <!-- СОН -->
   <div class="glass card">
     <h2><span class="dot" style="background:var(--purple)"></span>Сон</h2>
+    <div class="flex" style="margin-bottom:8px"><button class="sm acc" onclick="sleepBedNow()" style="flex:1">😴 Ліг зараз</button><button class="sm acc" onclick="sleepWakeNow()" style="flex:1">☀️ Встав зараз</button></div>
+    <div id="sleepPending" class="muted" style="margin-bottom:8px"></div>
     <div class="flex" style="gap:12px">
       <label class="muted" style="flex:1;font-size:12px">Заснув<input type="time" id="sleepBed" onchange="setSleep('b',this.value)" style="margin-top:4px"></label>
       <label class="muted" style="flex:1;font-size:12px">Прокинувся<input type="time" id="sleepWake" onchange="setSleep('w',this.value)" style="margin-top:4px"></label>
@@ -397,7 +399,7 @@ let lang=localStorage.getItem('lifeos_lang')||'uk';
 const LOC=()=>lang==='en'?'en-US':'uk-UA';
 const EN={
 '🔥 серія':'🔥 streak','⭐ бал дня':'⭐ day score','💳 борг':'💳 debt',
-'Мій прогрес':'My progress','Активність':'Activity','Вода':'Water','Ліміти':'Limits','Лічильники':'Counters','Нотатка дня':'Day note','Мої цілі / таски':'My goals / tasks','Тиждень':'Week','Сон':'Sleep','Заснув':'Fell asleep','Прокинувся':'Woke up','Тривалість':'Duration','😴 Ціль сну (год)':'😴 Sleep goal (h)',
+'Мій прогрес':'My progress','Активність':'Activity','Вода':'Water','Ліміти':'Limits','Лічильники':'Counters','Нотатка дня':'Day note','Мої цілі / таски':'My goals / tasks','Тиждень':'Week','Сон':'Sleep','Заснув':'Fell asleep','Прокинувся':'Woke up','Тривалість':'Duration','😴 Ціль сну (год)':'😴 Sleep goal (h)','😴 Ліг зараз':'😴 To bed now','☀️ Встав зараз':'☀️ Awake now',
 'Огляд':'Overview','Місяць':'Month','Сер. сон':'Avg sleep','🎮 Ігри':'🎮 Games','Планка (сек)':'Plank (sec)','Фінанси (Влад) —':'Finances (Vlad) —',
 '🗓 Календар':'🗓 Calendar','📈 Графік':'📈 Chart','По місяцях':'By month','По днях':'By day','Нова ціль...':'New goal...','+ 💧':'+ 💧',
 'Витрати цього місяця':'Spent this month','Загальний борг зараз':'Total debt now','Витрати':'Spending','Куди йдуть гроші':'Where money goes','(тисни категорію → графік по днях)':'(tap a category → daily chart)','💳 Кредити — впиши поточний борг (зберігається на сьогодні)':'💳 Loans — enter current debt (saved for today)','📉 Борг':'📉 Debt','Підкатегорії:':'Subcategories:',
@@ -566,6 +568,9 @@ function setLimit(id,v){getDay(activeDay()).limits[id]=Math.max(0,+v||0);save();
 function setCounter(id,v){getDay(activeDay()).counters[id]=Math.max(0,+v||0);save();}
 function saveNote(v){getDay(activeDay()).note=v;save();}
 function setSleep(f,v){const d=getDay(activeDay());d.sleep=d.sleep||{};d.sleep[f]=v;save();}
+function nowHM(){const n=new Date();return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');}
+function sleepBedNow(){state.pendingBed=nowHM();save();toast('😴 Заснув о '+state.pendingBed);}
+function sleepWakeNow(){const w=nowHM(),b=state.pendingBed||'';const d=getDay(todayKey());d.sleep={b,w,h:null};state.pendingBed=null;save();const h=sleepHours(todayKey());toast('☀️ Сон записано: '+(b||'?')+'–'+w+(h?(' · '+h+' год'):''));}
 function sleepHours(k){const d=state.days[k];if(!d||!d.sleep)return 0;const s=d.sleep;if(s.h!=null&&s.h!=='')return Math.round((+s.h)*10)/10;if(!s.b||!s.w)return 0;const tm=t=>{const[h,m]=t.split(':').map(Number);return h*60+m;};let diff=tm(s.w)-tm(s.b);if(diff<0)diff+=1440;return Math.round(diff/60*10)/10;}
 let sleepDB={};
 async function loadSleepDB(){ if(!sb)return; const {data,error}=await sb.from('sleep').select('date,bed,wake,hours').limit(2000); if(error||!data)return; sleepDB={}; data.forEach(r=>{sleepDB[r.date]={b:r.bed||'',w:r.wake||'',h:(r.hours==null?null:r.hours)};}); applySleepDB(); render(); }
@@ -631,6 +636,7 @@ function render(){
   $('noteInput').value=d.note||'';
   const slp=d.sleep||{}; $('sleepBed').value=slp.b||''; $('sleepWake').value=slp.w||'';
   const sh=sleepHours(ad); $('sleepDur').textContent=sh?sh+' год':'—'; $('sleepBar').style.width=Math.min(100,sh/(S.sleepGoal||8)*100)+'%';
+  $('sleepPending').textContent=state.pendingBed?('😴 Заснув о '+state.pendingBed+' — зранку тисни «Встав зараз»'):'';
   $('taskList').innerHTML=state.tasks.map(t=>`<div class="todo ${t.done?'done':''}"><div class="check ${t.done?'on':''}" onclick="toggleTask('${t.id}')">${t.done?'✓':''}</div><span style="flex:1">${t.text}</span><button class="del sm" onclick="delTask('${t.id}')">✕</button></div>`).join('')||'<div class="empty">Постав собі перші цілі 🎯</div>';
 
   renderFinance();

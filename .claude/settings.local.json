@@ -42,7 +42,9 @@
       "Bash(node --check server/login.js)",
       "Bash(node --check _g.js)",
       "Bash(rm -f _g.js)",
-      "Bash(curl -s \"https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=C3C22A053C50BE2A3CE1F0733B5264A5&steamid=76561199040923067&include_played_free_games=1&include_appinfo=1&format=json\" -o s2.json)"
+      "Bash(curl -s \"https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=C3C22A053C50BE2A3CE1F0733B5264A5&steamid=76561199040923067&include_played_free_games=1&include_appinfo=1&format=json\" -o s2.json)",
+      "Bash(node --check _c.js)",
+      "Bash(rm -f _c.js)"
     ]
   }
 }
