@@ -45,7 +45,10 @@
       "Bash(curl -s \"https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=C3C22A053C50BE2A3CE1F0733B5264A5&steamid=76561199040923067&include_played_free_games=1&include_appinfo=1&format=json\" -o s2.json)",
       "Bash(node --check _c.js)",
       "Bash(rm -f _c.js)",
-      "Bash(grep -n \"const v=\\(d.limits&&d.limits\\\\[mt.ref.id\\\\]\\)||0;return{v,goal:mt.ref.max\" index.html)"
+      "Bash(grep -n \"const v=\\(d.limits&&d.limits\\\\[mt.ref.id\\\\]\\)||0;return{v,goal:mt.ref.max\" index.html)",
+      "Bash(cd \"C:/Users/User/AppData/Local/Temp/claude/C--Users-User-Desktop-Active-Live/05a714fb-a967-4081-b627-abf060bfe395/scratchpad\")",
+      "Bash(curl -s '__TRACKED_VAR__/solo?select=data&id=eq.me' -H 'apikey: __TRACKED_VAR__' -H 'Authorization: Bearer __TRACKED_VAR__' -o solo.json)",
+      "Bash(curl -s 'https://xezhbqcteaihrlrykbkr.supabase.co/rest/v1/solo?select=data&id=eq.me' -H 'apikey: sb_publishable_qNcUyFxMlWAWAry3uSHndg_ADVMCE3a' -H 'Authorization: Bearer sb_publishable_qNcUyFxMlWAWAry3uSHndg_ADVMCE3a')"
     ]
   }
 }

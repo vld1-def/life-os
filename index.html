@@ -68,7 +68,7 @@
   .layout{display:flex; gap:15px; align-items:flex-start}
   .main{flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:15px}
   .side{flex:0 0 340px; width:340px; display:flex; flex-direction:column; gap:15px}
-  @media(max-width:900px){.layout{flex-direction:column}.side{flex:1 1 auto; width:100%}}
+  @media(max-width:900px){.layout{flex-direction:column}.main,.side{display:contents}.card{order:var(--o,50)}}
 
   .row{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:9px 0}
   .row+.row{border-top:1px solid rgba(255,255,255,.07)}
@@ -173,7 +173,7 @@
 <div class="layout">
  <div class="main">
   <!-- ПРОГРЕС -->
-  <div class="glass card">
+  <div class="glass card" style="--o:1">
     <div class="between" style="flex-wrap:wrap; gap:10px">
       <h2 style="margin:0"><span class="dot" style="background:var(--cyan)"></span>Мій прогрес</h2>
       <div class="flex" style="flex-wrap:wrap; gap:8px">
@@ -189,7 +189,7 @@
   </div>
 
   <!-- ОГЛЯД (тиждень/місяць) -->
-  <div class="glass card">
+  <div class="glass card" style="--o:2">
     <div class="between" style="flex-wrap:wrap;gap:8px">
       <h2 style="margin:0"><span class="dot" style="background:var(--yellow)"></span>Огляд <span id="ovRange" style="text-transform:none;letter-spacing:0;color:var(--muted);font-weight:600"></span></h2>
       <div class="flex"><button class="sm" id="ovWeekBtn" onclick="setOverview('week')">Тиждень</button><button class="sm" id="ovMonthBtn" onclick="setOverview('month')">Місяць</button></div>
@@ -198,7 +198,7 @@
   </div>
 
   <!-- АКТИВНІСТЬ -->
-  <div class="glass card">
+  <div class="glass card" style="--o:5">
     <h2><span class="dot" style="background:var(--green)"></span>Активність</h2>
     <div id="exList"></div>
   </div>
@@ -228,7 +228,7 @@
 
  <div class="side">
   <!-- ВОДА -->
-  <div class="glass card">
+  <div class="glass card" style="--o:3">
     <h2><span class="dot" style="background:var(--cyan)"></span>Вода</h2>
     <div class="between">
       <div><span class="cnt big-num neon-cyan" id="waterCnt">0</span> <span class="muted">/ <span id="waterGoal">2</span> Л</span><div class="muted" id="waterMl">0 мл</div></div>
@@ -242,19 +242,19 @@
   </div>
 
   <!-- ЛІМІТИ -->
-  <div class="glass card">
+  <div class="glass card" style="--o:6">
     <h2><span class="dot" style="background:var(--red)"></span>Ліміти</h2>
     <div id="limitList"></div>
   </div>
 
   <!-- ЛІЧИЛЬНИКИ -->
-  <div class="glass card">
+  <div class="glass card" style="--o:4">
     <h2><span class="dot" style="background:var(--yellow)"></span>Лічильники</h2>
     <div id="counterList"></div>
   </div>
 
   <!-- СОН -->
-  <div class="glass card">
+  <div class="glass card" style="--o:7">
     <h2><span class="dot" style="background:var(--purple)"></span>Сон</h2>
     <div class="flex" style="margin-bottom:8px"><button class="sm acc" onclick="sleepBedNow()" style="flex:1">😴 Ліг зараз</button><button class="sm acc" onclick="sleepWakeNow()" style="flex:1">☀️ Встав зараз</button></div>
     <div id="sleepPending" class="muted" style="margin-bottom:8px"></div>
@@ -663,7 +663,7 @@ function openNotifs(){const n=buildNotifs();const sec=(t,arr,empty)=>`<div class
   applyLang(); notifs.showModal();}
 
 /* ===== ГРАФІК ===== */
-function svgLine({data,w=800,h=150,color='#5cc9dd',goal=null,goalLabel=''}){
+function svgLine({data,w=800,h=150,color='#5cc9dd',goal=null,goalLabel='',avg=false}){
   if(!data.length) return '<div class="empty">немає даних</div>';
   const pad={l:46,r:14,t:14,b:26}, n=data.length;
   const ys=data.map(d=>d.y);
@@ -681,8 +681,10 @@ function svgLine({data,w=800,h=150,color='#5cc9dd',goal=null,goalLabel=''}){
   const dots=n<=40?pts.map(p=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.6" fill="${color}"/>`).join(''):'';
   const seg=n>1?iw/(n-1):iw;
   let hits='';data.forEach((d,i)=>{hits+=`<rect x="${(X(i)-seg/2).toFixed(1)}" y="0" width="${seg.toFixed(1)}" height="${h}" fill="transparent" data-tip="${(d.tip||(d.x+': '+fmt(d.y))).replace(/"/g,'&quot;')}"/>`;});
+  let al='';
+  if(avg){const nz=ys.filter(v=>v>0);if(nz.length){const m=nz.reduce((a,b)=>a+b,0)/nz.length,ay=Y(m);al=`<line x1="${pad.l}" y1="${ay.toFixed(1)}" x2="${w-pad.r}" y2="${ay.toFixed(1)}" stroke="#e3bd68" stroke-dasharray="5 4" stroke-width="1.2" opacity=".9"/><text x="${pad.l+4}" y="${(ay-4).toFixed(1)}" fill="#e3bd68" font-size="9">сер. ${fmt(Math.round(m*10)/10)}</text>`;}}
   const g='g'+uid();
-  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;display:block"><defs><linearGradient id="${g}" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".32"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>${gl}<path d="${area}" fill="url(#${g})"/><path d="${path}" fill="none" stroke="${color}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>${dots}${xl}${yl}${hits}</svg>`;
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;display:block"><defs><linearGradient id="${g}" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".32"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs>${gl}${al}<path d="${area}" fill="url(#${g})"/><path d="${path}" fill="none" stroke="${color}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>${dots}${xl}${yl}${hits}</svg>`;
 }
 function svgBars({data,w=800,h=175,color='#5cc9dd'}){
   if(!data.length)return '<div class="empty">немає даних</div>';
@@ -765,7 +767,7 @@ function renderMonth(){
     } else {
       const data=[];for(let dd=1;dd<=lastDay;dd++){const k=dayKey(new Date(y,mo,dd)),r=metricDay(gm,k);data.push({x:dd,y:r.has?r.v:0,tip:dd+' '+msh+': '+(r.has?metricValTxt(gm,r.v):'немає даних')});}
       const color=gm.kind==='limit'?'#e56b7b':'#5cc9dd';
-      $('monthBody').innerHTML=svgLine({data,color,goal:metricGoal(gm),goalLabel:gm.kind==='limit'?'ліміт':'ціль',h:180});
+      $('monthBody').innerHTML=svgLine({data,color,goal:metricGoal(gm),goalLabel:gm.kind==='limit'?'ліміт':'ціль',h:180,avg:true});
       $('monthLegend').textContent=(gm.kind==='limit'?'Значення по днях; зелена пунктирна — ліміт.':'Значення по днях; зелена пунктирна — ціль.');
     }
   }
@@ -931,7 +933,7 @@ function addLimit(){state.settings.limitHabits.push({id:uid(),name:'Новий �
 function addCounter(){state.settings.counters.push({id:uid(),name:'Лічильник',goal:100,unit:''});rl('setCounters',state.settings.counters,'cnt');}
 function addLoan(){state.settings.loans.push({id:uid(),name:'Кредит'});rl('setLoans',state.settings.loans,'loan');}
 function delItem(type,i){const map={ex:'exercises',lim:'limitHabits',cnt:'counters',loan:'loans'},el={ex:'setExercises',lim:'setLimits',cnt:'setCounters',loan:'setLoans'};state.settings[map[type]].splice(i,1);rl(el[type],state.settings[map[type]],type);}
-function saveSettings(){const S=state.settings,keep=(a,o)=>a.map((n,i)=>o[i]?{...n,id:o[i].id}:n);S.exercises=keep(readL('setExercises','ex'),S.exercises);S.limitHabits=readL('setLimits','lim').map((n,i)=>{const o=S.limitHabits[i];if(!o)return {...n,maxHist:[{d:'2000-01-01',max:n.max}]};let mh=o.maxHist||[{d:'2000-01-01',max:o.max}];if(n.mode!=='week'&&n.max!==o.max)mh=mh.concat([{d:todayKey(),max:n.max}]);return {...n,id:o.id,maxHist:mh,startDate:(n.mode==='week'?(o.mode==='week'&&o.startDate?o.startDate:n.startDate):undefined)};});S.counters=keep(readL('setCounters','cnt'),S.counters);S.loans=keep(readL('setLoans','loan'),S.loans);S.waterGoal=+$('setWaterGoal').value||2000;S.sleepGoal=+$('setSleepGoal').value||8;S.currency=$('setCurrency').value||'₴';S.reminders={on:$('remOn').checked,everyMin:Math.max(15,+$('remEvery').value||120),from:Math.min(23,Math.max(0,+$('remFrom').value||9)),to:Math.min(24,Math.max(1,+$('remTo').value||21))};settings.close();save();startReminders();}
+function saveSettings(){const S=state.settings,keep=(a,o)=>a.map((n,i)=>o[i]?{...n,id:o[i].id}:n);S.exercises=keep(readL('setExercises','ex'),S.exercises);S.limitHabits=readL('setLimits','lim').map((n,i)=>{const o=S.limitHabits[i];if(!o)return {...n,maxHist:[{d:'2000-01-01',max:n.max}]};let mh=o.maxHist||[{d:'2000-01-01',max:o.max}];if(n.mode!=='week'&&n.max!==o.max){mh=(n.max>o.max)?[{d:'2000-01-01',max:n.max}]:mh.concat([{d:todayKey(),max:n.max}]);}return {...n,id:o.id,maxHist:mh,startDate:(n.mode==='week'?(o.mode==='week'&&o.startDate?o.startDate:n.startDate):undefined)};});S.counters=keep(readL('setCounters','cnt'),S.counters);S.loans=keep(readL('setLoans','loan'),S.loans);S.waterGoal=+$('setWaterGoal').value||2000;S.sleepGoal=+$('setSleepGoal').value||8;S.currency=$('setCurrency').value||'₴';S.reminders={on:$('remOn').checked,everyMin:Math.max(15,+$('remEvery').value||120),from:Math.min(23,Math.max(0,+$('remFrom').value||9)),to:Math.min(24,Math.max(1,+$('remTo').value||21))};settings.close();save();startReminders();}
 function resetAll(){if(confirm('Скинути ВСІ дані?')){localStorage.removeItem(cacheKey);state=structuredClone(defaults);if(sb)sb.from('solo').upsert({id:SOLO_ID,data:state,updated_at:new Date().toISOString()});settings.close();render();}}
 
 function exportData(){const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='lifeos-backup-'+todayKey()+'.json';a.click();}
