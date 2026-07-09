@@ -687,21 +687,29 @@ function openNotifs(){const n=buildNotifs();const sec=(t,arr,empty)=>`<div class
   applyLang(); notifs.showModal();}
 
 /* ===== БЕЙДЖІ ===== */
+function bestRun(keys){const arr=[...new Set(keys)].sort();let best=0,run=0,prev=null;arr.forEach(k=>{const dt=new Date(k+'T00:00:00');if(prev&&(dt-prev)===86400000)run++;else run=1;if(run>best)best=run;prev=dt;});return best;}
 function badgeStats(){
   const days=Object.keys(state.days),S=state.settings;
   const stepC=S.counters.find(c=>/крок|steps/i.test(c.name));
-  let perfect=0,good=0,tracked=0,waterHits=0,sleepHits=0,bestSteps=0,totalSteps=0;const goodArr=[];
+  const plankEx=S.exercises.find(e=>/планк|plank/i.test(e.name)),pushEx=S.exercises.find(e=>/віджим|push/i.test(e.name)),squatEx=S.exercises.find(e=>/присід|squat/i.test(e.name));
+  const coffeeL=S.limitHabits.find(l=>/кав|coffee/i.test(l.name));
+  let perfect=0,good=0,tracked=0,waterHits=0,sleepHits=0,bestSteps=0,totalSteps=0,bestPlank=0,bestPush=0,bestSquat=0;const goodArr=[],coffeeZero=[];
   days.forEach(k=>{const sc=dayScore(k),rest=!!(state.restDays&&state.restDays[k]);
     if(sc!=null){tracked++;if(sc>=70||rest)good++;if(sc===100)perfect++;}
-    const d=state.days[k];
+    const d=state.days[k],ex=d.exercises||{};
     if(d.water>=S.waterGoal)waterHits++;
     const sh=sleepHours(k);if(sh>0&&sh>=(S.sleepGoal||8))sleepHits++;
     if(stepC){const v=(d.counters&&d.counters[stepC.id])||0;if(v>bestSteps)bestSteps=v;totalSteps+=v;}
-    if((sc!=null&&sc>=70)||rest)goodArr.push(k);});
-  let bestStreak=0,run=0,prev=null;
-  goodArr.sort().forEach(k=>{const dt=new Date(k+'T00:00:00');if(prev&&(dt-prev)===86400000)run++;else run=1;if(run>bestStreak)bestStreak=run;prev=dt;});
+    if(plankEx&&(ex[plankEx.id]||0)>bestPlank)bestPlank=ex[plankEx.id]||0;
+    if(pushEx&&(ex[pushEx.id]||0)>bestPush)bestPush=ex[pushEx.id]||0;
+    if(squatEx&&(ex[squatEx.id]||0)>bestSquat)bestSquat=ex[squatEx.id]||0;
+    if((sc!=null&&sc>=70)||rest)goodArr.push(k);
+    if(coffeeL&&sc!=null&&(((d.limits&&d.limits[coffeeL.id])||0)===0))coffeeZero.push(k);});
+  const bestStreak=Math.max(bestRun(goodArr),computeStreak());
+  const noCS2Streak=bestRun(Object.keys(steamPlay).filter(k=>steamPlay[k]===0));
+  const coffeeStreak=bestRun(coffeeZero);
   let loanClosed=0;Object.keys(state.loanLog||{}).forEach(id=>{if(Object.values(state.loanLog[id]).some(v=>v===0))loanClosed=1;});
-  return {perfect,good,tracked,waterHits,sleepHits,bestSteps,totalSteps,bestStreak:Math.max(bestStreak,computeStreak()),loanClosed};
+  return {perfect,good,tracked,waterHits,sleepHits,bestSteps,totalSteps,bestStreak,loanClosed,bestPlank,bestPush,bestSquat,noCS2Streak,coffeeStreak};
 }
 function badgeList(){const s=badgeStats();return [
   {e:'🔥',n:'Тижнева серія',need:7,unit:'днів поспіль',val:s.bestStreak},
@@ -720,6 +728,16 @@ function badgeList(){const s=badgeStats();return [
   {e:'📅',n:'Тиждень у трекері',need:7,unit:'днів з даними',val:s.tracked},
   {e:'📆',n:'Місяць дисципліни',need:30,unit:'днів з даними',val:s.tracked},
   {e:'🏆',n:'Сотня',need:100,unit:'днів з даними',val:s.tracked},
+  {e:'🧘',n:'Планка 60',need:60,unit:'сек планки за день',val:s.bestPlank},
+  {e:'💪',n:'Віджимання 50',need:50,unit:'віджимань за день',val:s.bestPush},
+  {e:'🦾',n:'Віджимання 100',need:100,unit:'віджимань за день',val:s.bestPush},
+  {e:'🦵',n:'Присідання 50',need:50,unit:'присідань за день',val:s.bestSquat},
+  {e:'🏋️',n:'Присідання 100',need:100,unit:'присідань за день',val:s.bestSquat},
+  {e:'🎮',n:'День без CS2',need:1,unit:'день без CS2 поспіль',val:s.noCS2Streak},
+  {e:'🕹️',n:'Тиждень без CS2',need:7,unit:'днів без CS2 поспіль',val:s.noCS2Streak},
+  {e:'✋',n:'2 тижні без CS2',need:14,unit:'днів без CS2 поспіль',val:s.noCS2Streak},
+  {e:'🧠',n:'Місяць без CS2',need:30,unit:'днів без CS2 поспіль',val:s.noCS2Streak},
+  {e:'☕',n:'Тиждень без кави',need:7,unit:'днів без кави поспіль',val:s.coffeeStreak},
   {e:'💳',n:'Кредит закрито',need:1,unit:'закритий борг',val:s.loanClosed},
 ];}
 function openBadges(){
