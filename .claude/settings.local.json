@@ -48,7 +48,8 @@
       "Bash(grep -n \"const v=\\(d.limits&&d.limits\\\\[mt.ref.id\\\\]\\)||0;return{v,goal:mt.ref.max\" index.html)",
       "Bash(cd \"C:/Users/User/AppData/Local/Temp/claude/C--Users-User-Desktop-Active-Live/05a714fb-a967-4081-b627-abf060bfe395/scratchpad\")",
       "Bash(curl -s '__TRACKED_VAR__/solo?select=data&id=eq.me' -H 'apikey: __TRACKED_VAR__' -H 'Authorization: Bearer __TRACKED_VAR__' -o solo.json)",
-      "Bash(curl -s 'https://xezhbqcteaihrlrykbkr.supabase.co/rest/v1/solo?select=data&id=eq.me' -H 'apikey: sb_publishable_qNcUyFxMlWAWAry3uSHndg_ADVMCE3a' -H 'Authorization: Bearer sb_publishable_qNcUyFxMlWAWAry3uSHndg_ADVMCE3a')"
+      "Bash(curl -s 'https://xezhbqcteaihrlrykbkr.supabase.co/rest/v1/solo?select=data&id=eq.me' -H 'apikey: sb_publishable_qNcUyFxMlWAWAry3uSHndg_ADVMCE3a' -H 'Authorization: Bearer sb_publishable_qNcUyFxMlWAWAry3uSHndg_ADVMCE3a')",
+      "Bash(awk '/function openBadges/{f=1} f{print NR\": \"$0} /badges.showModal\\\\\\(\\\\\\);.*\\\\}/{if\\(f\\)exit}' index.html)"
     ]
   }
 }

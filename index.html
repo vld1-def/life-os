@@ -149,10 +149,21 @@
   .sync-dot{width:8px;height:8px;border-radius:50%;background:var(--green);transition:.3s}
   .sync-dot.busy{background:var(--yellow)} .sync-dot.off{background:var(--red)}
   #notifBadge{position:absolute; top:-5px; right:-5px; background:var(--red); color:#fff; font-size:10px; min-width:17px; height:17px; border-radius:9px; display:none; align-items:center; justify-content:center; padding:0 4px; font-weight:800}
-  .badge{display:flex; gap:12px; align-items:center; padding:10px 12px; border:1px solid var(--stroke); border-radius:14px; margin-bottom:8px; opacity:.5}
-  .badge.on{opacity:1; background:linear-gradient(90deg,rgba(92,201,221,.12),rgba(157,138,214,.12)); border-color:rgba(92,201,221,.4)}
-  .badge .be{font-size:30px; filter:grayscale(1) opacity(.6); flex-shrink:0}
-  .badge.on .be{filter:none}
+  .badge-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(116px,1fr)); gap:9px; margin-bottom:8px}
+  .badge-card{border:1px solid var(--stroke); border-radius:14px; padding:11px 7px; text-align:center; opacity:.5; transition:.15s; overflow:hidden}
+  .badge-card.on{opacity:1; background:linear-gradient(160deg,rgba(92,201,221,.14),rgba(157,138,214,.14)); border-color:rgba(92,201,221,.4)}
+  .badge-card.ready{opacity:1; cursor:pointer; border-color:var(--yellow); animation:readyPulse 1.6s ease-in-out infinite}
+  .badge-card.ready:active{transform:scale(.95)}
+  @keyframes readyPulse{0%,100%{box-shadow:0 0 8px rgba(227,189,104,.25)} 50%{box-shadow:0 0 20px rgba(227,189,104,.6)}}
+  .badge-card .be{font-size:32px; line-height:1; filter:grayscale(1) opacity(.5)}
+  .badge-card.on .be,.badge-card.ready .be{filter:none}
+  .badge-card .bn{font-weight:700; font-size:11.5px; margin-top:4px; line-height:1.15}
+  .badge-card .bf{font-size:9.5px; color:var(--muted); margin-top:3px; line-height:1.25; min-height:24px}
+  .badge-card .bstat{font-size:10px; margin-top:5px}
+  @keyframes badgePop{0%{transform:scale(.2) rotate(-30deg)} 55%{transform:scale(1.2) rotate(12deg)} 100%{transform:scale(1) rotate(0)}}
+  .badge-card.pop{animation:badgePop .65s cubic-bezier(.2,.8,.3,1.2)}
+  .confetti{position:fixed; top:-14px; width:9px; height:14px; z-index:500; border-radius:2px; pointer-events:none; animation:confFall linear forwards}
+  @keyframes confFall{to{top:106vh; transform:rotate(720deg)}}
 </style>
 </head>
 <body>
@@ -497,7 +508,7 @@ async function boot(){
 function enterApp(){
   $('app').classList.remove('hidden');
   localStorage.setItem(cacheKey,JSON.stringify(state));
-  render(); loadExpenses(); loadSteam(); loadScreen(); loadSleepDB(); initTip(); startReminders();
+  render(); loadExpenses(); loadSteam(); loadScreen(); loadSleepDB(); loadStepsDB(); initTip(); startReminders();
   if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
 let saveTimer=null, dirty=false;
@@ -511,7 +522,7 @@ function toast(m){const t=$('toast'); t.textContent=lang==='en'?trStr(m):m; t.cl
 
 function migrate(s){
   s=Object.assign(structuredClone(defaults),s);
-  s.months=s.months||{}; s.tasks=s.tasks||[]; s.loanLog=s.loanLog||{}; s.restDays=s.restDays||{};
+  s.months=s.months||{}; s.tasks=s.tasks||[]; s.loanLog=s.loanLog||{}; s.restDays=s.restDays||{}; s.badges=s.badges||{};
   s.settings=Object.assign(structuredClone(defaults.settings),s.settings);
   s.settings.reminders=Object.assign({on:false,everyMin:120,from:9,to:21},s.settings.reminders||{});
   s.settings.limitHabits.forEach(l=>{if(!l.maxHist)l.maxHist=[{d:'2000-01-01',max:l.max}];});
@@ -571,6 +582,12 @@ async function loadScreen(){
 function screenLimitId(){const l=state.settings.limitHabits.find(x=>/соц|екран|screen|мереж/i.test(x.name));return l?l.id:null;}
 function applyScreen(){const gid=screenLimitId();if(!gid)return;Object.keys(screenMin).forEach(dk=>{getDay(dk).limits[gid]=screenMin[dk];});}
 
+/* ===== КРОКИ (айфон → таблиця steps; raw = кроки по годинах через новий рядок, сумуємо) ===== */
+let stepsDB={};
+async function loadStepsDB(){ if(!sb)return; const {data,error}=await sb.from('steps').select('date,raw').limit(3000); if(error||!data)return; stepsDB={}; data.forEach(r=>{const sum=String(r.raw==null?'':r.raw).split(/[\s,;]+/).map(Number).filter(n=>!isNaN(n)).reduce((a,b)=>a+b,0); if(sum>0)stepsDB[r.date]=Math.round(sum);}); applyStepsDB(); render(); }
+function stepsCounterId(){const c=state.settings.counters.find(x=>/крок|steps/i.test(x.name));return c?c.id:null;}
+function applyStepsDB(){const cid=stepsCounterId();if(!cid)return;Object.keys(stepsDB).forEach(dk=>{getDay(dk).counters[cid]=stepsDB[dk];});}
+
 /* ===== КРЕДИТИ (щоденні знімки боргу) ===== */
 function setLoanToday(id,v){ if(!state.loanLog[id])state.loanLog[id]={}; state.loanLog[id][todayKey()]=Math.max(0,+v||0); save(); }
 function loanValAt(id,dateStr){const log=state.loanLog[id];if(!log)return null;const ks=Object.keys(log).filter(k=>k<=dateStr).sort();return ks.length?log[ks[ks.length-1]]:null;}
@@ -625,12 +642,13 @@ function dayComponents(k){const d=state.days[k];if(!d)return null;const S=state.
   S.counters.forEach(c=>{const v=d.counters[c.id]||0;a.push({label:c.name,kind:'goal',ok:v>=c.goal,pct:c.goal?v/c.goal:0,txt:fmt(v)+' / '+fmt(c.goal)});});
   return a;}
 function compColor(c){if(c.ok)return 'var(--green)';if(c.kind!=='limit'&&c.pct>=.5)return 'var(--yellow)';return 'var(--red)';}
-function dayTitle(k){const comps=dayComponents(k);if(!comps)return k+' — немає даних';let s=k+' — бал '+(dayScore(k)??0)+'%';comps.forEach(c=>s+='\n'+(c.ok?'✅':'❌')+' '+c.label+': '+c.txt);const nt=state.days[k]&&state.days[k].note;if(nt)s+='\n📝 '+nt;return s;}
+function dayBadges(k){return Object.keys(state.badges||{}).filter(id=>state.badges[id]===k).map(id=>'\n🏅 '+badgeName(id)).join('');}
+function dayTitle(k){const bg=dayBadges(k);const comps=dayComponents(k);if(!comps)return k+(bg?bg:' — немає даних');let s=k+' — бал '+(dayScore(k)??0)+'%';comps.forEach(c=>s+='\n'+(c.ok?'✅':'❌')+' '+c.label+': '+c.txt);const nt=state.days[k]&&state.days[k].note;if(nt)s+='\n📝 '+nt;return s+bg;}
 
 /* ===== РЕНДЕР ===== */
 function render(){
   Object.keys(_c).forEach(k=>delete _c[k]);
-  applySteam(); applyScreen(); applySleepDB();
+  applySteam(); applyScreen(); applySleepDB(); applyStepsDB();
   const tk=todayKey(),ad=activeDay(),d=getDay(ad),S=state.settings;
   $('todayLabel').textContent=new Date().toLocaleDateString(LOC(),{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   $('waterCnt').textContent=(d.water/1000).toFixed(2);
@@ -687,68 +705,97 @@ function openNotifs(){const n=buildNotifs();const sec=(t,arr,empty)=>`<div class
   applyLang(); notifs.showModal();}
 
 /* ===== БЕЙДЖІ ===== */
+const TT=(u,e)=>lang==='en'?e:u;
 function bestRun(keys){const arr=[...new Set(keys)].sort();let best=0,run=0,prev=null;arr.forEach(k=>{const dt=new Date(k+'T00:00:00');if(prev&&(dt-prev)===86400000)run++;else run=1;if(run>best)best=run;prev=dt;});return best;}
 function badgeStats(){
   const days=Object.keys(state.days),S=state.settings;
   const stepC=S.counters.find(c=>/крок|steps/i.test(c.name));
   const plankEx=S.exercises.find(e=>/планк|plank/i.test(e.name)),pushEx=S.exercises.find(e=>/віджим|push/i.test(e.name)),squatEx=S.exercises.find(e=>/присід|squat/i.test(e.name));
   const coffeeL=S.limitHabits.find(l=>/кав|coffee/i.test(l.name));
-  let perfect=0,good=0,tracked=0,waterHits=0,sleepHits=0,bestSteps=0,totalSteps=0,bestPlank=0,bestPush=0,bestSquat=0;const goodArr=[],coffeeZero=[];
-  days.forEach(k=>{const sc=dayScore(k),rest=!!(state.restDays&&state.restDays[k]);
+  let perfect=0,good=0,tracked=0,waterHits=0,sleepHits=0,bestSteps=0,totalSteps=0,bestPlank=0,bestPush=0,bestSquat=0,totalPush=0,totalSquat=0,totalPlank=0;
+  const goodArr=[],coffeeZero=[],mPush={},mSquat={},mPlank={},mWater={};
+  days.forEach(k=>{const sc=dayScore(k),rest=!!(state.restDays&&state.restDays[k]),ym=k.slice(0,7);
     if(sc!=null){tracked++;if(sc>=70||rest)good++;if(sc===100)perfect++;}
     const d=state.days[k],ex=d.exercises||{};
     if(d.water>=S.waterGoal)waterHits++;
     const sh=sleepHours(k);if(sh>0&&sh>=(S.sleepGoal||8))sleepHits++;
     if(stepC){const v=(d.counters&&d.counters[stepC.id])||0;if(v>bestSteps)bestSteps=v;totalSteps+=v;}
-    if(plankEx&&(ex[plankEx.id]||0)>bestPlank)bestPlank=ex[plankEx.id]||0;
-    if(pushEx&&(ex[pushEx.id]||0)>bestPush)bestPush=ex[pushEx.id]||0;
-    if(squatEx&&(ex[squatEx.id]||0)>bestSquat)bestSquat=ex[squatEx.id]||0;
+    const pv=pushEx?(ex[pushEx.id]||0):0,sv=squatEx?(ex[squatEx.id]||0):0,plv=plankEx?(ex[plankEx.id]||0):0;
+    totalPush+=pv;totalSquat+=sv;totalPlank+=plv;
+    if(pv>bestPush)bestPush=pv;if(sv>bestSquat)bestSquat=sv;if(plv>bestPlank)bestPlank=plv;
+    mPush[ym]=(mPush[ym]||0)+pv;mSquat[ym]=(mSquat[ym]||0)+sv;mPlank[ym]=(mPlank[ym]||0)+plv;mWater[ym]=(mWater[ym]||0)+(d.water||0);
     if((sc!=null&&sc>=70)||rest)goodArr.push(k);
     if(coffeeL&&sc!=null&&(((d.limits&&d.limits[coffeeL.id])||0)===0))coffeeZero.push(k);});
-  const bestStreak=Math.max(bestRun(goodArr),computeStreak());
-  const noCS2Streak=bestRun(Object.keys(steamPlay).filter(k=>steamPlay[k]===0));
-  const coffeeStreak=bestRun(coffeeZero);
+  const mx=o=>Object.values(o).reduce((a,b)=>Math.max(a,b),0);
   let loanClosed=0;Object.keys(state.loanLog||{}).forEach(id=>{if(Object.values(state.loanLog[id]).some(v=>v===0))loanClosed=1;});
-  return {perfect,good,tracked,waterHits,sleepHits,bestSteps,totalSteps,bestStreak,loanClosed,bestPlank,bestPush,bestSquat,noCS2Streak,coffeeStreak};
+  let bestGame=0;try{bestGame=(JSON.parse(localStorage.getItem('run_best3'))||{}).p||0;}catch(e){}
+  return {perfect,good,tracked,waterHits,sleepHits,bestSteps,totalSteps,bestPlank,bestPush,bestSquat,totalPush,totalSquat,totalPlank,
+    monthPush:mx(mPush),monthSquat:mx(mSquat),monthPlank:mx(mPlank),monthWaterL:Math.round(mx(mWater)/1000),
+    bestStreak:Math.max(bestRun(goodArr),computeStreak()),noCS2Streak:bestRun(Object.keys(steamPlay).filter(k=>steamPlay[k]===0)),coffeeStreak:bestRun(coffeeZero),loanClosed,bestGame};
 }
-function badgeList(){const s=badgeStats();return [
-  {e:'🔥',n:'Тижнева серія',need:7,unit:'днів поспіль',val:s.bestStreak},
-  {e:'💪',n:'Два тижні',need:14,unit:'днів поспіль',val:s.bestStreak},
-  {e:'👑',n:'Місяць сили',need:30,unit:'днів поспіль',val:s.bestStreak},
-  {e:'⭐',n:'Ідеальний день',need:1,unit:'день на 100%',val:s.perfect},
-  {e:'🌟',n:'П\'ять зірок',need:5,unit:'днів на 100%',val:s.perfect},
-  {e:'💚',n:'Хороша форма',need:30,unit:'хороших днів',val:s.good},
-  {e:'💧',n:'Гідратація',need:15,unit:'днів з ціллю води',val:s.waterHits},
-  {e:'🌊',n:'Водний майстер',need:30,unit:'днів з ціллю води',val:s.waterHits},
-  {e:'👣',n:'Ходок',need:8000,unit:'кроків за день',val:s.bestSteps},
-  {e:'🚶',n:'Марафонець дня',need:15000,unit:'кроків за день',val:s.bestSteps},
-  {e:'🗺️',n:'100 тисяч кроків',need:100000,unit:'кроків усього',val:s.totalSteps},
-  {e:'😴',n:'Сплюх',need:7,unit:'ночей з нормою сну',val:s.sleepHits},
-  {e:'🛌',n:'Режим сну',need:20,unit:'ночей з нормою сну',val:s.sleepHits},
-  {e:'📅',n:'Тиждень у трекері',need:7,unit:'днів з даними',val:s.tracked},
-  {e:'📆',n:'Місяць дисципліни',need:30,unit:'днів з даними',val:s.tracked},
-  {e:'🏆',n:'Сотня',need:100,unit:'днів з даними',val:s.tracked},
-  {e:'🧘',n:'Планка 60',need:60,unit:'сек планки за день',val:s.bestPlank},
-  {e:'💪',n:'Віджимання 50',need:50,unit:'віджимань за день',val:s.bestPush},
-  {e:'🦾',n:'Віджимання 100',need:100,unit:'віджимань за день',val:s.bestPush},
-  {e:'🦵',n:'Присідання 50',need:50,unit:'присідань за день',val:s.bestSquat},
-  {e:'🏋️',n:'Присідання 100',need:100,unit:'присідань за день',val:s.bestSquat},
-  {e:'🎮',n:'День без CS2',need:1,unit:'день без CS2 поспіль',val:s.noCS2Streak},
-  {e:'🕹️',n:'Тиждень без CS2',need:7,unit:'днів без CS2 поспіль',val:s.noCS2Streak},
-  {e:'✋',n:'2 тижні без CS2',need:14,unit:'днів без CS2 поспіль',val:s.noCS2Streak},
-  {e:'🧠',n:'Місяць без CS2',need:30,unit:'днів без CS2 поспіль',val:s.noCS2Streak},
-  {e:'☕',n:'Тиждень без кави',need:7,unit:'днів без кави поспіль',val:s.coffeeStreak},
-  {e:'💳',n:'Кредит закрито',need:1,unit:'закритий борг',val:s.loanClosed},
-];}
-function openBadges(){
-  const list=badgeList(),unlocked=list.filter(b=>b.val>=b.need).length;
-  $('badgeCount').textContent=unlocked+' / '+list.length;
-  $('badgeBody').innerHTML=list.map(b=>{const on=b.val>=b.need,pct=Math.min(100,Math.round(b.val/b.need*100));
-    return `<div class="badge ${on?'on':''}"><div class="be">${b.e}</div><div style="flex:1;min-width:0"><div style="font-weight:700">${b.n} ${on?'✅':'🔒'}</div>`+
-      (on?`<div class="muted" style="font-size:11px">Відкрито!</div>`
-         :`<div class="muted" style="font-size:11px">Потрібно: ${fmt(b.need)} ${b.unit}</div><div class="bar" style="height:5px;margin-top:5px"><i class="g-cyan" style="width:${pct}%"></i></div><div class="muted" style="font-size:10px;margin-top:2px">${fmt(b.val)} / ${fmt(b.need)}</div>`)+
-      `</div></div>`;}).join('');
-  applyLang(); badges.showModal();
+const BADGE_GROUPS=[['streak','🔥 Серії','🔥 Streaks'],['score','⭐ Ідеал','⭐ Perfection'],['strength','💪 Сила','💪 Strength'],['steps','👣 Кроки','👣 Steps'],['water','💧 Вода','💧 Water'],['sleep','😴 Сон','😴 Sleep'],['games','🎮 Ігри','🎮 Games'],['coffee','☕ Кава','☕ Coffee'],['tenure','📅 Стаж','📅 Tenure'],['finance','💰 Гроші','💰 Money'],['game','🎯 Раннер','🎯 Runner']];
+const BADGE_DEFS=[
+ {id:'streak7',g:'streak',e:'🔥',n:'Тижнева серія',ne:'Weekly streak',f:'Тиждень без відмазок 💥',fe:'A week, zero excuses 💥',need:7,u:'днів поспіль',ue:'days in a row',k:'bestStreak'},
+ {id:'streak14',g:'streak',e:'💪',n:'Два тижні',ne:'Two weeks',f:'Воля з титану',fe:'Titanium willpower',need:14,u:'днів поспіль',ue:'days in a row',k:'bestStreak'},
+ {id:'streak30',g:'streak',e:'👑',n:'Місяць вогню',ne:'Month of fire',f:'Ти вже інша людина',fe:'You are a new person now',need:30,u:'днів поспіль',ue:'days in a row',k:'bestStreak'},
+ {id:'perfect1',g:'score',e:'⭐',n:'Ідеальний день',ne:'Perfect day',f:'100% — навіть кома на місці',fe:'100% — flawless',need:1,u:'день на 100%',ue:'perfect day',k:'perfect'},
+ {id:'perfect5',g:'score',e:'🌟',n:'П`ять зірок',ne:'Five stars',f:'Мішленівський рівень',fe:'Michelin level',need:5,u:'днів на 100%',ue:'perfect days',k:'perfect'},
+ {id:'good30',g:'score',e:'💚',n:'Хороша форма',ne:'In good shape',f:'30 днів у зеленій зоні',fe:'30 days in the green',need:30,u:'хороших днів',ue:'good days',k:'good'},
+ {id:'push_d50',g:'strength',e:'💪',n:'Віджим 50',ne:'Push 50',f:'Підлога тебе боїться',fe:'The floor fears you',need:50,u:'віджимань за день',ue:'push-ups a day',k:'bestPush'},
+ {id:'push_d100',g:'strength',e:'🦾',n:'Віджим 100',ne:'Push 100',f:'Руки-базуки активовано',fe:'Bazooka arms unlocked',need:100,u:'віджимань за день',ue:'push-ups a day',k:'bestPush'},
+ {id:'push_m500',g:'strength',e:'📅',n:'500 за місяць',ne:'500 a month',f:'Місяць проти гравітації',fe:'A month against gravity',need:500,u:'віджимань за місяць',ue:'push-ups a month',k:'monthPush'},
+ {id:'push_t1000',g:'strength',e:'🏆',n:'1000 віджимань',ne:'1000 push-ups',f:'Тисяча — і не спітнів',fe:'A thousand, barely sweating',need:1000,u:'віджимань усього',ue:'push-ups total',k:'totalPush'},
+ {id:'squat_d50',g:'strength',e:'🦵',n:'Присід 50',ne:'Squat 50',f:'Ноги сказали дякую',fe:'Legs said thank you',need:50,u:'присідань за день',ue:'squats a day',k:'bestSquat'},
+ {id:'squat_d100',g:'strength',e:'🏋️',n:'Присід 100',ne:'Squat 100',f:'Ноги з бетону',fe:'Concrete legs',need:100,u:'присідань за день',ue:'squats a day',k:'bestSquat'},
+ {id:'squat_m1000',g:'strength',e:'📅',n:'1000 за місяць',ne:'1000 a month',f:'Місяць присідав як не в себе',fe:'Squatted all month',need:1000,u:'присідань за місяць',ue:'squats a month',k:'monthSquat'},
+ {id:'squat_t5000',g:'strength',e:'🏆',n:'5000 присідань',ne:'5000 squats',f:'Легенда присіду',fe:'Squat legend',need:5000,u:'присідань усього',ue:'squats total',k:'totalSquat'},
+ {id:'plank_d60',g:'strength',e:'🧘',n:'Планка 60с',ne:'Plank 60s',f:'Хвилина, що триває вічність',fe:'The eternal minute',need:60,u:'сек планки за день',ue:'sec plank a day',k:'bestPlank'},
+ {id:'plank_m1000',g:'strength',e:'📅',n:'1000с за місяць',ne:'1000s a month',f:'Місяць тремтячих ліктів',fe:'A month of shaky elbows',need:1000,u:'сек планки за місяць',ue:'sec plank a month',k:'monthPlank'},
+ {id:'plank_t3600',g:'strength',e:'🏆',n:'Година планки',ne:'An hour of plank',f:'3600 секунд болю',fe:'3600 seconds of pain',need:3600,u:'сек планки усього',ue:'sec plank total',k:'totalPlank'},
+ {id:'steps8k',g:'steps',e:'👣',n:'Ходок',ne:'Walker',f:'8 тисяч і жодного таксі',fe:'8k steps, no taxi',need:8000,u:'кроків за день',ue:'steps a day',k:'bestSteps'},
+ {id:'steps15k',g:'steps',e:'🚶',n:'Марафонець дня',ne:'Day marathoner',f:'Хтось загубив пульт?',fe:'Lost the remote again?',need:15000,u:'кроків за день',ue:'steps a day',k:'bestSteps'},
+ {id:'steps20k',g:'steps',e:'🏃',n:'20 тисяч',ne:'20k steps',f:'Ноги в режимі турбо',fe:'Legs in turbo mode',need:20000,u:'кроків за день',ue:'steps a day',k:'bestSteps'},
+ {id:'steps30k',g:'steps',e:'🥇',n:'30 тисяч',ne:'30k steps',f:'Ти точно не кур`єр?',fe:'Sure you are not a courier?',need:30000,u:'кроків за день',ue:'steps a day',k:'bestSteps'},
+ {id:'steps100k',g:'steps',e:'🗺️',n:'100 тисяч',ne:'100k total',f:'Пішки до сусіднього міста',fe:'Walked to the next town',need:100000,u:'кроків усього',ue:'steps total',k:'totalSteps'},
+ {id:'steps1m',g:'steps',e:'🌍',n:'Мільйон кроків',ne:'A million steps',f:'Можна було дійти до Парижа',fe:'Could have walked to Paris',need:1000000,u:'кроків усього',ue:'steps total',k:'totalSteps'},
+ {id:'water15',g:'water',e:'💧',n:'Гідратація',ne:'Hydration',f:'Кактус би позаздрив',fe:'A cactus is jealous',need:15,u:'днів з ціллю води',ue:'days at water goal',k:'waterHits'},
+ {id:'water30',g:'water',e:'🌊',n:'Водний майстер',ne:'Water master',f:'Всередині — маленьке море',fe:'A little sea within',need:30,u:'днів з ціллю води',ue:'days at water goal',k:'waterHits'},
+ {id:'water_m60',g:'water',e:'🚰',n:'60 літрів за місяць',ne:'60L a month',f:'Ходячий акведук',fe:'A walking aqueduct',need:60,u:'літрів за місяць',ue:'liters a month',k:'monthWaterL'},
+ {id:'sleep7',g:'sleep',e:'😴',n:'Сплюх',ne:'Sleeper',f:'7 ночей як немовля',fe:'7 nights like a baby',need:7,u:'ночей з нормою',ue:'nights at goal',k:'sleepHits'},
+ {id:'sleep20',g:'sleep',e:'🛌',n:'Режим сну',ne:'Sleep mode',f:'Подушка тебе обожнює',fe:'Your pillow adores you',need:20,u:'ночей з нормою',ue:'nights at goal',k:'sleepHits'},
+ {id:'nocs1',g:'games',e:'🎮',n:'День без CS2',ne:'A day without CS2',f:'CS2: ти де?',fe:'CS2: where are you?',need:1,u:'день без CS2 поспіль',ue:'CS2-free day',k:'noCS2Streak'},
+ {id:'nocs7',g:'games',e:'🕹️',n:'Тиждень без CS2',ne:'Week without CS2',f:'Команда шукає тебе',fe:'The team is searching',need:7,u:'днів без CS2 поспіль',ue:'CS2-free days',k:'noCS2Streak'},
+ {id:'nocs14',g:'games',e:'✋',n:'2 тижні без CS2',ne:'2 weeks without CS2',f:'Ранг тихенько плаче',fe:'Your rank quietly cries',need:14,u:'днів без CS2 поспіль',ue:'CS2-free days',k:'noCS2Streak'},
+ {id:'nocs30',g:'games',e:'🧠',n:'Місяць без CS2',ne:'Month without CS2',f:'Життя за межами de_dust',fe:'Life beyond de_dust',need:30,u:'днів без CS2 поспіль',ue:'CS2-free days',k:'noCS2Streak'},
+ {id:'coffee7',g:'coffee',e:'☕',n:'Тиждень без кави',ne:'Week without coffee',f:'Бариста оголосив розшук',fe:'The barista filed a report',need:7,u:'днів без кави поспіль',ue:'coffee-free days',k:'coffeeStreak'},
+ {id:'days7',g:'tenure',e:'📅',n:'Тиждень у трекері',ne:'A week in',f:'Початок чогось великого',fe:'Start of something big',need:7,u:'днів з даними',ue:'days tracked',k:'tracked'},
+ {id:'days30',g:'tenure',e:'📆',n:'Місяць дисципліни',ne:'A month of discipline',f:'Звичка сформована',fe:'Habit formed',need:30,u:'днів з даними',ue:'days tracked',k:'tracked'},
+ {id:'days90',g:'tenure',e:'🗓️',n:'3 місяці',ne:'3 months',f:'Квартал сили волі',fe:'A quarter of willpower',need:90,u:'днів з даними',ue:'days tracked',k:'tracked'},
+ {id:'days180',g:'tenure',e:'📊',n:'Пів року',ne:'Half a year',f:'Ти в цьому серйозно',fe:'You mean business',need:180,u:'днів з даними',ue:'days tracked',k:'tracked'},
+ {id:'days365',g:'tenure',e:'🎖️',n:'Рік!',ne:'A year!',f:'365 днів легенди',fe:'365 days of legend',need:365,u:'днів з даними',ue:'days tracked',k:'tracked'},
+ {id:'loan',g:'finance',e:'💳',n:'Кредит закрито',ne:'Loan closed',f:'Банк плаче, ти святкуєш',fe:'The bank weeps, you party',need:1,u:'закритий борг',ue:'closed loan',k:'loanClosed'},
+ {id:'runner20k',g:'game',e:'🎯',n:'Раннер-зірка',ne:'Runner star',f:'Біг, стрибав, вижив, розбагатів',fe:'Ran, jumped, survived, got rich',need:20000,u:'очок у грі',ue:'points in the game',k:'bestGame'},
+];
+function badgeName(id){const b=BADGE_DEFS.find(x=>x.id===id);return b?b.e+' '+TT(b.n,b.ne):id;}
+function badgeList(){const s=badgeStats();return BADGE_DEFS.map(b=>({...b,val:s[b.k]||0}));}
+function confetti(){const c=['#5cc9dd','#9d8ad6','#4fc596','#e3bd68','#e56b7b'];for(let i=0;i<46;i++){const p=document.createElement('div');p.className='confetti';p.style.left=Math.random()*100+'vw';p.style.background=c[i%c.length];p.style.animationDuration=(1.4+Math.random()*.9)+'s';p.style.animationDelay=(Math.random()*.25)+'s';document.body.appendChild(p);setTimeout(()=>p.remove(),2600);}}
+function claimBadge(id){const b=badgeList().find(x=>x.id===id);if(!b||b.val<b.need||(state.badges&&state.badges[id]))return;if(!state.badges)state.badges={};state.badges[id]=todayKey();save();confetti();toast(TT('🏅 Вітаємо! Ви відкрили бейдж: ','🏅 Congrats! Badge unlocked: ')+TT(b.n,b.ne));if(typeof notify==='function')notify(TT('🏅 Новий бейдж!','🏅 New badge!'),b.e+' '+TT(b.n,b.ne));openBadges(id);}
+function openBadges(justId){
+  const list=badgeList(),done=id=>state.badges&&state.badges[id];
+  $('badgeCount').textContent=list.filter(b=>done(b.id)).length+' / '+list.length;
+  const card=b=>{const cl=done(b.id),rd=b.val>=b.need&&!cl,pct=Math.min(100,Math.round(b.val/b.need*100));
+    let st;if(cl)st='<span style="color:var(--green);font-weight:700">🗓 '+state.badges[b.id]+'</span>';
+    else if(rd)st='<span style="color:var(--yellow);font-weight:800">'+TT('🎉 Відкрити!','🎉 Unlock!')+'</span>';
+    else st=`<div class="bar" style="height:4px;margin-top:4px"><i class="g-cyan" style="width:${pct}%"></i></div><div class="muted" style="font-size:9px;margin-top:2px">${fmt(b.val)}/${fmt(b.need)}</div>`;
+    return `<div class="badge-card ${cl?'on':''} ${rd?'ready':''} ${justId===b.id?'pop':''}" ${rd?`onclick="claimBadge('${b.id}')"`:''} title="${TT('Потрібно','Need')}: ${fmt(b.need)} ${TT(b.u,b.ue)}"><div class="be">${b.e}</div><div class="bn">${TT(b.n,b.ne)}</div><div class="bf">${TT(b.f,b.fe)}</div><div class="bstat">${st}</div></div>`;};
+  const grid=arr=>`<div class="badge-grid">${arr.map(card).join('')}</div>`;
+  let html='';
+  const ready=list.filter(b=>b.val>=b.need&&!done(b.id));
+  const almost=list.filter(b=>b.val<b.need&&!done(b.id)&&b.val/b.need>=0.7).sort((a,b)=>b.val/b.need-a.val/a.need);
+  if(ready.length)html+=`<div class="sec-title" style="color:var(--yellow)">${TT('🎉 Можна відкрити','🎉 Ready to unlock')} (${ready.length})</div>`+grid(ready);
+  if(almost.length)html+=`<div class="sec-title">${TT('🔜 Майже відкрито','🔜 Almost there')}</div>`+grid(almost);
+  BADGE_GROUPS.forEach(([g,lu,le])=>{const bs=list.filter(b=>b.g===g);if(bs.length)html+=`<div class="sec-title">${TT(lu,le)}</div>`+grid(bs);});
+  $('badgeBody').innerHTML=html; applyLang(); badges.showModal();
 }
 
 /* ===== ГРАФІК ===== */
@@ -836,7 +883,7 @@ function renderMonth(){
     const start=(new Date(y,mo,1).getDay()+6)%7;
     const head=['Пн','Вт','Ср','Чт','Пт','Сб','Нд'].map(h=>`<div class="hd">${h}</div>`).join('');
     let cells='';for(let i=0;i<start;i++)cells+='<div></div>';
-    for(let dd=1;dd<=days;dd++){const k=dayKey(new Date(y,mo,dd)),t=k===todayKey(),rest=!!(state.restDays&&state.restDays[k]);const tip=((rest?'🛡 Вихідний\n':'')+dayTitle(k)).replace(/"/g,'&quot;').replace(/\n/g,'¶');const num=dd+(rest?' 🛡':'');const ol=t?'outline:2px solid var(--cyan);outline-offset:1px':(k===selDay?'outline:2px solid var(--yellow);outline-offset:1px':'');
+    for(let dd=1;dd<=days;dd++){const k=dayKey(new Date(y,mo,dd)),t=k===todayKey(),rest=!!(state.restDays&&state.restDays[k]);const tip=((rest?'🛡 Вихідний\n':'')+dayTitle(k)).replace(/"/g,'&quot;').replace(/\n/g,'¶');const gotB=Object.values(state.badges||{}).includes(k);const num=dd+(rest?' 🛡':'')+(gotB?' 🏅':'');const ol=t?'outline:2px solid var(--cyan);outline-offset:1px':(k===selDay?'outline:2px solid var(--yellow);outline-offset:1px':'');
       if(mt.id==='all'){const comps=dayComponents(k);const dots=comps?`<div class="mdots">${comps.map(c=>`<i style="background:${compColor(c)}"></i>`).join('')}</div>`:'';
         cells+=`<div class="d" data-tip="${tip}" onclick="selectDay('${k}')" style="cursor:pointer;${ol}"><b>${num}</b>${dots}</div>`;
       } else {const r=metricDay(mt,k),c=metricColor(mt,r);
