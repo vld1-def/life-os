@@ -584,7 +584,8 @@ function applyScreen(){const gid=screenLimitId();if(!gid)return;Object.keys(scre
 
 /* ===== КРОКИ (айфон → таблиця steps; raw = кроки по годинах через новий рядок, сумуємо) ===== */
 let stepsDB={};
-async function loadStepsDB(){ if(!sb)return; const {data,error}=await sb.from('steps').select('date,raw').limit(3000); if(error||!data)return; stepsDB={}; data.forEach(r=>{const sum=String(r.raw==null?'':r.raw).split(/[\s,;]+/).map(Number).filter(n=>!isNaN(n)).reduce((a,b)=>a+b,0); if(sum>0)stepsDB[r.date]=Math.round(sum);}); applyStepsDB(); render(); }
+function normDayKey(s){s=String(s||'').trim();if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.slice(0,10);return parseUaDate(s);}
+async function loadStepsDB(){ if(!sb)return; const {data,error}=await sb.from('steps').select('date,raw').limit(5000); if(error||!data)return; stepsDB={}; data.forEach(r=>{const dk=normDayKey(r.date); if(!dk)return; const sum=Math.round(String(r.raw==null?'':r.raw).split(/[\s,;]+/).map(Number).filter(n=>!isNaN(n)).reduce((a,b)=>a+b,0)); if(sum>0)stepsDB[dk]=Math.max(stepsDB[dk]||0,sum);}); applyStepsDB(); render(); }
 function stepsCounterId(){const c=state.settings.counters.find(x=>/крок|steps/i.test(x.name));return c?c.id:null;}
 function applyStepsDB(){const cid=stepsCounterId();if(!cid)return;Object.keys(stepsDB).forEach(dk=>{getDay(dk).counters[cid]=stepsDB[dk];});}
 
