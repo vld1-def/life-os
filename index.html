@@ -149,6 +149,10 @@
   .sync-dot{width:8px;height:8px;border-radius:50%;background:var(--green);transition:.3s}
   .sync-dot.busy{background:var(--yellow)} .sync-dot.off{background:var(--red)}
   #notifBadge{position:absolute; top:-5px; right:-5px; background:var(--red); color:#fff; font-size:10px; min-width:17px; height:17px; border-radius:9px; display:none; align-items:center; justify-content:center; padding:0 4px; font-weight:800}
+  .badge{display:flex; gap:12px; align-items:center; padding:10px 12px; border:1px solid var(--stroke); border-radius:14px; margin-bottom:8px; opacity:.5}
+  .badge.on{opacity:1; background:linear-gradient(90deg,rgba(92,201,221,.12),rgba(157,138,214,.12)); border-color:rgba(92,201,221,.4)}
+  .badge .be{font-size:30px; filter:grayscale(1) opacity(.6); flex-shrink:0}
+  .badge.on .be{filter:none}
 </style>
 </head>
 <body>
@@ -165,6 +169,7 @@
       <div class="glass pill" style="min-width:auto;padding:11px" title="Синхронізація: зелений — збережено, жовтий — зберігаю, червоний — немає зв'язку"><span class="sync-dot" id="syncDot"></span></div>
       <button class="acc" onclick="openNotifs()" style="position:relative">🔔<span id="notifBadge">0</span></button>
       <button class="acc" id="langBtn" onclick="toggleLang()">EN</button>
+      <button class="acc" onclick="openBadges()">🏅</button>
       <button class="acc" onclick="openSettings()">⚙️</button>
     </div>
   </div>
@@ -264,6 +269,15 @@
     </div>
     <div class="between" style="margin-top:10px"><span class="muted">Тривалість</span><span class="cnt" id="sleepDur">—</span></div>
     <div class="bar"><i class="g-purple" id="sleepBar" style="width:0%"></i></div>
+  </div>
+
+  <!-- ВАГА -->
+  <div class="glass card" style="--o:8">
+    <h2><span class="dot" style="background:var(--green)"></span>Вага</h2>
+    <div class="between">
+      <div class="flex"><input type="number" id="weightInput" step="0.1" min="0" placeholder="—" style="width:100px" onchange="setWeight(this.value)"><span class="muted">кг</span></div>
+      <div class="muted" id="weightTrend" style="font-size:12px"></div>
+    </div>
   </div>
 
   <!-- НОТАТКА -->
@@ -369,6 +383,11 @@
   <div id="notifBody"></div>
 </dialog>
 
+<dialog id="badges">
+  <div class="between"><h2 style="margin:0">🏅 Бейджі <span id="badgeCount" style="text-transform:none;letter-spacing:0;color:var(--muted)"></span></h2><button class="sm" onclick="badges.close()">✕</button></div>
+  <div id="badgeBody" style="margin-top:12px"></div>
+</dialog>
+
 <div class="toast" id="toast"></div>
 <div id="tip"></div>
 
@@ -400,7 +419,8 @@ const LOC=()=>lang==='en'?'en-US':'uk-UA';
 const EN={
 '🔥 серія':'🔥 streak','⭐ бал дня':'⭐ day score','💳 борг':'💳 debt',
 'Мій прогрес':'My progress','Активність':'Activity','Вода':'Water','Ліміти':'Limits','Лічильники':'Counters','Нотатка дня':'Day note','Мої цілі / таски':'My goals / tasks','Тиждень':'Week','Сон':'Sleep','Заснув':'Fell asleep','Прокинувся':'Woke up','Тривалість':'Duration','😴 Ціль сну (год)':'😴 Sleep goal (h)','😴 Ліг зараз':'😴 To bed now','☀️ Встав зараз':'☀️ Awake now',
-'Огляд':'Overview','Місяць':'Month','Сер. сон':'Avg sleep','🎮 Ігри':'🎮 Games','Планка (сек)':'Plank (sec)','Фінанси (Влад) —':'Finances (Vlad) —',
+'Огляд':'Overview','Місяць':'Month','Сер. сон':'Avg sleep','🎮 Ігри':'🎮 Games','Планка (сек)':'Plank (sec)',
+'Вага':'Weight','🏅 Бейджі':'🏅 Badges','Відкрито!':'Unlocked!','Фінанси (Влад) —':'Finances (Vlad) —',
 '🗓 Календар':'🗓 Calendar','📈 Графік':'📈 Chart','По місяцях':'By month','По днях':'By day','Нова ціль...':'New goal...','+ 💧':'+ 💧',
 'Витрати цього місяця':'Spent this month','Загальний борг зараз':'Total debt now','Витрати':'Spending','Куди йдуть гроші':'Where money goes','(тисни категорію → графік по днях)':'(tap a category → daily chart)','💳 Кредити — впиши поточний борг (зберігається на сьогодні)':'💳 Loans — enter current debt (saved for today)','📉 Борг':'📉 Debt','Підкатегорії:':'Subcategories:',
 'цього місяця витрат ще немає':'no spending this month yet','немає підкатегорій':'no subcategories','завантаження витрат...':'loading spending...','почни вписувати борг — і тут з\'явиться графік':'start entering debt — a chart will appear here','Додай кредити в налаштуваннях':'Add loans in settings','впиши поточний борг →':'enter current debt →','🎉 закрито!':'🎉 closed!','= як минулого':'= same as last','немає даних':'no data',
@@ -573,6 +593,8 @@ function nowHM(){const n=new Date();return String(n.getHours()).padStart(2,'0')+
 function sleepBedNow(){state.pendingBed=nowHM();save();toast('😴 Заснув о '+state.pendingBed);}
 function sleepWakeNow(){const w=nowHM(),b=state.pendingBed||'';const d=getDay(todayKey());d.sleep={b,w,h:null};state.pendingBed=null;save();const h=sleepHours(todayKey());toast('☀️ Сон записано: '+(b||'?')+'–'+w+(h?(' · '+h+' год'):''));}
 function sleepHours(k){const d=state.days[k];if(!d||!d.sleep)return 0;const s=d.sleep;if(s.h!=null&&s.h!=='')return Math.round((+s.h)*10)/10;if(!s.b||!s.w)return 0;const tm=t=>{const[h,m]=t.split(':').map(Number);return h*60+m;};let diff=tm(s.w)-tm(s.b);if(diff<0)diff+=1440;return Math.round(diff/60*10)/10;}
+function setWeight(v){const d=getDay(activeDay());if(v===''||v==null)delete d.weight;else d.weight=+v||0;save();}
+function lastWeightBefore(k){const ds=Object.keys(state.days).filter(x=>x<k&&state.days[x].weight>0).sort();return ds.length?state.days[ds[ds.length-1]].weight:null;}
 let sleepDB={};
 async function loadSleepDB(){ if(!sb)return; const {data,error}=await sb.from('sleep').select('date,bed,wake,hours').limit(2000); if(error||!data)return; sleepDB={}; data.forEach(r=>{sleepDB[r.date]={b:r.bed||'',w:r.wake||'',h:(r.hours==null?null:r.hours)};}); applySleepDB(); render(); }
 function applySleepDB(){ Object.keys(sleepDB).forEach(dk=>{ const s=sleepDB[dk]; getDay(dk).sleep={b:s.b,w:s.w,h:s.h}; }); }
@@ -639,6 +661,8 @@ function render(){
   const slp=d.sleep||{}; $('sleepBed').value=slp.b||''; $('sleepWake').value=slp.w||'';
   const sh=sleepHours(ad); $('sleepDur').textContent=sh?sh+' год':'—'; $('sleepBar').style.width=Math.min(100,sh/(S.sleepGoal||8)*100)+'%';
   $('sleepPending').textContent=state.pendingBed?('😴 Заснув о '+state.pendingBed+' — зранку тисни «Встав зараз»'):'';
+  $('weightInput').value=d.weight||''; const pw=lastWeightBefore(ad);
+  $('weightTrend').innerHTML=d.weight?(pw!=null?(()=>{const df=Math.round((d.weight-pw)*10)/10;return df===0?'без змін':((df>0?'▲ +':'▼ ')+Math.abs(df)+' кг з минулого');})():'перше зважування'):'впиши вагу для інфо';
   $('taskList').innerHTML=state.tasks.map(t=>`<div class="todo ${t.done?'done':''}"><div class="check ${t.done?'on':''}" onclick="toggleTask('${t.id}')">${t.done?'✓':''}</div><span style="flex:1">${t.text}</span><button class="del sm" onclick="delTask('${t.id}')">✕</button></div>`).join('')||'<div class="empty">Постав собі перші цілі 🎯</div>';
 
   renderFinance();
@@ -661,6 +685,53 @@ function renderNotifBadge(){const b=$('notifBadge');if(!b)return;const c=notifCo
 function openNotifs(){const n=buildNotifs();const sec=(t,arr,empty)=>`<div class="sec-title">${t}</div>`+(arr.length?arr.map(x=>`<div class="row" style="padding:7px 0">${x}</div>`).join(''):`<div class="empty">${empty}</div>`);
   $('notifBody').innerHTML=sec('📋 Зробити сьогодні',n.todo,'усе виконано 🎉')+sec('⚠️ Перевищені ліміти',n.over,'лімітів не перевищено 👍')+sec('🔥 Активні штрафи',n.pen,'штрафів немає');
   applyLang(); notifs.showModal();}
+
+/* ===== БЕЙДЖІ ===== */
+function badgeStats(){
+  const days=Object.keys(state.days),S=state.settings;
+  const stepC=S.counters.find(c=>/крок|steps/i.test(c.name));
+  let perfect=0,good=0,tracked=0,waterHits=0,sleepHits=0,bestSteps=0,totalSteps=0;const goodArr=[];
+  days.forEach(k=>{const sc=dayScore(k),rest=!!(state.restDays&&state.restDays[k]);
+    if(sc!=null){tracked++;if(sc>=70||rest)good++;if(sc===100)perfect++;}
+    const d=state.days[k];
+    if(d.water>=S.waterGoal)waterHits++;
+    const sh=sleepHours(k);if(sh>0&&sh>=(S.sleepGoal||8))sleepHits++;
+    if(stepC){const v=(d.counters&&d.counters[stepC.id])||0;if(v>bestSteps)bestSteps=v;totalSteps+=v;}
+    if((sc!=null&&sc>=70)||rest)goodArr.push(k);});
+  let bestStreak=0,run=0,prev=null;
+  goodArr.sort().forEach(k=>{const dt=new Date(k+'T00:00:00');if(prev&&(dt-prev)===86400000)run++;else run=1;if(run>bestStreak)bestStreak=run;prev=dt;});
+  let loanClosed=0;Object.keys(state.loanLog||{}).forEach(id=>{if(Object.values(state.loanLog[id]).some(v=>v===0))loanClosed=1;});
+  return {perfect,good,tracked,waterHits,sleepHits,bestSteps,totalSteps,bestStreak:Math.max(bestStreak,computeStreak()),loanClosed};
+}
+function badgeList(){const s=badgeStats();return [
+  {e:'🔥',n:'Тижнева серія',need:7,unit:'днів поспіль',val:s.bestStreak},
+  {e:'💪',n:'Два тижні',need:14,unit:'днів поспіль',val:s.bestStreak},
+  {e:'👑',n:'Місяць сили',need:30,unit:'днів поспіль',val:s.bestStreak},
+  {e:'⭐',n:'Ідеальний день',need:1,unit:'день на 100%',val:s.perfect},
+  {e:'🌟',n:'П\'ять зірок',need:5,unit:'днів на 100%',val:s.perfect},
+  {e:'💚',n:'Хороша форма',need:30,unit:'хороших днів',val:s.good},
+  {e:'💧',n:'Гідратація',need:15,unit:'днів з ціллю води',val:s.waterHits},
+  {e:'🌊',n:'Водний майстер',need:30,unit:'днів з ціллю води',val:s.waterHits},
+  {e:'👣',n:'Ходок',need:8000,unit:'кроків за день',val:s.bestSteps},
+  {e:'🚶',n:'Марафонець дня',need:15000,unit:'кроків за день',val:s.bestSteps},
+  {e:'🗺️',n:'100 тисяч кроків',need:100000,unit:'кроків усього',val:s.totalSteps},
+  {e:'😴',n:'Сплюх',need:7,unit:'ночей з нормою сну',val:s.sleepHits},
+  {e:'🛌',n:'Режим сну',need:20,unit:'ночей з нормою сну',val:s.sleepHits},
+  {e:'📅',n:'Тиждень у трекері',need:7,unit:'днів з даними',val:s.tracked},
+  {e:'📆',n:'Місяць дисципліни',need:30,unit:'днів з даними',val:s.tracked},
+  {e:'🏆',n:'Сотня',need:100,unit:'днів з даними',val:s.tracked},
+  {e:'💳',n:'Кредит закрито',need:1,unit:'закритий борг',val:s.loanClosed},
+];}
+function openBadges(){
+  const list=badgeList(),unlocked=list.filter(b=>b.val>=b.need).length;
+  $('badgeCount').textContent=unlocked+' / '+list.length;
+  $('badgeBody').innerHTML=list.map(b=>{const on=b.val>=b.need,pct=Math.min(100,Math.round(b.val/b.need*100));
+    return `<div class="badge ${on?'on':''}"><div class="be">${b.e}</div><div style="flex:1;min-width:0"><div style="font-weight:700">${b.n} ${on?'✅':'🔒'}</div>`+
+      (on?`<div class="muted" style="font-size:11px">Відкрито!</div>`
+         :`<div class="muted" style="font-size:11px">Потрібно: ${fmt(b.need)} ${b.unit}</div><div class="bar" style="height:5px;margin-top:5px"><i class="g-cyan" style="width:${pct}%"></i></div><div class="muted" style="font-size:10px;margin-top:2px">${fmt(b.val)} / ${fmt(b.need)}</div>`)+
+      `</div></div>`;}).join('');
+  applyLang(); badges.showModal();
+}
 
 /* ===== ГРАФІК ===== */
 function svgLine({data,w=800,h=150,color='#5cc9dd',goal=null,goalLabel='',avg=false}){
@@ -718,22 +789,24 @@ function svgMultiLine({series,labels,w=800,h=190,unit=''}){
 let metricSel='all', monthView='cal';
 function setMetric(id){metricSel=id;renderMonth();}
 function setMonthView(v){monthView=v;renderMonth();}
-function metricList(){const S=state.settings;const a=[{id:'all',label:'Усі',kind:'all'},{id:'score',label:'Бал дня',unit:'%',kind:'score'},{id:'water',label:'Вода',unit:'мл',kind:'goal'},{id:'sleep',label:'Сон',unit:'год',kind:'sleep'}];S.counters.forEach(c=>a.push({id:'cnt:'+c.id,label:c.name,unit:c.unit,kind:'goal',ref:c}));S.limitHabits.forEach(l=>{if(l.mode==='week')return;a.push({id:'lim:'+l.id,label:l.name,unit:l.unit,kind:'limit',ref:l});});return a;}
+function metricList(){const S=state.settings;const a=[{id:'all',label:'Усі',kind:'all'},{id:'score',label:'Бал дня',unit:'%',kind:'score'},{id:'water',label:'Вода',unit:'мл',kind:'goal'},{id:'sleep',label:'Сон',unit:'год',kind:'sleep'},{id:'weight',label:'Вага',unit:'кг',kind:'weight'}];S.counters.forEach(c=>a.push({id:'cnt:'+c.id,label:c.name,unit:c.unit,kind:'goal',ref:c}));S.limitHabits.forEach(l=>{if(l.mode==='week')return;a.push({id:'lim:'+l.id,label:l.name,unit:l.unit,kind:'limit',ref:l});});return a;}
 function curMetric(){return metricList().find(m=>m.id===metricSel)||metricList()[0];}
-function metricGoal(mt){if(mt.id==='water')return state.settings.waterGoal;if(mt.id==='sleep')return state.settings.sleepGoal||8;if(mt.id==='score')return 70;if(mt.kind==='goal')return mt.ref.goal;if(mt.kind==='limit')return mt.ref.max;return null;}
+function metricGoal(mt){if(mt.id==='water')return state.settings.waterGoal;if(mt.id==='sleep')return state.settings.sleepGoal||8;if(mt.id==='weight')return null;if(mt.id==='score')return 70;if(mt.kind==='goal')return mt.ref.goal;if(mt.kind==='limit')return mt.ref.max;return null;}
 function metricDay(mt,k){const d=state.days[k];if(!d)return{has:false};
   if(mt.id==='score'){const sc=dayScore(k);return{v:sc,goal:100,ok:sc>=70,has:sc!=null};}
   if(mt.id==='water'){return{v:d.water||0,goal:state.settings.waterGoal,ok:(d.water||0)>=state.settings.waterGoal,has:true};}
   if(mt.id==='sleep'){const h=sleepHours(k),g=state.settings.sleepGoal||8;return{v:h,goal:g,ok:h>=g,has:h>0};}
+  if(mt.id==='weight'){const v=d.weight||0;return{v,goal:null,ok:true,has:v>0};}
   if(mt.kind==='goal'){const v=(d.counters&&d.counters[mt.ref.id])||0;return{v,goal:mt.ref.goal,ok:v>=mt.ref.goal,has:true};}
   const v=(d.limits&&d.limits[mt.ref.id])||0,mx=limitMaxOn(mt.ref,k);return{v,goal:mx,ok:v<=mx,has:true};}
 function metricColor(mt,r){if(!r.has)return{bg:'rgba(255,255,255,.05)',col:'var(--muted)'};
+  if(mt.kind==='weight')return{bg:'rgba(111,151,221,.6)',col:'#06121a'};
   if(mt.kind==='limit')return r.ok?{bg:'rgba(79,197,150,.8)',col:'#04140d'}:{bg:'rgba(229,107,123,.72)',col:'#2a0708'};
   const pct=r.goal?r.v/r.goal:0;
   if(r.ok||pct>=1)return{bg:'rgba(79,197,150,.82)',col:'#04140d'};
   if(pct>=.5)return{bg:'rgba(227,189,104,.78)',col:'#2a1e02'};
   return{bg:'rgba(229,107,123,.72)',col:'#2a0708'};}
-function metricValTxt(mt,v){if(mt.id==='water')return(v/1000).toFixed(1)+'л';if(mt.id==='sleep')return v+'г';if(mt.id==='score')return v+'%';return fmt(v)+(mt.unit?(' '+mt.unit):'');}
+function metricValTxt(mt,v){if(mt.id==='water')return(v/1000).toFixed(1)+'л';if(mt.id==='sleep')return v+'г';if(mt.id==='weight')return v+'кг';if(mt.id==='score')return v+'%';return fmt(v)+(mt.unit?(' '+mt.unit):'');}
 function renderMonth(){
   $('metricBar').innerHTML=metricList().map(m=>`<button class="sm ${m.id===metricSel?'acc':''}" onclick="setMetric('${m.id}')">${m.label}</button>`).join('');
   $('btnCal').className='sm '+(monthView==='cal'?'acc':'');
