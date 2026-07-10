@@ -70,15 +70,16 @@
 const cv=document.getElementById('c'),ctx=cv.getContext('2d');
 const W=cv.width,H=cv.height,GROUND=H-54;
 const $=id=>document.getElementById(id);
-let best={p:0,t:0}; try{const b=JSON.parse(localStorage.getItem('run_best3'));if(b&&typeof b.p==='number')best=b;}catch(e){}
-function showBest(){ $('best').textContent='рекорд: '+best.p+(best.t?(' · '+best.t+'с'):''); }
+const _qp=new URLSearchParams(location.search), PROFILE=_qp.get('u')||'me', PNAME=_qp.get('n')||PROFILE;
+const BKEY='run_best3'+(PROFILE==='me'?'':'_'+PROFILE); // рекорд окремо для кожного профілю
+let best={p:0,t:0}; try{const b=JSON.parse(localStorage.getItem(BKEY));if(b&&typeof b.p==='number')best=b;}catch(e){}
+function showBest(){ $('best').textContent='рекорд ('+PNAME+'): '+best.p+(best.t?(' · '+best.t+'с'):''); }
 showBest();
 /* ===== ТАБЛИЦЯ РЕКОРДІВ (Supabase run_scores) ===== */
 const SB_URL='https://xezhbqcteaihrlrykbkr.supabase.co', SB_KEY='sb_publishable_qNcUyFxMlWAWAry3uSHndg_ADVMCE3a';
-const _qp=new URLSearchParams(location.search), PROFILE=_qp.get('u')||'me', PNAME=_qp.get('n')||PROFILE;
 function sbFetch(path,opt){return fetch(SB_URL+'/rest/v1/'+path,Object.assign({headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY,'Content-Type':'application/json'}},opt||{}));}
-function renderLb(d){const el=$('lb');if(!el)return;if(!d||!d.length){el.innerHTML='';return;}el.innerHTML='<div class="lbrow" style="border:none;background:none;color:var(--muted);padding-bottom:0">🏆 Рекорди раннера</div>'+d.map((r,i)=>`<div class="lbrow"><span>${['🥇','🥈','🥉'][i]||'▫️'} ${r.name||r.profile}</span><span>${r.points} 👟 · ${(+r.secs||0).toFixed(1)}с</span></div>`).join('');}
-async function loadLb(){try{const r=await sbFetch('run_scores?select=*&order=points.desc.nullslast');renderLb(await r.json());}catch(e){}}
+function renderLb(d){const el=$('lb');if(!el)return;if(!d||!d.length){el.innerHTML='';return;}el.innerHTML='<div class="lbrow" style="border:none;background:none;color:var(--muted);padding-bottom:0">🏆 Рекорди раннера</div>'+d.map((r,i)=>`<div class="lbrow"><span>${['🥇','🥈','🥉'][i]||'▫️'} ${r.name||r.profile}${r.profile===PROFILE?' (ти)':''}</span><span>${r.points} 👟 · ${(+r.secs||0).toFixed(1)}с</span></div>`).join('');}
+async function loadLb(){try{const r=await sbFetch('run_scores?select=*&order=points.desc.nullslast');const d=await r.json();renderLb(d);const mine=(d||[]).find(x=>x.profile===PROFILE);if(mine&&mine.points>best.p){best={p:mine.points,t:+mine.secs||0};localStorage.setItem(BKEY,JSON.stringify(best));showBest();}}catch(e){}}
 async function saveScore(p,t){try{await sbFetch('run_scores',{method:'POST',headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates'},body:JSON.stringify([{profile:PROFILE,name:PNAME,points:p,secs:t}])});loadLb();}catch(e){}}
 loadLb();
 
@@ -103,7 +104,7 @@ function gameOver(won){
   if(state==='over')return; state='over';
   if(won) points*=2;
   const fp=Math.floor(points), ft=Math.round(elapsed);
-  if(fp>best.p){ best={p:fp,t:ft}; localStorage.setItem('run_best3',JSON.stringify(best)); showBest(); saveScore(fp,ft); }
+  if(fp>best.p){ best={p:fp,t:ft}; localStorage.setItem(BKEY,JSON.stringify(best)); showBest(); saveScore(fp,ft); }
   $('ovTitle').textContent=won?'🏆 Ти витримав!':'💀 Не дожив';
   $('ovText').innerHTML=(won?'<b style="color:#5cc9dd">×2 за витримку!</b> ':'')+'Набрав <b>'+fp+'</b> 👟 за <b>'+ft+' с</b>.<br>Рекорд: '+best.p+' · '+best.t+'с';
   $('playBtn').textContent='↻ Ще раз'; $('overlay').style.display='flex';

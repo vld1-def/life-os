@@ -842,7 +842,7 @@ function badgeStats(){
     if(coffeeL&&sc!=null&&(((d.limits&&d.limits[coffeeL.id])||0)===0))coffeeZero.push(k);});
   const mx=o=>Object.values(o).reduce((a,b)=>Math.max(a,b),0);
   let loanClosed=0;Object.keys(state.loanLog||{}).forEach(id=>{if(Object.values(state.loanLog[id]).some(v=>v===0))loanClosed=1;});
-  let bestGame=0;try{bestGame=(JSON.parse(localStorage.getItem('run_best3'))||{}).p||0;}catch(e){}
+  let bestGame=0;try{bestGame=(JSON.parse(localStorage.getItem('run_best3'+(PROFILE==='me'?'':'_'+PROFILE)))||{}).p||0;}catch(e){}
   return {perfect,good,tracked,waterHits,sleepHits,bestSteps,totalSteps,bestPlank,bestPush,bestSquat,totalPush,totalSquat,totalPlank,
     recPushSet:pushEx?exRecord(pushEx.id):0,recSquatSet:squatEx?exRecord(squatEx.id):0,
     monthPush:mx(mPush),monthSquat:mx(mSquat),monthPlank:mx(mPlank),monthWaterL:Math.round(mx(mWater)/1000),
