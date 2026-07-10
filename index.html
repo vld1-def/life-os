@@ -170,10 +170,39 @@
   .prof-row{display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--stroke); border-radius:12px; margin-bottom:8px}
   .prof-row.cur{border-color:var(--cyan); background:rgba(92,201,221,.1)}
   .prof-row .pn{flex:1; font-weight:700}
+  .gate{position:fixed; inset:0; z-index:600; display:flex; align-items:center; justify-content:center; padding:24px; background:rgba(8,12,20,.72); backdrop-filter:blur(14px)}
+  .gate.hidden{display:none}
+  .gate-inner{width:100%; max-width:560px; text-align:center}
+  .gate-inner h1{font-size:36px; margin:0; letter-spacing:1px}
+  .gate-inner h1 span{color:var(--cyan)}
+  .gate-sub{color:var(--muted); margin:8px 0 26px; font-size:15px}
+  .gate-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px}
+  .gate-card{position:relative; border:1px solid var(--stroke); border-radius:18px; padding:24px 14px; cursor:pointer; background:rgba(255,255,255,.03); transition:.15s}
+  .gate-card:hover{border-color:var(--cyan); transform:translateY(-2px); background:rgba(92,201,221,.08)}
+  .gate-card .ge{font-size:48px; line-height:1}
+  .gate-card .gn{font-weight:800; margin-top:10px; font-size:18px}
+  .gate-card .gtag{font-size:11px; color:var(--cyan); margin-top:4px}
+  .gate-card .gdel{position:absolute; top:8px; right:8px; background:none; border:none; cursor:pointer; font-size:14px; opacity:.55}
+  .gate-card .gdel:hover{opacity:1}
+  .gate-add{display:flex; gap:8px; margin-top:24px}
+  .gate-add input{flex:1}
 </style>
 </head>
 <body>
 <div class="blobs"><i></i><i></i><i></i></div>
+
+<div id="gate" class="gate hidden">
+  <div class="gate-inner">
+    <h1>LIFE&nbsp;<span>OS</span></h1>
+    <div class="gate-sub">Хто зараз користується?</div>
+    <div id="gateList" class="gate-grid"></div>
+    <div class="gate-add">
+      <input id="newProfileName" placeholder="Ім'я нового профілю" onkeydown="if(event.key==='Enter')addProfile()">
+      <button class="acc" onclick="addProfile()">+ Створити</button>
+    </div>
+    <div class="muted" style="margin-top:14px;font-size:12px">Кожен профіль — окремі дані. Порада: додай свій профіль у закладки за посиланням <code>?u=ім'я</code>.</div>
+  </div>
+</div>
 
 <div id="app" class="hidden">
 <header>
@@ -185,7 +214,6 @@
     <div class="flex">
       <div class="glass pill" style="min-width:auto;padding:11px" title="Синхронізація: зелений — збережено, жовтий — зберігаю, червоний — немає зв'язку"><span class="sync-dot" id="syncDot"></span></div>
       <button class="acc" onclick="openNotifs()" style="position:relative">🔔<span id="notifBadge">0</span></button>
-      <button class="acc" id="profBtn" onclick="openProfiles()" title="Профіль">👤</button>
       <button class="acc" id="langBtn" onclick="toggleLang()">EN</button>
       <button class="acc" onclick="openBadges()">🏅</button>
       <button class="acc" onclick="openSettings()">⚙️</button>
@@ -391,6 +419,9 @@
       <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(this)">
     </div>
     <div class="muted" style="margin-top:8px">Дані й так зберігаються в хмарі. Це — додаткова копія на випадок.</div>
+    <div class="sec-title" style="margin-top:18px">👤 Профіль</div>
+    <button onclick="location.href=location.pathname">🔄 Змінити користувача</button>
+    <div class="muted" style="margin-top:8px">Відкриє екран вибору профілю (Влад / Бодя / інші).</div>
   </div>
 
   <div class="between" style="margin-top:24px">
@@ -404,16 +435,6 @@
   <div id="notifBody"></div>
 </dialog>
 
-<dialog id="profilePick">
-  <div class="between"><h2 style="margin:0">👤 Профіль</h2><button class="sm" onclick="profilePick.close()">✕</button></div>
-  <div class="muted" style="margin:8px 0 12px;font-size:13px">Кожен профіль — окремі дані й свої налаштування. Дані не пересікаються.</div>
-  <div id="profileList"></div>
-  <div class="flex" style="margin-top:14px;gap:8px">
-    <input id="newProfileName" placeholder="Ім'я нового профілю (напр. Бодя)" onkeydown="if(event.key==='Enter')addProfile()">
-    <button class="acc sm" onclick="addProfile()">+ Створити</button>
-  </div>
-  <div class="muted" style="margin-top:10px;font-size:12px">Порада: кожен може відкрити свій профіль напряму за посиланням <code>?u=ім'я</code> і додати в закладки.</div>
-</dialog>
 
 <dialog id="badges">
   <div class="between"><h2 style="margin:0">🏅 Бейджі <span id="badgeCount" style="text-transform:none;letter-spacing:0;color:var(--muted)"></span></h2><button class="sm" onclick="badges.close()">✕</button></div>
@@ -511,7 +532,7 @@ const TRANSLIT={а:'a',б:'b',в:'v',г:'h',ґ:'g',д:'d',е:'e',є:'ie',ж:'zh'
 function slugify(s){return String(s||'').toLowerCase().split('').map(c=>TRANSLIT[c]!=null?TRANSLIT[c]:c).join('').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,20)||('user'+Math.random().toString(36).slice(2,6));}
 const urlU=new URLSearchParams(location.search).get('u');
 let PROFILE=slugify(urlU||localStorage.getItem('lifeos_profile')||'me')||'me';
-localStorage.setItem('lifeos_profile',PROFILE);
+if(urlU)localStorage.setItem('lifeos_profile',PROFILE);
 let SOLO_ID=(PROFILE==='me')?'me':'profile_'+PROFILE;
 let cacheKey='lifeos_cache'+(PROFILE==='me'?'':'_'+PROFILE);
 let profiles=[{id:'me',name:'Влад',emoji:'🧑'}];
@@ -520,6 +541,7 @@ let selDay=null; const activeDay=()=>selDay||todayKey();
 /* ===== АВТЕНТИФІКАЦІЯ ===== */
 async function boot(){
   if(!configured) return;
+  if(!urlU){ showProfileGate(); return; } // немає ?u= → повноекранний вибір користувача
   let started=false;
   const start=()=>{if(started)return;started=true;enterApp();};
   const cache=localStorage.getItem(cacheKey);
@@ -542,14 +564,16 @@ function enterApp(){
   if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
 /* ===== ПРОФІЛІ: реєстр у рядку solo id='__profiles__' ===== */
-async function loadProfiles(){ if(!sb)return; try{const {data}=await sb.from('solo').select('data').eq('id','__profiles__').maybeSingle(); if(data&&data.data&&Array.isArray(data.data.list)&&data.data.list.length)profiles=data.data.list; if(!profiles.find(p=>p.id===PROFILE)){profiles.push({id:PROFILE,name:PROFILE==='me'?'Влад':(urlU||PROFILE),emoji:'🧑'});await saveProfiles();} updateProfileBtn();}catch(e){} }
+async function loadProfilesRegistry(){ if(!sb)return; try{const {data}=await sb.from('solo').select('data').eq('id','__profiles__').maybeSingle();
+  if(data&&data.data&&Array.isArray(data.data.list)&&data.data.list.length){ profiles=data.data.list; if(!profiles.find(p=>p.id==='me')){profiles.unshift({id:'me',name:'Влад',emoji:'🧑'});await saveProfiles();} }
+  else { profiles=[{id:'me',name:'Влад',emoji:'🧑'},{id:'bodia',name:'Бодя',emoji:'🧑‍🦱'}]; await saveProfiles(); } }catch(e){} }
+async function loadProfiles(){ await loadProfilesRegistry(); if(!profiles.find(p=>p.id===PROFILE)){profiles.push({id:PROFILE,name:(urlU||PROFILE),emoji:'🧑'});await saveProfiles();} }
 async function saveProfiles(){ if(!sb)return; try{await sb.from('solo').upsert({id:'__profiles__',data:{list:profiles}});}catch(e){} }
-function updateProfileBtn(){const b=$('profBtn');if(!b)return;const p=profiles.find(x=>x.id===PROFILE);b.textContent=p&&p.emoji?p.emoji:'👤';b.title='Профіль: '+(p?p.name:PROFILE);}
-function openProfiles(){renderProfiles();applyLang();profilePick.showModal();}
-function renderProfiles(){$('profileList').innerHTML=profiles.map(p=>{const cur=p.id===PROFILE;return `<div class="prof-row ${cur?'cur':''}"><span style="font-size:20px">${p.emoji||'👤'}</span><span class="pn">${p.name}${cur?' <span class="muted" style="font-weight:400">(зараз)</span>':''}</span>`+(cur?'':`<button class="sm acc" onclick="switchProfile('${p.id}')">Увійти</button>`)+(p.id==='me'?'':`<button class="sm del" onclick="deleteProfile('${p.id}')" title="Видалити">🗑</button>`)+`</div>`;}).join('');}
-function switchProfile(id){localStorage.setItem('lifeos_profile',id);location.href=location.pathname+(id==='me'?'':'?u='+encodeURIComponent(id));}
+async function showProfileGate(){ await loadProfilesRegistry(); renderGate(); applyLang(); $('gate').classList.remove('hidden'); }
+function renderGate(){$('gateList').innerHTML=profiles.map(p=>`<div class="gate-card" onclick="switchProfile('${p.id}')"><div class="ge">${p.emoji||'👤'}</div><div class="gn">${p.name}</div>`+(p.id==='me'?'<div class="gtag">твої дані</div>':`<button class="gdel" onclick="event.stopPropagation();deleteProfile('${p.id}')" title="Видалити">🗑</button>`)+`</div>`).join('');}
+function switchProfile(id){localStorage.setItem('lifeos_profile',id);location.href=location.pathname+'?u='+encodeURIComponent(id);}
 function addProfile(){const name=($('newProfileName').value||'').trim();if(!name)return;let id=slugify(name);if(id==='me'||profiles.find(p=>p.id===id))id=id+'-'+Math.random().toString(36).slice(2,5);profiles.push({id,name,emoji:'🧑'});saveProfiles();$('newProfileName').value='';switchProfile(id);}
-function deleteProfile(id){if(id==='me')return;if(!confirm('Видалити профіль «'+((profiles.find(p=>p.id===id)||{}).name||id)+'» разом з його даними?'))return;profiles=profiles.filter(p=>p.id!==id);saveProfiles();if(sb)sb.from('solo').delete().eq('id','profile_'+id);if(PROFILE===id)switchProfile('me');else renderProfiles();}
+function deleteProfile(id){if(id==='me')return;if(!confirm('Видалити профіль «'+((profiles.find(p=>p.id===id)||{}).name||id)+'» разом з його даними?'))return;profiles=profiles.filter(p=>p.id!==id);saveProfiles();if(sb){const clean=structuredClone(defaults);clean.badges={};sb.from('solo').upsert({id:'profile_'+id,data:clean,updated_at:new Date().toISOString()}).then(()=>sb.from('solo').delete().eq('id','profile_'+id));}if(PROFILE===id)switchProfile('me');else if($('gate')&&!$('gate').classList.contains('hidden'))renderGate();}
 /* ===== МОДУЛІ (вмик/вимик блоків для профілю) ===== */
 function mod(n){const m=state.settings.modules;return !m||m[n]!==false;}
 function applyModules(){document.querySelectorAll('[data-mod]').forEach(el=>{el.style.display=mod(el.dataset.mod)?'':'none';});}
