@@ -68,7 +68,7 @@
   .layout{display:flex; gap:15px; align-items:flex-start}
   .main{flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:15px}
   .side{flex:0 0 340px; width:340px; display:flex; flex-direction:column; gap:15px}
-  @media(max-width:900px){.layout{flex-direction:column}.main,.side{display:contents}.card{order:var(--o,50)}}
+  @media(max-width:900px){.layout{flex-direction:column; align-items:stretch}.main,.side{display:contents}.card{order:var(--o,50)}}
 
   .row{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:9px 0}
   .row+.row{border-top:1px solid rgba(255,255,255,.07)}
@@ -143,8 +143,9 @@
   .toast.show{opacity:1}
   #tip{position:fixed; z-index:300; pointer-events:none; background:rgba(18,20,32,.97); backdrop-filter:blur(12px); border:1px solid var(--stroke); border-radius:12px; padding:9px 12px; font-size:12px; line-height:1.55; white-space:pre-line; max-width:250px; box-shadow:var(--shadow); opacity:0; transition:opacity .1s; left:0; top:0}
   #tip.on{opacity:1}
-  .week-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:10px}
-  @media(max-width:520px){.week-grid{grid-template-columns:repeat(2,1fr)}}
+  .week-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(128px,1fr)); gap:10px}
+  #metricBar{gap:5px}
+  #metricBar button{padding:4px 9px; font-size:11px; border-radius:8px}
   .hidden{display:none!important}
   .sync-dot{width:8px;height:8px;border-radius:50%;background:var(--green);transition:.3s}
   .sync-dot.busy{background:var(--yellow)} .sync-dot.off{background:var(--red)}
@@ -385,6 +386,8 @@
     <div class="sec-title" style="margin-top:16px">🧩 Модулі (що показувати цьому профілю)</div>
     <div id="setModules" class="mod-grid"></div>
     <div class="muted" style="margin-top:6px;font-size:12px">Вимкнені модулі ховаються й не впливають на бал дня.</div>
+    <div class="sec-title" style="margin-top:16px">📊 Огляд — які показники показувати</div>
+    <div id="setOverview" class="mod-grid"></div>
   </div>
   <div class="tabpane" id="tab-act">
     <div class="sec-title">💪 Вправи (норма · множник штрафу · зростання/день)</div>
@@ -483,7 +486,7 @@ const EN={
 'Мій прогрес':'My progress','Активність':'Activity','Вода':'Water','Ліміти':'Limits','Лічильники':'Counters','Нотатка дня':'Day note','Мої цілі / таски':'My goals / tasks','Тиждень':'Week','Сон':'Sleep','Заснув':'Fell asleep','Прокинувся':'Woke up','Тривалість':'Duration','😴 Ціль сну (год)':'😴 Sleep goal (h)','😴 Ліг зараз':'😴 To bed now','☀️ Встав зараз':'☀️ Awake now',
 'Огляд':'Overview','Місяць':'Month','Сер. сон':'Avg sleep','🎮 Ігри':'🎮 Games','Планка (сек)':'Plank (sec)',
 'Вага':'Weight','🏅 Бейджі':'🏅 Badges','Відкрито!':'Unlocked!','Фінанси (Влад) —':'Finances (Vlad) —',
-'+ підхід':'+ set','✓ ціль':'✓ goal','Макс: Віджимання':'Max: Push-ups','Макс: Присідання':'Max: Squats','Макс: Планка (сек)':'Max: Plank (sec)',
+'+ підхід':'+ set','🏆 Макс/підхід':'🏆 Max/set','📊 Огляд — які показники показувати':'📊 Overview — which stats to show','Сер. сон':'Avg sleep',
 '👤 Профіль':'👤 Profile','Кожен профіль — окремі дані й свої налаштування. Дані не пересікаються.':'Each profile keeps its own data and settings. Nothing overlaps.','+ Створити':'+ Create','Увійти':'Switch','🧩 Модулі (що показувати цьому профілю)':'🧩 Modules (shown for this profile)','Вимкнені модулі ховаються й не впливають на бал дня.':'Disabled modules are hidden and don\'t count toward the day score.','💧 Вода':'💧 Water','💪 Активність':'💪 Activity','🚫 Ліміти':'🚫 Limits','🔢 Лічильники':'🔢 Counters','😴 Сон':'😴 Sleep','⚖️ Вага':'⚖️ Weight','💰 Фінанси':'💰 Finances','📝 Нотатка':'📝 Note','🎯 Таски':'🎯 Tasks','🎮 Гра':'🎮 Game','Нотатка':'Note','Таски':'Tasks','Гра':'Game','Фінанси':'Finances',
 '🗓 Календар':'🗓 Calendar','📈 Графік':'📈 Chart','По місяцях':'By month','По днях':'By day','Нова ціль...':'New goal...','+ 💧':'+ 💧',
 'Витрати цього місяця':'Spent this month','Загальний борг зараз':'Total debt now','Витрати':'Spending','Куди йдуть гроші':'Where money goes','(тисни категорію → графік по днях)':'(tap a category → daily chart)','💳 Кредити — впиши поточний борг (зберігається на сьогодні)':'💳 Loans — enter current debt (saved for today)','📉 Борг':'📉 Debt','Підкатегорії:':'Subcategories:',
@@ -591,6 +594,7 @@ function mod(n){if(n==='finance'&&PROFILE!=='me')return false;const m=state.sett
 function applyModules(){document.querySelectorAll('[data-mod]').forEach(el=>{el.style.display=mod(el.dataset.mod)?'':'none';});}
 const MODULES=[['water','💧 Вода'],['activity','💪 Активність'],['limits','🚫 Ліміти'],['counters','🔢 Лічильники'],['sleep','😴 Сон'],['weight','⚖️ Вага'],['finance','💰 Фінанси'],['notes','📝 Нотатка'],['tasks','🎯 Таски'],['game','🎮 Гра']];
 function renderModuleToggles(){$('setModules').innerHTML=MODULES.filter(([k])=>!(k==='finance'&&PROFILE!=='me')).map(([k,lab])=>`<label><input type="checkbox" data-modk="${k}" ${mod(k)?'checked':''}>${lab}</label>`).join('');}
+function renderOverviewToggles(){$('setOverview').innerHTML=OVSTATS.filter(([k])=>ovAvail(k)).map(([k,lab])=>`<label><input type="checkbox" data-ovk="${k}" ${ovOn(k)?'checked':''}>${lab}</label>`).join('');}
 let saveTimer=null, dirty=false;
 function scheduleSync(){ dirty=true; localStorage.setItem(cacheKey,JSON.stringify(state)); setSync('busy'); clearTimeout(saveTimer); saveTimer=setTimeout(pushState,700); }
 async function pushState(){
@@ -751,8 +755,7 @@ function render(){
     const chips=sets.map((s,i)=>`<span class="setchip" onclick="delSet('${ex.id}',${i})" title="прибрати підхід">${s}<b>×</b></span>`).join('');
     return `<div class="row-ex"><div class="between"><span>${ex.name} ${tag}</span><span class="muted cnt">${done} / ${t}${ok?' ✅':''}</span></div>`+
       `<div class="bar" style="margin:6px 0"><i class="g-green" style="width:${Math.min(100,done/t*100)}%"></i></div>`+
-      `<div class="ex-sets">${chips}<input type="number" inputmode="numeric" id="setin-${ex.id}" class="setin" placeholder="підхід" onkeydown="if(event.key==='Enter')addSet('${ex.id}')"><button class="sm acc" onclick="addSet('${ex.id}')">+ підхід</button><span class="muted setrec">${maxSet?('макс '+maxSet+' · '):''}🏆 ${rec}</span></div>`+
-      `<div class="flex" style="margin-top:6px"><button class="sm" onclick="addEx('${ex.id}',-5)">−5</button><button class="sm" onclick="addEx('${ex.id}',5)">+5</button><button class="${ok?'done':'acc'} sm" onclick="addEx('${ex.id}',${t-done})">✓ ціль</button></div></div>`;
+      `<div class="ex-sets">${chips}<input type="number" inputmode="numeric" id="setin-${ex.id}" class="setin" placeholder="підхід" onkeydown="if(event.key==='Enter')addSet('${ex.id}')"><button class="sm acc" onclick="addSet('${ex.id}')">+ підхід</button><span class="muted setrec">${maxSet?('макс '+maxSet+' · '):''}🏆 ${rec}</span></div></div>`;
   }).join('')||'<div class="empty">Додай вправи в налаштуваннях</div>';
 
   $('limitList').innerHTML=S.limitHabits.map(l=>{
@@ -845,6 +848,7 @@ const BADGE_DEFS=[
  {id:'squat_m1000',g:'strength',e:'📅',n:'1000 за місяць',ne:'1000 a month',f:'Місяць присідав як не в себе',fe:'Squatted all month',need:1000,u:'присідань за місяць',ue:'squats a month',k:'monthSquat'},
  {id:'squat_t5000',g:'strength',e:'🏆',n:'5000 присідань',ne:'5000 squats',f:'Легенда присіду',fe:'Squat legend',need:5000,u:'присідань усього',ue:'squats total',k:'totalSquat'},
  {id:'plank_d60',g:'strength',e:'🧘',n:'Планка 60с',ne:'Plank 60s',f:'Хвилина, що триває вічність',fe:'The eternal minute',need:60,u:'сек планки за день',ue:'sec plank a day',k:'bestPlank'},
+ {id:'plank_d120',g:'strength',e:'🧘',n:'Планка 120с',ne:'Plank 120s',f:'Дві хвилини дзену',fe:'Two minutes of zen',need:120,u:'сек планки за день',ue:'sec plank a day',k:'bestPlank'},
  {id:'plank_m1000',g:'strength',e:'📅',n:'1000с за місяць',ne:'1000s a month',f:'Місяць тремтячих ліктів',fe:'A month of shaky elbows',need:1000,u:'сек планки за місяць',ue:'sec plank a month',k:'monthPlank'},
  {id:'plank_t3600',g:'strength',e:'🏆',n:'Година планки',ne:'An hour of plank',f:'3600 секунд болю',fe:'3600 seconds of pain',need:3600,u:'сек планки усього',ue:'sec plank total',k:'totalPlank'},
  {id:'pushset30',g:'strength',e:'🔥',n:'Підхід 30',ne:'Set of 30',f:'30 віджимань без зупинки',fe:'30 push-ups nonstop',need:30,u:'віджимань за підхід',ue:'push-ups in one set',k:'recPushSet'},
@@ -953,7 +957,7 @@ function svgMultiLine({series,labels,w=800,h=190,unit=''}){
 let metricSel='all', monthView='cal';
 function setMetric(id){metricSel=id;renderMonth();}
 function setMonthView(v){monthView=v;renderMonth();}
-function metricList(){const S=state.settings;const a=[{id:'all',label:'Усі',kind:'all'},{id:'score',label:'Бал дня',unit:'%',kind:'score'}];if(mod('water'))a.push({id:'water',label:'Вода',unit:'мл',kind:'goal'});if(mod('sleep'))a.push({id:'sleep',label:'Сон',unit:'год',kind:'sleep'});if(mod('weight'))a.push({id:'weight',label:'Вага',unit:'кг',kind:'weight'});if(mod('counters'))S.counters.forEach(c=>a.push({id:'cnt:'+c.id,label:c.name,unit:c.unit,kind:'goal',ref:c}));if(mod('limits'))S.limitHabits.forEach(l=>{if(l.mode==='week')return;a.push({id:'lim:'+l.id,label:l.name,unit:l.unit,kind:'limit',ref:l});});if(mod('activity'))S.exercises.forEach(ex=>a.push({id:'exmax:'+ex.id,label:'Макс: '+ex.name,unit:'реп',kind:'exmax',ref:ex}));return a;}
+function metricList(){const S=state.settings;const a=[{id:'all',label:'Усі',kind:'all'},{id:'score',label:'Бал дня',unit:'%',kind:'score'}];if(mod('water'))a.push({id:'water',label:'Вода',unit:'мл',kind:'goal'});if(mod('sleep'))a.push({id:'sleep',label:'Сон',unit:'год',kind:'sleep'});if(mod('weight'))a.push({id:'weight',label:'Вага',unit:'кг',kind:'weight'});if(mod('counters'))S.counters.forEach(c=>a.push({id:'cnt:'+c.id,label:c.name,unit:c.unit,kind:'goal',ref:c}));if(mod('limits'))S.limitHabits.forEach(l=>{if(l.mode==='week')return;a.push({id:'lim:'+l.id,label:l.name,unit:l.unit,kind:'limit',ref:l});});if(mod('activity')&&S.exercises.length)a.push({id:'exmaxAll',label:'🏆 Макс/підхід',unit:'реп',kind:'exmaxAll'});return a;}
 function curMetric(){return metricList().find(m=>m.id===metricSel)||metricList()[0];}
 function metricGoal(mt){if(mt.id==='water')return state.settings.waterGoal;if(mt.id==='sleep')return state.settings.sleepGoal||8;if(mt.id==='weight')return null;if(mt.id==='score')return 70;if(mt.kind==='goal')return mt.ref.goal;if(mt.kind==='limit')return mt.ref.max;return null;}
 function metricDay(mt,k){const d=state.days[k];if(!d)return{has:false};
@@ -980,6 +984,14 @@ function renderMonth(){
   $('btnRest').className='sm '+(state.restDays&&state.restDays[todayKey()]?'acc':'');
   const mt=curMetric();
   const now=new Date(),y=now.getFullYear(),mo=now.getMonth(),days=new Date(y,mo+1,0).getDate();
+  if(mt.kind==='exmaxAll'){
+    const exs=state.settings.exercises,cols=['#5cc9dd','#4fc596','#e3bd68','#9d8ad6','#e56b7b'];
+    const series=exs.map((ex,i)=>({name:ex.name,color:cols[i%cols.length],data:[]})),labels=[],msh=now.toLocaleDateString(LOC(),{month:'short'}),last=new Date().getDate();
+    for(let dd=1;dd<=last;dd++){const k=dayKey(new Date(y,mo,dd));labels.push(dd+' '+msh);exs.forEach((ex,i)=>series[i].data.push({x:dd,y:exMaxSet(ex.id,k)}));}
+    $('monthBody').innerHTML=exs.length?svgMultiLine({series,labels,unit:'реп',h:200}):'<div class="empty">немає вправ</div>';
+    $('monthLegend').textContent='Макс за підхід по днях — окрема лінія на кожну вправу.';
+    return;
+  }
   if(monthView==='cal'){
     const start=(new Date(y,mo,1).getDay()+6)%7;
     const head=['Пн','Вт','Ср','Чт','Пт','Сб','Нд'].map(h=>`<div class="hd">${h}</div>`).join('');
@@ -1024,9 +1036,20 @@ function debtDailySeries(ym){const[y,mm]=ym.split('-').map(Number);const days=ne
 
 /* тижневий підсумок */
 function weekStats(){const mon=weekMonday(new Date());const set=new Set();for(let i=0;i<7;i++){const d=new Date(mon);d.setDate(d.getDate()+i);set.add(dayKey(d));}
-  let scSum=0,scN=0,good=0,waterOk=0;set.forEach(k=>{const sc=dayScore(k);if(sc!=null){scSum+=sc;scN++;if(sc>=70||state.restDays[k])good++;}const d=state.days[k];if(d&&d.water>=state.settings.waterGoal)waterOk++;});
+  let scSum=0,scN=0,good=0,waterOk=0,slpSum=0,slpN=0,gamesMin=0;set.forEach(k=>{const sc=dayScore(k);if(sc!=null){scSum+=sc;scN++;if(sc>=70||state.restDays[k])good++;}const d=state.days[k];if(d&&d.water>=state.settings.waterGoal)waterOk++;const sh=sleepHours(k);if(sh>0){slpSum+=sh;slpN++;}if(steamPlay[k])gamesMin+=steamPlay[k];});
   let spent=0;(expRows||[]).forEach(r=>{const ds=r.ym+'-'+String(r.day).padStart(2,'0');if(set.has(ds))spent+=r.sum;});
-  return{good,avg:scN?Math.round(scSum/scN):0,waterOk,spent};}
+  return{good,avg:scN?Math.round(scSum/scN):0,waterOk,spent,avgSleep:slpN?Math.round(slpSum/slpN*10)/10:0,gamesH:Math.round(gamesMin/60*10)/10};}
+const OVSTATS=[['good','Хороші дні'],['avg','Сер. бал'],['water','Вода ✓'],['sleep','Сер. сон'],['games','🎮 Ігри'],['spent','Витрачено']];
+function ovOn(k){const o=state.settings.overview;return !o||o[k]!==false;}
+function ovAvail(k){if(k==='water')return mod('water');if(k==='sleep')return mod('sleep');if(k==='games')return PROFILE==='me';if(k==='spent')return mod('finance');return true;}
+function ovCards(s,denom){const cur=state.settings.currency;const b=(lbl,val,cls)=>`<div class="fin-box"><div class="lbl">${lbl}</div><div class="big-num ${cls||''}">${val}</div></div>`;let out='';
+  if(ovOn('good')&&ovAvail('good'))out+=b('Хороші дні',s.good+'/'+denom,'neon-green');
+  if(ovOn('avg')&&ovAvail('avg'))out+=b('Сер. бал',s.avg+'%','neon-cyan');
+  if(ovOn('water')&&ovAvail('water'))out+=b('Вода ✓',s.waterOk+'/'+denom,'');
+  if(ovOn('sleep')&&ovAvail('sleep'))out+=b('Сер. сон',s.avgSleep+' год','neon-purple');
+  if(ovOn('games')&&ovAvail('games'))out+=b('🎮 Ігри',s.gamesH+' год','');
+  if(ovOn('spent')&&ovAvail('spent'))out+=b('Витрачено',fmt(Math.round(s.spent))+' '+cur,'neon-red');
+  return out||'<div class="empty" style="grid-column:1/-1">Обери показники в налаштуваннях ⚙️</div>';}
 let overviewMode='week';
 function setOverview(m){overviewMode=m;renderOverview();}
 function monthStats(){
@@ -1051,23 +1074,11 @@ function renderOverview(){
     let extra='';
     if(wl.length){extra='<div style="margin-top:12px">'+wl.map(l=>{const q=limitWeekQuota(l),c=weekConsumed(l.id),over=c>q,left=Math.max(0,q-c);
       return `<div class="row"><div style="flex:1"><div>${l.name} <span class="tag ${over?'warn':'ok'}">${c}/${q} ${l.unit}</span></div><div class="muted">лишилось ${left} ${l.unit} до кінця тижня · наступний тиждень: ${Math.max(l.minPerWeek||1,q-(l.stepPerWeek||1))}</div><div class="bar" style="height:6px"><i style="width:${Math.min(100,c/q*100)}%;background:${over?'linear-gradient(90deg,#dc2626,#e56b7b)':'linear-gradient(90deg,#2f8b66,#4fc596)'}"></i></div></div></div>`;}).join('')+'</div>';}
-    $('ovBody').innerHTML=`<div class="week-grid">
-      <div class="fin-box"><div class="lbl">Хороші дні</div><div class="big-num neon-green">${w.good}/7</div></div>
-      <div class="fin-box"><div class="lbl">Сер. бал</div><div class="big-num neon-cyan">${w.avg}%</div></div>
-      <div class="fin-box"><div class="lbl">Вода ✓</div><div class="big-num">${w.waterOk}/7</div></div>
-      <div class="fin-box"><div class="lbl">Витрачено</div><div class="big-num neon-red">${fmt(Math.round(w.spent))} ${cur}</div></div>
-    </div>`+extra;
+    $('ovBody').innerHTML=`<div class="week-grid">${ovCards(w,7)}</div>`+extra;
   } else {
     const s=monthStats();
     $('ovRange').textContent='· '+new Date().toLocaleDateString(LOC(),{month:'long'});
-    $('ovBody').innerHTML=`<div class="week-grid" style="grid-template-columns:repeat(3,1fr)">
-      <div class="fin-box"><div class="lbl">Хороші дні</div><div class="big-num neon-green">${s.good}/${s.daysIn}</div></div>
-      <div class="fin-box"><div class="lbl">Сер. бал</div><div class="big-num neon-cyan">${s.avg}%</div></div>
-      <div class="fin-box"><div class="lbl">Вода ✓</div><div class="big-num">${s.waterOk}/${s.daysIn}</div></div>
-      <div class="fin-box"><div class="lbl">Сер. сон</div><div class="big-num neon-purple">${s.avgSleep} год</div></div>
-      <div class="fin-box"><div class="lbl">🎮 Ігри</div><div class="big-num">${s.gamesH} год</div></div>
-      <div class="fin-box"><div class="lbl">Витрачено</div><div class="big-num neon-red">${fmt(Math.round(s.spent))} ${cur}</div></div>
-    </div>`;
+    $('ovBody').innerHTML=`<div class="week-grid">${ovCards(s,s.daysIn)}</div>`;
   }
 }
 
@@ -1155,7 +1166,7 @@ function renderFinance(){
 
 /* ===== НАЛАШТУВАННЯ ===== */
 function setTab(name){['gen','act','lim','cnt','loan','rem','data'].forEach(t=>$('tab-'+t).classList.toggle('on',t===name));[...$('setTabs').children].forEach(b=>b.className='sm'+(b.getAttribute('onclick').includes("'"+name+"'")?' acc':''));}
-function openSettings(){const S=state.settings,R=S.reminders||{};$('setWaterGoal').value=S.waterGoal;$('setSleepGoal').value=S.sleepGoal||8;$('setCurrency').value=S.currency;$('remOn').checked=!!R.on;$('remEvery').value=R.everyMin||120;$('remFrom').value=R.from??9;$('remTo').value=R.to??21;rl('setExercises',S.exercises,'ex');rl('setLimits',S.limitHabits,'lim');rl('setCounters',S.counters,'cnt');rl('setLoans',S.loans,'loan');renderModuleToggles();setTab('gen');applyLang();settings.showModal();}
+function openSettings(){const S=state.settings,R=S.reminders||{};$('setWaterGoal').value=S.waterGoal;$('setSleepGoal').value=S.sleepGoal||8;$('setCurrency').value=S.currency;$('remOn').checked=!!R.on;$('remEvery').value=R.everyMin||120;$('remFrom').value=R.from??9;$('remTo').value=R.to??21;rl('setExercises',S.exercises,'ex');rl('setLimits',S.limitHabits,'lim');rl('setCounters',S.counters,'cnt');rl('setLoans',S.loans,'loan');renderModuleToggles();renderOverviewToggles();setTab('gen');applyLang();settings.showModal();}
 function rl(elId,arr,type){$(elId).innerHTML=arr.map((it,i)=>{const del=`<button class="del" onclick="delItem('${type}',${i})">✕</button>`;
   if(type==='ex')return `<div class="settings-item"><input value="${it.name}" data-f="name" placeholder="Назва"><input type="number" value="${it.base}" data-f="base" style="width:66px" title="норма"><input type="number" value="${it.penalty}" data-f="penalty" step="0.5" style="width:58px" title="штраф ×"><input type="number" value="${it.grow||0}" data-f="grow" style="width:58px" title="зростання/день">${del}</div>`;
   if(type==='lim')return `<div class="settings-item"><input value="${it.name}" data-f="name" placeholder="Назва" style="min-width:90px"><select data-f="mode" style="width:auto"><option value="day"${it.mode!=='week'?' selected':''}>на день</option><option value="week"${it.mode==='week'?' selected':''}>на тиждень ↓</option></select><select data-f="entry" style="width:auto" title="як вводити значення"><option value="input"${it.entry!=='buttons'?' selected':''}>поле</option><option value="buttons"${it.entry==='buttons'?' selected':''}>кнопки ±</option></select><input type="number" value="${it.max??2}" data-f="max" step="0.5" style="width:56px" title="макс на день"><input type="number" value="${it.startPerWeek??5}" data-f="startPerWeek" style="width:48px" title="старт: скільки на тиждень"><input type="number" value="${it.stepPerWeek??1}" data-f="stepPerWeek" style="width:44px" title="мінус за тиждень"><input type="number" value="${it.minPerWeek??2}" data-f="minPerWeek" style="width:44px" title="мінімум на тиждень"><input value="${it.unit||''}" data-f="unit" style="width:56px" placeholder="од.">${del}</div>`;
@@ -1172,7 +1183,7 @@ function addLimit(){state.settings.limitHabits.push({id:uid(),name:'Новий �
 function addCounter(){state.settings.counters.push({id:uid(),name:'Лічильник',goal:100,unit:''});rl('setCounters',state.settings.counters,'cnt');}
 function addLoan(){state.settings.loans.push({id:uid(),name:'Кредит'});rl('setLoans',state.settings.loans,'loan');}
 function delItem(type,i){const map={ex:'exercises',lim:'limitHabits',cnt:'counters',loan:'loans'},el={ex:'setExercises',lim:'setLimits',cnt:'setCounters',loan:'setLoans'};state.settings[map[type]].splice(i,1);rl(el[type],state.settings[map[type]],type);}
-function saveSettings(){const S=state.settings,keep=(a,o)=>a.map((n,i)=>o[i]?{...n,id:o[i].id}:n);S.exercises=keep(readL('setExercises','ex'),S.exercises);S.limitHabits=readL('setLimits','lim').map((n,i)=>{const o=S.limitHabits[i];if(!o)return {...n,maxHist:[{d:'2000-01-01',max:n.max}]};let mh=o.maxHist||[{d:'2000-01-01',max:o.max}];if(n.mode!=='week'&&n.max!==o.max){mh=(n.max>o.max)?[{d:'2000-01-01',max:n.max}]:mh.concat([{d:todayKey(),max:n.max}]);}return {...n,id:o.id,maxHist:mh,startDate:(n.mode==='week'?(o.mode==='week'&&o.startDate?o.startDate:n.startDate):undefined)};});S.counters=keep(readL('setCounters','cnt'),S.counters);S.loans=keep(readL('setLoans','loan'),S.loans);S.waterGoal=+$('setWaterGoal').value||2000;S.sleepGoal=+$('setSleepGoal').value||8;S.currency=$('setCurrency').value||'₴';S.reminders={on:$('remOn').checked,everyMin:Math.max(15,+$('remEvery').value||120),from:Math.min(23,Math.max(0,+$('remFrom').value||9)),to:Math.min(24,Math.max(1,+$('remTo').value||21))};const mods={};document.querySelectorAll('#setModules input[data-modk]').forEach(cb=>{mods[cb.dataset.modk]=cb.checked;});S.modules=mods;settings.close();save();startReminders();}
+function saveSettings(){const S=state.settings,keep=(a,o)=>a.map((n,i)=>o[i]?{...n,id:o[i].id}:n);S.exercises=keep(readL('setExercises','ex'),S.exercises);S.limitHabits=readL('setLimits','lim').map((n,i)=>{const o=S.limitHabits[i];if(!o)return {...n,maxHist:[{d:'2000-01-01',max:n.max}]};let mh=o.maxHist||[{d:'2000-01-01',max:o.max}];if(n.mode!=='week'&&n.max!==o.max){mh=(n.max>o.max)?[{d:'2000-01-01',max:n.max}]:mh.concat([{d:todayKey(),max:n.max}]);}return {...n,id:o.id,maxHist:mh,startDate:(n.mode==='week'?(o.mode==='week'&&o.startDate?o.startDate:n.startDate):undefined)};});S.counters=keep(readL('setCounters','cnt'),S.counters);S.loans=keep(readL('setLoans','loan'),S.loans);S.waterGoal=+$('setWaterGoal').value||2000;S.sleepGoal=+$('setSleepGoal').value||8;S.currency=$('setCurrency').value||'₴';S.reminders={on:$('remOn').checked,everyMin:Math.max(15,+$('remEvery').value||120),from:Math.min(23,Math.max(0,+$('remFrom').value||9)),to:Math.min(24,Math.max(1,+$('remTo').value||21))};const mods={};document.querySelectorAll('#setModules input[data-modk]').forEach(cb=>{mods[cb.dataset.modk]=cb.checked;});S.modules=mods;const ov={};document.querySelectorAll('#setOverview input[data-ovk]').forEach(cb=>{ov[cb.dataset.ovk]=cb.checked;});S.overview=ov;settings.close();save();startReminders();}
 function resetAll(){if(confirm('Скинути ВСІ дані?')){localStorage.removeItem(cacheKey);state=structuredClone(defaults);if(sb)sb.from('solo').upsert({id:SOLO_ID,data:state,updated_at:new Date().toISOString()});settings.close();render();}}
 
 function exportData(){const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='lifeos-backup-'+todayKey()+'.json';a.click();}
