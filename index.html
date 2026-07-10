@@ -180,6 +180,7 @@
   .gate-card{position:relative; border:1px solid var(--stroke); border-radius:18px; padding:24px 14px; cursor:pointer; background:rgba(255,255,255,.03); transition:.15s}
   .gate-card:hover{border-color:var(--cyan); transform:translateY(-2px); background:rgba(92,201,221,.08)}
   .gate-card .ge{font-size:48px; line-height:1}
+  .gate-card .ge svg{width:56px; height:56px; border-radius:50%; vertical-align:middle}
   .gate-card .gn{font-weight:800; margin-top:10px; font-size:18px}
   .gate-card .gtag{font-size:11px; color:var(--cyan); margin-top:4px}
   .gate-card .gdel{position:absolute; top:8px; right:8px; background:none; border:none; cursor:pointer; font-size:14px; opacity:.55}
@@ -535,7 +536,8 @@ let PROFILE=slugify(urlU||localStorage.getItem('lifeos_profile')||'me')||'me';
 if(urlU)localStorage.setItem('lifeos_profile',PROFILE);
 let SOLO_ID=(PROFILE==='me')?'me':'profile_'+PROFILE;
 let cacheKey='lifeos_cache'+(PROFILE==='me'?'':'_'+PROFILE);
-let profiles=[{id:'me',name:'Влад',emoji:'🧑'}];
+const BODIA_AV='<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><circle cx="32" cy="32" r="31" fill="#2e3658"/><rect x="27" y="43" width="10" height="12" rx="3" fill="#d99b6c"/><ellipse cx="32" cy="30" rx="15" ry="17" fill="#eab887"/><path d="M17 29 q0 21 15 23 q15 -2 15 -23 q-5 11 -15 11 q-10 0 -15 -11 z" fill="#141414"/><path d="M23 35 q9 5 18 0 q-9 6 -18 0 z" fill="#141414"/><path d="M15 30 q-3 -23 17 -23 q20 0 17 23 q-4 -13 -17 -13 q-13 0 -17 13 z" fill="#141414"/><circle cx="26" cy="29" r="2.1" fill="#20232b"/><circle cx="38" cy="29" r="2.1" fill="#20232b"/><rect x="21.5" y="24" width="8" height="2.4" rx="1.2" fill="#141414"/><rect x="34.5" y="24" width="8" height="2.4" rx="1.2" fill="#141414"/></svg>';
+let profiles=[{id:'me',name:'Влад',emoji:'🧑'},{id:'bodia',name:'Бодя',avatar:BODIA_AV}];
 let selDay=null; const activeDay=()=>selDay||todayKey();
 
 /* ===== АВТЕНТИФІКАЦІЯ ===== */
@@ -560,25 +562,26 @@ function enterApp(){
   $('app').classList.remove('hidden');
   localStorage.setItem(cacheKey,JSON.stringify(state));
   render(); loadProfiles(); initTip(); startReminders();
-  if(PROFILE==='me'){ loadExpenses(); loadSteam(); loadScreen(); loadSleepDB(); loadStepsDB(); } // інтеграції (Steam/айфон/фінанси) — лише основний профіль
+  loadScreen(); loadStepsDB(); // айфон-дані по користувачу (колонка who)
+  if(PROFILE==='me'){ loadExpenses(); loadSteam(); loadSleepDB(); } // Steam/фінанси/сон — лише Влад
   if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
 /* ===== ПРОФІЛІ: реєстр у рядку solo id='__profiles__' ===== */
 async function loadProfilesRegistry(){ if(!sb)return; try{const {data}=await sb.from('solo').select('data').eq('id','__profiles__').maybeSingle();
   if(data&&data.data&&Array.isArray(data.data.list)&&data.data.list.length){ profiles=data.data.list; if(!profiles.find(p=>p.id==='me')){profiles.unshift({id:'me',name:'Влад',emoji:'🧑'});await saveProfiles();} }
-  else { profiles=[{id:'me',name:'Влад',emoji:'🧑'},{id:'bodia',name:'Бодя',emoji:'🧑‍🦱'}]; await saveProfiles(); } }catch(e){} }
+  else { profiles=[{id:'me',name:'Влад',emoji:'🧑'},{id:'bodia',name:'Бодя',avatar:BODIA_AV}]; await saveProfiles(); } }catch(e){} }
 async function loadProfiles(){ await loadProfilesRegistry(); if(!profiles.find(p=>p.id===PROFILE)){profiles.push({id:PROFILE,name:(urlU||PROFILE),emoji:'🧑'});await saveProfiles();} }
 async function saveProfiles(){ if(!sb)return; try{await sb.from('solo').upsert({id:'__profiles__',data:{list:profiles}});}catch(e){} }
 async function showProfileGate(){ await loadProfilesRegistry(); renderGate(); applyLang(); $('gate').classList.remove('hidden'); }
-function renderGate(){$('gateList').innerHTML=profiles.map(p=>`<div class="gate-card" onclick="switchProfile('${p.id}')"><div class="ge">${p.emoji||'👤'}</div><div class="gn">${p.name}</div>`+(p.id==='me'?'<div class="gtag">твої дані</div>':`<button class="gdel" onclick="event.stopPropagation();deleteProfile('${p.id}')" title="Видалити">🗑</button>`)+`</div>`).join('');}
+function renderGate(){$('gateList').innerHTML=profiles.map(p=>`<div class="gate-card" onclick="switchProfile('${p.id}')"><div class="ge">${p.avatar||p.emoji||'👤'}</div><div class="gn">${p.name}</div>`+(p.id==='me'?'<div class="gtag">твої дані</div>':`<button class="gdel" onclick="event.stopPropagation();deleteProfile('${p.id}')" title="Видалити">🗑</button>`)+`</div>`).join('');}
 function switchProfile(id){localStorage.setItem('lifeos_profile',id);location.href=location.pathname+'?u='+encodeURIComponent(id);}
 function addProfile(){const name=($('newProfileName').value||'').trim();if(!name)return;let id=slugify(name);if(id==='me'||profiles.find(p=>p.id===id))id=id+'-'+Math.random().toString(36).slice(2,5);profiles.push({id,name,emoji:'🧑'});saveProfiles();$('newProfileName').value='';switchProfile(id);}
 function deleteProfile(id){if(id==='me')return;if(!confirm('Видалити профіль «'+((profiles.find(p=>p.id===id)||{}).name||id)+'» разом з його даними?'))return;profiles=profiles.filter(p=>p.id!==id);saveProfiles();if(sb){const clean=structuredClone(defaults);clean.badges={};sb.from('solo').upsert({id:'profile_'+id,data:clean,updated_at:new Date().toISOString()}).then(()=>sb.from('solo').delete().eq('id','profile_'+id));}if(PROFILE===id)switchProfile('me');else if($('gate')&&!$('gate').classList.contains('hidden'))renderGate();}
 /* ===== МОДУЛІ (вмик/вимик блоків для профілю) ===== */
-function mod(n){const m=state.settings.modules;return !m||m[n]!==false;}
+function mod(n){if(n==='finance'&&PROFILE!=='me')return false;const m=state.settings.modules;return !m||m[n]!==false;}
 function applyModules(){document.querySelectorAll('[data-mod]').forEach(el=>{el.style.display=mod(el.dataset.mod)?'':'none';});}
 const MODULES=[['water','💧 Вода'],['activity','💪 Активність'],['limits','🚫 Ліміти'],['counters','🔢 Лічильники'],['sleep','😴 Сон'],['weight','⚖️ Вага'],['finance','💰 Фінанси'],['notes','📝 Нотатка'],['tasks','🎯 Таски'],['game','🎮 Гра']];
-function renderModuleToggles(){$('setModules').innerHTML=MODULES.map(([k,lab])=>`<label><input type="checkbox" data-modk="${k}" ${mod(k)?'checked':''}>${lab}</label>`).join('');}
+function renderModuleToggles(){$('setModules').innerHTML=MODULES.filter(([k])=>!(k==='finance'&&PROFILE!=='me')).map(([k,lab])=>`<label><input type="checkbox" data-modk="${k}" ${mod(k)?'checked':''}>${lab}</label>`).join('');}
 let saveTimer=null, dirty=false;
 function scheduleSync(){ dirty=true; localStorage.setItem(cacheKey,JSON.stringify(state)); setSync('busy'); clearTimeout(saveTimer); saveTimer=setTimeout(pushState,700); }
 async function pushState(){
@@ -596,9 +599,11 @@ function migrate(s){
   s.settings.limitHabits.forEach(l=>{if(!l.maxHist)l.maxHist=[{d:'2000-01-01',max:l.max}];});
   if(s.settings.waterGoal<100) s.settings.waterGoal=2000;
   s.settings.limitHabits.forEach(l=>{if(l.name==='☕ Кава (цукор)')l.name='Кава (цукор)';});
-  if(!s.settings.limitHabits.some(l=>/кав|coffee/i.test(l.name))) s.settings.limitHabits.push({id:uid(),name:'Кава (цукор)',mode:'week',entry:'buttons',startPerWeek:5,stepPerWeek:1,minPerWeek:2,max:99,unit:'чашок',startDate:weekMondayKey(new Date())});
-  if(!s.settings.limitHabits.some(l=>/соц|екран|screen|мереж/i.test(l.name))) s.settings.limitHabits.push({id:uid(),name:'📱 Соцмережі',mode:'day',max:60,unit:'хв'});
-  if(!s.settings.exercises.some(e=>/планк|plank/i.test(e.name))) s.settings.exercises.push({id:uid(),name:'Планка (сек)',base:60,penalty:1,grow:0});
+  if(PROFILE==='me'){ // авто-онбординг (Кава/Соцмережі/Планка) — тільки для Влада, не нав'язувати іншим профілям
+    if(!s.settings.limitHabits.some(l=>/кав|coffee/i.test(l.name))) s.settings.limitHabits.push({id:uid(),name:'Кава (цукор)',mode:'week',entry:'buttons',startPerWeek:5,stepPerWeek:1,minPerWeek:2,max:99,unit:'чашок',startDate:weekMondayKey(new Date())});
+    if(!s.settings.limitHabits.some(l=>/соц|екран|screen|мереж/i.test(l.name))) s.settings.limitHabits.push({id:uid(),name:'📱 Соцмережі',mode:'day',max:60,unit:'хв'});
+    if(!s.settings.exercises.some(e=>/планк|plank/i.test(e.name))) s.settings.exercises.push({id:uid(),name:'Планка (сек)',base:60,penalty:1,grow:0});
+  }
   return s;
 }
 function save(){ render(); scheduleSync(); }
@@ -638,10 +643,10 @@ function parseUaDate(s){s=String(s||'');const m=s.match(/(\d{1,2})\s+([а-яії
 function parseMins(s){const m=String(s||'').match(/\(([^)]*)\)/);if(!m)return 0;const t=m[1];let mins=0;const h=t.match(/(\d+)\s*г/);if(h)mins+=+h[1]*60;const mm=t.match(/(\d+)\s*хв/);if(mm)mins+=+mm[1];const sc=t.match(/(\d+)\s*с(?![а-яіїєґ])/i);if(sc)mins+=+sc[1]/60;return mins;}
 async function loadScreen(){
   if(!sb) return;
-  const {data,error}=await sb.from('screen_time').select('data').limit(3000);
+  const {data,error}=await sb.from('screen_time').select('*').limit(3000);
   if(error||!data) return;
   screenMin={}; screenApps={};
-  data.forEach(row=>{let o=row.data;if(typeof o==='string'){try{o=JSON.parse(o);}catch(e){return;}}if(!o)return;const dk=parseUaDate(o.date);if(!dk)return;
+  data.forEach(row=>{if((row.who||'me')!==PROFILE)return;let o=row.data;if(typeof o==='string'){try{o=JSON.parse(o);}catch(e){return;}}if(!o)return;const dk=parseUaDate(o.date);if(!dk)return;
     String(o.App||o.app||'').split('\n').forEach(line=>{const name=line.replace(/\s*\([^)]*\)\s*$/,'').trim();if(!name)return;const hit=SOC_APPS.find(s=>s[1].test(name));if(!hit)return;if(!screenApps[dk])screenApps[dk]={};screenApps[dk][hit[0]]=(screenApps[dk][hit[0]]||0)+parseMins(line);});
   });
   Object.keys(screenApps).forEach(dk=>{screenMin[dk]=Math.round(Object.values(screenApps[dk]).reduce((a,b)=>a+b,0));});
@@ -653,7 +658,7 @@ function applyScreen(){const gid=screenLimitId();if(!gid)return;Object.keys(scre
 /* ===== КРОКИ (айфон → таблиця steps; raw = кроки по годинах через новий рядок, сумуємо) ===== */
 let stepsDB={};
 function normDayKey(s){s=String(s||'').trim();if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.slice(0,10);return parseUaDate(s);}
-async function loadStepsDB(){ if(!sb)return; const {data,error}=await sb.from('steps').select('date,raw').limit(5000); if(error||!data)return; stepsDB={}; data.forEach(r=>{const dk=normDayKey(r.date); if(!dk)return; const sum=Math.round(String(r.raw==null?'':r.raw).split(/[\s,;]+/).map(Number).filter(n=>!isNaN(n)).reduce((a,b)=>a+b,0)); if(sum>0)stepsDB[dk]=Math.max(stepsDB[dk]||0,sum);}); applyStepsDB(); render(); }
+async function loadStepsDB(){ if(!sb)return; const {data,error}=await sb.from('steps').select('*').limit(5000); if(error||!data)return; stepsDB={}; data.forEach(r=>{if((r.who||'me')!==PROFILE)return; const dk=normDayKey(r.date); if(!dk)return; const sum=Math.round(String(r.raw==null?'':r.raw).split(/[\s,;]+/).map(Number).filter(n=>!isNaN(n)).reduce((a,b)=>a+b,0)); if(sum>0)stepsDB[dk]=Math.max(stepsDB[dk]||0,sum);}); applyStepsDB(); render(); }
 function stepsCounterId(){const c=state.settings.counters.find(x=>/крок|steps/i.test(x.name));return c?c.id:null;}
 function applyStepsDB(){const cid=stepsCounterId();if(!cid)return;Object.keys(stepsDB).forEach(dk=>{getDay(dk).counters[cid]=stepsDB[dk];});}
 
@@ -924,7 +929,7 @@ function svgMultiLine({series,labels,w=800,h=190,unit=''}){
 let metricSel='all', monthView='cal';
 function setMetric(id){metricSel=id;renderMonth();}
 function setMonthView(v){monthView=v;renderMonth();}
-function metricList(){const S=state.settings;const a=[{id:'all',label:'Усі',kind:'all'},{id:'score',label:'Бал дня',unit:'%',kind:'score'},{id:'water',label:'Вода',unit:'мл',kind:'goal'},{id:'sleep',label:'Сон',unit:'год',kind:'sleep'},{id:'weight',label:'Вага',unit:'кг',kind:'weight'}];S.counters.forEach(c=>a.push({id:'cnt:'+c.id,label:c.name,unit:c.unit,kind:'goal',ref:c}));S.limitHabits.forEach(l=>{if(l.mode==='week')return;a.push({id:'lim:'+l.id,label:l.name,unit:l.unit,kind:'limit',ref:l});});return a;}
+function metricList(){const S=state.settings;const a=[{id:'all',label:'Усі',kind:'all'},{id:'score',label:'Бал дня',unit:'%',kind:'score'}];if(mod('water'))a.push({id:'water',label:'Вода',unit:'мл',kind:'goal'});if(mod('sleep'))a.push({id:'sleep',label:'Сон',unit:'год',kind:'sleep'});if(mod('weight'))a.push({id:'weight',label:'Вага',unit:'кг',kind:'weight'});if(mod('counters'))S.counters.forEach(c=>a.push({id:'cnt:'+c.id,label:c.name,unit:c.unit,kind:'goal',ref:c}));if(mod('limits'))S.limitHabits.forEach(l=>{if(l.mode==='week')return;a.push({id:'lim:'+l.id,label:l.name,unit:l.unit,kind:'limit',ref:l});});return a;}
 function curMetric(){return metricList().find(m=>m.id===metricSel)||metricList()[0];}
 function metricGoal(mt){if(mt.id==='water')return state.settings.waterGoal;if(mt.id==='sleep')return state.settings.sleepGoal||8;if(mt.id==='weight')return null;if(mt.id==='score')return 70;if(mt.kind==='goal')return mt.ref.goal;if(mt.kind==='limit')return mt.ref.max;return null;}
 function metricDay(mt,k){const d=state.days[k];if(!d)return{has:false};
