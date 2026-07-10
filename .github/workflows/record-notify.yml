@@ -1,0 +1,36 @@
+name: Record push
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'   # кожні ~10 хв: розсилає пуш про нові рекорди активності
+  workflow_dispatch:
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send record pushes
+        env:
+          SB_URL: ${{ secrets.SB_URL }}
+          SB_KEY: ${{ secrets.SB_KEY }}
+          VAPID_PUBLIC: ${{ secrets.VAPID_PUBLIC }}
+          VAPID_PRIVATE: ${{ secrets.VAPID_PRIVATE }}
+        run: |
+          npm i web-push@3 --no-save --silent
+          node <<'EOF'
+          const webpush=require('web-push');
+          const https=require('https');
+          const req=(method,path,body)=>new Promise((res,rej)=>{const u=new URL(process.env.SB_URL+path);const opt={method,headers:{apikey:process.env.SB_KEY,Authorization:'Bearer '+process.env.SB_KEY,'Content-Type':'application/json'}};const rq=https.request(u,opt,r=>{let d='';r.on('data',c=>d+=c);r.on('end',()=>res(d));});rq.on('error',rej);if(body)rq.write(JSON.stringify(body));rq.end();});
+          (async()=>{
+            webpush.setVapidDetails('mailto:brovladay@gmail.com',process.env.VAPID_PUBLIC,process.env.VAPID_PRIVATE);
+            const events=JSON.parse(await req('GET','/rest/v1/record_events?select=id,who,ex,reps&sent=eq.false&order=id.asc')||'[]');
+            if(!events.length){console.log('no new records');return;}
+            const subs=JSON.parse(await req('GET','/rest/v1/push_subs?select=sub,endpoint')||'[]');
+            for(const ev of events){
+              const payload=JSON.stringify({title:'🏆 Новий рекорд!',body:`${ev.who} побив рекорд: ${ev.reps} ${ev.ex}!`});
+              for(const s of subs){ try{ await webpush.sendNotification(s.sub,payload); }catch(e){ if(e.statusCode===404||e.statusCode===410){ await req('DELETE','/rest/v1/push_subs?endpoint=eq.'+encodeURIComponent(s.endpoint)); } } }
+              await req('PATCH','/rest/v1/record_events?id=eq.'+ev.id,{sent:true});
+            }
+            console.log('sent records:',events.length,'to subs:',subs.length);
+          })().catch(e=>{console.error(e);process.exit(1);});
+          EOF

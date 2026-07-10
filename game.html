@@ -19,6 +19,9 @@
   h1{font-size:18px;margin:0;letter-spacing:.5px;font-weight:800}
   h1 span{background:linear-gradient(90deg,var(--cyan),var(--purple));-webkit-background-clip:text;background-clip:text;color:transparent}
   .best{font-size:12px;color:var(--muted)}
+  .lb{width:100%;max-width:300px;margin:2px auto 4px}
+  .lbrow{display:flex;justify-content:space-between;gap:10px;padding:5px 12px;font-size:13px;border:1px solid var(--stroke);border-radius:10px;margin-bottom:5px;background:rgba(255,255,255,.03)}
+  .lbrow span:last-child{color:var(--muted);font-variant-numeric:tabular-nums}
   .hud{width:100%;max-width:820px;display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px;font-variant-numeric:tabular-nums}
   .hud .pts{font-size:24px;font-weight:800;line-height:1}
   .hud .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
@@ -56,6 +59,7 @@
   <div class="overlay" id="overlay">
     <h2 id="ovTitle">🏃 Раннер за 30 сек</h2>
     <p id="ovText">Набери якнайбільше 👟! Стрибай через конуси 🚧 та перестрибуй ями. Лови 🪙 (+50) і 💧 (×2 на 5с). Втрата ❤️ = +5 секунд. <b>Витримаєш усі 30 с — очки ×2!</b></p>
+    <div id="lb" class="lb"></div>
     <button class="play" id="playBtn">▶ Грати</button>
     <div class="hint">Тап по екрану / Пробіл / ↑ — стрибок</div>
   </div>
@@ -69,6 +73,14 @@ const $=id=>document.getElementById(id);
 let best={p:0,t:0}; try{const b=JSON.parse(localStorage.getItem('run_best3'));if(b&&typeof b.p==='number')best=b;}catch(e){}
 function showBest(){ $('best').textContent='рекорд: '+best.p+(best.t?(' · '+best.t+'с'):''); }
 showBest();
+/* ===== ТАБЛИЦЯ РЕКОРДІВ (Supabase run_scores) ===== */
+const SB_URL='https://xezhbqcteaihrlrykbkr.supabase.co', SB_KEY='sb_publishable_qNcUyFxMlWAWAry3uSHndg_ADVMCE3a';
+const _qp=new URLSearchParams(location.search), PROFILE=_qp.get('u')||'me', PNAME=_qp.get('n')||PROFILE;
+function sbFetch(path,opt){return fetch(SB_URL+'/rest/v1/'+path,Object.assign({headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY,'Content-Type':'application/json'}},opt||{}));}
+function renderLb(d){const el=$('lb');if(!el)return;if(!d||!d.length){el.innerHTML='';return;}el.innerHTML='<div class="lbrow" style="border:none;background:none;color:var(--muted);padding-bottom:0">🏆 Рекорди раннера</div>'+d.map((r,i)=>`<div class="lbrow"><span>${['🥇','🥈','🥉'][i]||'▫️'} ${r.name||r.profile}</span><span>${r.points} 👟 · ${(+r.secs||0).toFixed(1)}с</span></div>`).join('');}
+async function loadLb(){try{const r=await sbFetch('run_scores?select=*&order=points.desc.nullslast');renderLb(await r.json());}catch(e){}}
+async function saveScore(p,t){try{await sbFetch('run_scores',{method:'POST',headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates'},body:JSON.stringify([{profile:PROFILE,name:PNAME,points:p,secs:t}])});loadLb();}catch(e){}}
+loadLb();
 
 const BASE_SPEED=5.0, SPEED_RATE=0.09, GRAV=0.9, JUMP=-15, START_TIME=30;
 const player={x:100,y:GROUND,w:30,h:50,vy:0,onGround:true};
@@ -91,7 +103,7 @@ function gameOver(won){
   if(state==='over')return; state='over';
   if(won) points*=2;
   const fp=Math.floor(points), ft=Math.round(elapsed);
-  if(fp>best.p){ best={p:fp,t:ft}; localStorage.setItem('run_best3',JSON.stringify(best)); showBest(); }
+  if(fp>best.p){ best={p:fp,t:ft}; localStorage.setItem('run_best3',JSON.stringify(best)); showBest(); saveScore(fp,ft); }
   $('ovTitle').textContent=won?'🏆 Ти витримав!':'💀 Не дожив';
   $('ovText').innerHTML=(won?'<b style="color:#5cc9dd">×2 за витримку!</b> ':'')+'Набрав <b>'+fp+'</b> 👟 за <b>'+ft+' с</b>.<br>Рекорд: '+best.p+' · '+best.t+'с';
   $('playBtn').textContent='↻ Ще раз'; $('overlay').style.display='flex';

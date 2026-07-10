@@ -359,6 +359,7 @@
       <div class="muted" style="font-size:13px">🏃 Раннер: біжи, стрибай, лови 🪙 і 💧×2</div>
       <a id="gameLink" href="./game.html" style="text-decoration:none;padding:10px 18px;border-radius:12px;font-weight:700;color:#06121a;white-space:nowrap;background:linear-gradient(90deg,var(--cyan),var(--purple));border:1px solid rgba(92,201,221,.5)">▶ Грати</a>
     </div>
+    <div id="runLb"></div>
   </div>
  </div>
 </div>
@@ -432,7 +433,7 @@
     </div>
     <div class="muted" style="margin-top:8px">Дані й так зберігаються в хмарі. Це — додаткова копія на випадок.</div>
     <div class="sec-title" style="margin-top:18px">👤 Профіль</div>
-    <button onclick="location.href=location.pathname">🔄 Змінити користувача</button>
+    <button onclick="location.href=location.pathname+'?pick=1'">🔄 Змінити користувача</button>
     <div class="muted" style="margin-top:8px">Відкриє екран вибору профілю (Влад / Бодя / інші).</div>
   </div>
 
@@ -555,7 +556,11 @@ let selDay=null; const activeDay=()=>selDay||todayKey();
 /* ===== АВТЕНТИФІКАЦІЯ ===== */
 async function boot(){
   if(!configured) return;
-  if(!urlU){ showProfileGate(); return; } // немає ?u= → повноекранний вибір користувача
+  if(!urlU){ // немає ?u=: якщо профіль вже обирали — заходимо одразу (для PWA), інакше показуємо вибір
+    const remembered=localStorage.getItem('lifeos_profile');
+    if(remembered && !new URLSearchParams(location.search).has('pick')){ location.replace(location.pathname+'?u='+encodeURIComponent(remembered)); return; }
+    showProfileGate(); return;
+  }
   let started=false;
   const start=()=>{if(started)return;started=true;enterApp();};
   const cache=localStorage.getItem(cacheKey);
@@ -572,9 +577,9 @@ async function boot(){
 }
 function enterApp(){
   $('app').classList.remove('hidden');
-  {const gl=$('gameLink');if(gl)gl.href='./game.html?u='+encodeURIComponent(PROFILE);}
+  updateGameLink();
   localStorage.setItem(cacheKey,JSON.stringify(state));
-  render(); loadProfiles(); initTip(); startReminders();
+  render(); loadProfiles(); initTip(); startReminders(); subscribeRecords();
   loadScreen(); loadStepsDB(); // айфон-дані по користувачу (колонка who)
   if(PROFILE==='me'){ loadExpenses(); loadSteam(); loadSleepDB(); } // Steam/фінанси/сон — лише Влад
   if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
@@ -583,7 +588,7 @@ function enterApp(){
 async function loadProfilesRegistry(){ if(!sb)return; try{const {data}=await sb.from('solo').select('data').eq('id','__profiles__').maybeSingle();
   if(data&&data.data&&Array.isArray(data.data.list)&&data.data.list.length){ profiles=data.data.list; if(!profiles.find(p=>p.id==='me')){profiles.unshift({id:'me',name:'Влад',emoji:'🧑'});await saveProfiles();} }
   else { profiles=[{id:'me',name:'Влад',emoji:'🧑'},{id:'bodia',name:'Бодя',avatar:BODIA_AV}]; await saveProfiles(); } }catch(e){} }
-async function loadProfiles(){ await loadProfilesRegistry(); if(!profiles.find(p=>p.id===PROFILE)){profiles.push({id:PROFILE,name:(urlU||PROFILE),emoji:'🧑'});await saveProfiles();} }
+async function loadProfiles(){ await loadProfilesRegistry(); if(!profiles.find(p=>p.id===PROFILE)){profiles.push({id:PROFILE,name:(urlU||PROFILE),emoji:'🧑'});await saveProfiles();} updateGameLink(); loadRunScores(); }
 async function saveProfiles(){ if(!sb)return; try{await sb.from('solo').upsert({id:'__profiles__',data:{list:profiles}});}catch(e){} }
 async function showProfileGate(){ await loadProfilesRegistry(); renderGate(); applyLang(); $('gate').classList.remove('hidden'); }
 function renderGate(){$('gateList').innerHTML=profiles.map(p=>`<div class="gate-card" onclick="switchProfile('${p.id}')"><div class="ge">${p.avatar||p.emoji||'👤'}</div><div class="gn">${p.name}</div>`+(p.id==='me'?'<div class="gtag">твої дані</div>':'')+`</div>`).join('');}
@@ -690,7 +695,18 @@ const _c={};
 function exTarget(ex,k){const ck=ex.id+'|'+k;if(_c[ck]!=null)return _c[ck];if(!state.days[prevKey(k)])return _c[ck]=ex.base;const p=prevKey(k),pt=exTarget(ex,p);const pd=(state.days[p].exercises&&state.days[p].exercises[ex.id])||0;const g=ex.grow||0;if(pd>=pt)return _c[ck]=Math.round(g?pt+g:ex.base);return _c[ck]=Math.max(ex.base,Math.round(pt*ex.penalty));}
 function addWater(n){const d=getDay(activeDay());d.water=Math.max(0,d.water+n);save();}
 function addEx(id,n){const d=getDay(activeDay());d.exercises[id]=Math.max(0,(d.exercises[id]||0)+n);save();}
-function addSet(id){const inp=$('setin-'+id);const v=Math.round(+inp.value||0);if(v<=0)return;const d=getDay(activeDay());d.exSets=d.exSets||{};(d.exSets[id]=d.exSets[id]||[]).push(v);d.exercises[id]=(d.exercises[id]||0)+v;inp.value='';save();}
+function profileName(){return (profiles.find(p=>p.id===PROFILE)||{}).name||PROFILE;}
+function updateGameLink(){const gl=$('gameLink');if(gl)gl.href='./game.html?u='+encodeURIComponent(PROFILE)+'&n='+encodeURIComponent(profileName());}
+function exNameOf(id){const e=state.settings.exercises.find(x=>x.id===id);return e?e.name:'вправа';}
+function addSet(id){const inp=$('setin-'+id);const v=Math.round(+inp.value||0);if(v<=0)return;const d=getDay(activeDay());d.exSets=d.exSets||{};const oldRec=exRecord(id);(d.exSets[id]=d.exSets[id]||[]).push(v);d.exercises[id]=(d.exercises[id]||0)+v;inp.value='';save();
+  if(v>oldRec&&oldRec>0)onNewRecord(id,v,oldRec);}
+function onNewRecord(id,v,old){const nm=exNameOf(id);toast('🎉 Новий рекорд: '+v+' '+nm+' (було '+old+')');if(typeof notify==='function')notify('🎉 Новий рекорд!',profileName()+': '+v+' '+nm);
+  if(sb)sb.from('record_events').insert({who:profileName(),ex:nm,reps:v}).then(()=>{},()=>{});}
+let runScores=[];
+async function loadRunScores(){if(!sb)return;const {data,error}=await sb.from('run_scores').select('*').order('points',{ascending:false});if(error||!data)return;runScores=data;renderRunLb();}
+function renderRunLb(){const el=$('runLb');if(!el)return;if(!runScores.length){el.innerHTML='';return;}el.innerHTML='<div class="sec-title" style="margin-top:14px">🏆 Рекорди раннера</div>'+runScores.map((r,i)=>`<div class="row" style="padding:6px 0"><span>${['🥇','🥈','🥉'][i]||'▫️'} ${r.name||r.profile}</span><span class="muted cnt">${fmt(r.points)} 👟 · ${(+r.secs||0).toFixed(1)}с</span></div>`).join('');}
+function subscribeRecords(){if(!sb||window._recSub)return;window._recSub=1;const me=profileName();
+  try{sb.channel('rec').on('postgres_changes',{event:'INSERT',schema:'public',table:'record_events'},p=>{const r=p.new;if(!r||r.who===me)return;toast('🏆 '+r.who+' побив рекорд: '+r.reps+' '+r.ex+'!');if(typeof notify==='function')notify('🏆 Новий рекорд!',r.who+': '+r.reps+' '+r.ex);}).subscribe();}catch(e){}}
 function delSet(id,i){const d=getDay(activeDay());if(!d.exSets||!d.exSets[id])return;const v=d.exSets[id][i]||0;d.exSets[id].splice(i,1);if(!d.exSets[id].length)delete d.exSets[id];d.exercises[id]=Math.max(0,(d.exercises[id]||0)-v);save();}
 function exSetsOf(id,k){const d=state.days[k];return(d&&d.exSets&&d.exSets[id])||[];}
 function exMaxSet(id,k){const s=exSetsOf(id,k);return s.length?Math.max(...s):0;}
