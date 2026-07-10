@@ -164,6 +164,12 @@
   .badge-card.pop{animation:badgePop .65s cubic-bezier(.2,.8,.3,1.2)}
   .confetti{position:fixed; top:-14px; width:9px; height:14px; z-index:500; border-radius:2px; pointer-events:none; animation:confFall linear forwards}
   @keyframes confFall{to{top:106vh; transform:rotate(720deg)}}
+  .mod-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(128px,1fr)); gap:6px; margin-top:6px}
+  .mod-grid label{display:flex; align-items:center; gap:7px; padding:8px 10px; border:1px solid var(--stroke); border-radius:10px; font-size:13px; cursor:pointer}
+  .mod-grid label input{width:auto}
+  .prof-row{display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--stroke); border-radius:12px; margin-bottom:8px}
+  .prof-row.cur{border-color:var(--cyan); background:rgba(92,201,221,.1)}
+  .prof-row .pn{flex:1; font-weight:700}
 </style>
 </head>
 <body>
@@ -179,6 +185,7 @@
     <div class="flex">
       <div class="glass pill" style="min-width:auto;padding:11px" title="Синхронізація: зелений — збережено, жовтий — зберігаю, червоний — немає зв'язку"><span class="sync-dot" id="syncDot"></span></div>
       <button class="acc" onclick="openNotifs()" style="position:relative">🔔<span id="notifBadge">0</span></button>
+      <button class="acc" id="profBtn" onclick="openProfiles()" title="Профіль">👤</button>
       <button class="acc" id="langBtn" onclick="toggleLang()">EN</button>
       <button class="acc" onclick="openBadges()">🏅</button>
       <button class="acc" onclick="openSettings()">⚙️</button>
@@ -214,13 +221,13 @@
   </div>
 
   <!-- АКТИВНІСТЬ -->
-  <div class="glass card" style="--o:5">
+  <div class="glass card" style="--o:5" data-mod="activity">
     <h2><span class="dot" style="background:var(--green)"></span>Активність</h2>
     <div id="exList"></div>
   </div>
 
   <!-- ФІНАНСИ -->
-  <div class="glass card">
+  <div class="glass card" data-mod="finance">
     <h2><span class="dot" style="background:var(--green)"></span>Фінанси (Влад) — <span id="finMonthLabel" style="text-transform:none;letter-spacing:0;color:var(--text)"></span></h2>
     <div class="fin-grid">
       <div class="fin-box"><div class="lbl">Витрати цього місяця</div><div class="big-num neon-red" id="finExpenses">—</div><div class="delta" id="expenseDelta"></div></div>
@@ -244,7 +251,7 @@
 
  <div class="side">
   <!-- ВОДА -->
-  <div class="glass card" style="--o:3">
+  <div class="glass card" style="--o:3" data-mod="water">
     <h2><span class="dot" style="background:var(--cyan)"></span>Вода</h2>
     <div class="between">
       <div><span class="cnt big-num neon-cyan" id="waterCnt">0</span> <span class="muted">/ <span id="waterGoal">2</span> Л</span><div class="muted" id="waterMl">0 мл</div></div>
@@ -258,19 +265,19 @@
   </div>
 
   <!-- ЛІМІТИ -->
-  <div class="glass card" style="--o:6">
+  <div class="glass card" style="--o:6" data-mod="limits">
     <h2><span class="dot" style="background:var(--red)"></span>Ліміти</h2>
     <div id="limitList"></div>
   </div>
 
   <!-- ЛІЧИЛЬНИКИ -->
-  <div class="glass card" style="--o:4">
+  <div class="glass card" style="--o:4" data-mod="counters">
     <h2><span class="dot" style="background:var(--yellow)"></span>Лічильники</h2>
     <div id="counterList"></div>
   </div>
 
   <!-- СОН -->
-  <div class="glass card" style="--o:7">
+  <div class="glass card" style="--o:7" data-mod="sleep">
     <h2><span class="dot" style="background:var(--purple)"></span>Сон</h2>
     <div class="flex" style="margin-bottom:8px"><button class="sm acc" onclick="sleepBedNow()" style="flex:1">😴 Ліг зараз</button><button class="sm acc" onclick="sleepWakeNow()" style="flex:1">☀️ Встав зараз</button></div>
     <div id="sleepPending" class="muted" style="margin-bottom:8px"></div>
@@ -283,7 +290,7 @@
   </div>
 
   <!-- ВАГА -->
-  <div class="glass card" style="--o:8">
+  <div class="glass card" style="--o:8" data-mod="weight">
     <h2><span class="dot" style="background:var(--green)"></span>Вага</h2>
     <div class="between">
       <div class="flex"><input type="number" id="weightInput" step="0.1" min="0" placeholder="—" style="width:100px" onchange="setWeight(this.value)"><span class="muted">кг</span></div>
@@ -292,13 +299,13 @@
   </div>
 
   <!-- НОТАТКА -->
-  <div class="glass card">
+  <div class="glass card" data-mod="notes">
     <h2><span class="dot" style="background:var(--blue)"></span>Нотатка дня</h2>
     <textarea id="noteInput" placeholder="Як пройшов день? Що завадило / що вдалось..." onchange="saveNote(this.value)"></textarea>
   </div>
 
   <!-- ТАСКИ -->
-  <div class="glass card">
+  <div class="glass card" data-mod="tasks">
     <h2><span class="dot" style="background:var(--purple)"></span>Мої цілі / таски</h2>
     <div class="flex" style="margin-bottom:8px">
       <input id="taskInput" placeholder="Нова ціль..." onkeydown="if(event.key==='Enter')addTask()">
@@ -308,7 +315,7 @@
   </div>
 
   <!-- ГРА -->
-  <div class="glass card">
+  <div class="glass card" data-mod="game">
     <h2><span class="dot" style="background:var(--cyan)"></span>Перерва — гра</h2>
     <div class="between">
       <div class="muted" style="font-size:13px">🏃 Раннер: біжи, стрибай, лови 🪙 і 💧×2</div>
@@ -338,6 +345,9 @@
     <input type="number" id="setSleepGoal" min="1" max="14" step="0.5" style="max-width:120px">
     <div class="sec-title">💱 Валюта</div>
     <input id="setCurrency" style="max-width:120px" placeholder="₴">
+    <div class="sec-title" style="margin-top:16px">🧩 Модулі (що показувати цьому профілю)</div>
+    <div id="setModules" class="mod-grid"></div>
+    <div class="muted" style="margin-top:6px;font-size:12px">Вимкнені модулі ховаються й не впливають на бал дня.</div>
   </div>
   <div class="tabpane" id="tab-act">
     <div class="sec-title">💪 Вправи (норма · множник штрафу · зростання/день)</div>
@@ -394,6 +404,17 @@
   <div id="notifBody"></div>
 </dialog>
 
+<dialog id="profilePick">
+  <div class="between"><h2 style="margin:0">👤 Профіль</h2><button class="sm" onclick="profilePick.close()">✕</button></div>
+  <div class="muted" style="margin:8px 0 12px;font-size:13px">Кожен профіль — окремі дані й свої налаштування. Дані не пересікаються.</div>
+  <div id="profileList"></div>
+  <div class="flex" style="margin-top:14px;gap:8px">
+    <input id="newProfileName" placeholder="Ім'я нового профілю (напр. Бодя)" onkeydown="if(event.key==='Enter')addProfile()">
+    <button class="acc sm" onclick="addProfile()">+ Створити</button>
+  </div>
+  <div class="muted" style="margin-top:10px;font-size:12px">Порада: кожен може відкрити свій профіль напряму за посиланням <code>?u=ім'я</code> і додати в закладки.</div>
+</dialog>
+
 <dialog id="badges">
   <div class="between"><h2 style="margin:0">🏅 Бейджі <span id="badgeCount" style="text-transform:none;letter-spacing:0;color:var(--muted)"></span></h2><button class="sm" onclick="badges.close()">✕</button></div>
   <div id="badgeBody" style="margin-top:12px"></div>
@@ -432,6 +453,7 @@ const EN={
 'Мій прогрес':'My progress','Активність':'Activity','Вода':'Water','Ліміти':'Limits','Лічильники':'Counters','Нотатка дня':'Day note','Мої цілі / таски':'My goals / tasks','Тиждень':'Week','Сон':'Sleep','Заснув':'Fell asleep','Прокинувся':'Woke up','Тривалість':'Duration','😴 Ціль сну (год)':'😴 Sleep goal (h)','😴 Ліг зараз':'😴 To bed now','☀️ Встав зараз':'☀️ Awake now',
 'Огляд':'Overview','Місяць':'Month','Сер. сон':'Avg sleep','🎮 Ігри':'🎮 Games','Планка (сек)':'Plank (sec)',
 'Вага':'Weight','🏅 Бейджі':'🏅 Badges','Відкрито!':'Unlocked!','Фінанси (Влад) —':'Finances (Vlad) —',
+'👤 Профіль':'👤 Profile','Кожен профіль — окремі дані й свої налаштування. Дані не пересікаються.':'Each profile keeps its own data and settings. Nothing overlaps.','+ Створити':'+ Create','Увійти':'Switch','🧩 Модулі (що показувати цьому профілю)':'🧩 Modules (shown for this profile)','Вимкнені модулі ховаються й не впливають на бал дня.':'Disabled modules are hidden and don\'t count toward the day score.','💧 Вода':'💧 Water','💪 Активність':'💪 Activity','🚫 Ліміти':'🚫 Limits','🔢 Лічильники':'🔢 Counters','😴 Сон':'😴 Sleep','⚖️ Вага':'⚖️ Weight','💰 Фінанси':'💰 Finances','📝 Нотатка':'📝 Note','🎯 Таски':'🎯 Tasks','🎮 Гра':'🎮 Game','Нотатка':'Note','Таски':'Tasks','Гра':'Game','Фінанси':'Finances',
 '🗓 Календар':'🗓 Calendar','📈 Графік':'📈 Chart','По місяцях':'By month','По днях':'By day','Нова ціль...':'New goal...','+ 💧':'+ 💧',
 'Витрати цього місяця':'Spent this month','Загальний борг зараз':'Total debt now','Витрати':'Spending','Куди йдуть гроші':'Where money goes','(тисни категорію → графік по днях)':'(tap a category → daily chart)','💳 Кредити — впиши поточний борг (зберігається на сьогодні)':'💳 Loans — enter current debt (saved for today)','📉 Борг':'📉 Debt','Підкатегорії:':'Subcategories:',
 'цього місяця витрат ще немає':'no spending this month yet','немає підкатегорій':'no subcategories','завантаження витрат...':'loading spending...','почни вписувати борг — і тут з\'явиться графік':'start entering debt — a chart will appear here','Додай кредити в налаштуваннях':'Add loans in settings','впиши поточний борг →':'enter current debt →','🎉 закрито!':'🎉 closed!','= як минулого':'= same as last','немає даних':'no data',
@@ -484,8 +506,15 @@ const defaults={
   days:{},months:{},tasks:[],loanLog:{},restDays:{}
 };
 let state=structuredClone(defaults);
-const cacheKey='lifeos_cache';
-const SOLO_ID='me';
+/* ===== ПРОФІЛІ (варіант А: без пароля, окремий рядок solo на кожного) ===== */
+const TRANSLIT={а:'a',б:'b',в:'v',г:'h',ґ:'g',д:'d',е:'e',є:'ie',ж:'zh',з:'z',и:'y',і:'i',ї:'i',й:'i',к:'k',л:'l',м:'m',н:'n',о:'o',п:'p',р:'r',с:'s',т:'t',у:'u',ф:'f',х:'kh',ц:'ts',ч:'ch',ш:'sh',щ:'shch',ь:'',ю:'iu',я:'ia'};
+function slugify(s){return String(s||'').toLowerCase().split('').map(c=>TRANSLIT[c]!=null?TRANSLIT[c]:c).join('').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,20)||('user'+Math.random().toString(36).slice(2,6));}
+const urlU=new URLSearchParams(location.search).get('u');
+let PROFILE=slugify(urlU||localStorage.getItem('lifeos_profile')||'me')||'me';
+localStorage.setItem('lifeos_profile',PROFILE);
+let SOLO_ID=(PROFILE==='me')?'me':'profile_'+PROFILE;
+let cacheKey='lifeos_cache'+(PROFILE==='me'?'':'_'+PROFILE);
+let profiles=[{id:'me',name:'Влад',emoji:'🧑'}];
 let selDay=null; const activeDay=()=>selDay||todayKey();
 
 /* ===== АВТЕНТИФІКАЦІЯ ===== */
@@ -508,9 +537,24 @@ async function boot(){
 function enterApp(){
   $('app').classList.remove('hidden');
   localStorage.setItem(cacheKey,JSON.stringify(state));
-  render(); loadExpenses(); loadSteam(); loadScreen(); loadSleepDB(); loadStepsDB(); initTip(); startReminders();
+  render(); loadProfiles(); initTip(); startReminders();
+  if(PROFILE==='me'){ loadExpenses(); loadSteam(); loadScreen(); loadSleepDB(); loadStepsDB(); } // інтеграції (Steam/айфон/фінанси) — лише основний профіль
   if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
+/* ===== ПРОФІЛІ: реєстр у рядку solo id='__profiles__' ===== */
+async function loadProfiles(){ if(!sb)return; try{const {data}=await sb.from('solo').select('data').eq('id','__profiles__').maybeSingle(); if(data&&data.data&&Array.isArray(data.data.list)&&data.data.list.length)profiles=data.data.list; if(!profiles.find(p=>p.id===PROFILE)){profiles.push({id:PROFILE,name:PROFILE==='me'?'Влад':(urlU||PROFILE),emoji:'🧑'});await saveProfiles();} updateProfileBtn();}catch(e){} }
+async function saveProfiles(){ if(!sb)return; try{await sb.from('solo').upsert({id:'__profiles__',data:{list:profiles}});}catch(e){} }
+function updateProfileBtn(){const b=$('profBtn');if(!b)return;const p=profiles.find(x=>x.id===PROFILE);b.textContent=p&&p.emoji?p.emoji:'👤';b.title='Профіль: '+(p?p.name:PROFILE);}
+function openProfiles(){renderProfiles();applyLang();profilePick.showModal();}
+function renderProfiles(){$('profileList').innerHTML=profiles.map(p=>{const cur=p.id===PROFILE;return `<div class="prof-row ${cur?'cur':''}"><span style="font-size:20px">${p.emoji||'👤'}</span><span class="pn">${p.name}${cur?' <span class="muted" style="font-weight:400">(зараз)</span>':''}</span>`+(cur?'':`<button class="sm acc" onclick="switchProfile('${p.id}')">Увійти</button>`)+(p.id==='me'?'':`<button class="sm del" onclick="deleteProfile('${p.id}')" title="Видалити">🗑</button>`)+`</div>`;}).join('');}
+function switchProfile(id){localStorage.setItem('lifeos_profile',id);location.href=location.pathname+(id==='me'?'':'?u='+encodeURIComponent(id));}
+function addProfile(){const name=($('newProfileName').value||'').trim();if(!name)return;let id=slugify(name);if(id==='me'||profiles.find(p=>p.id===id))id=id+'-'+Math.random().toString(36).slice(2,5);profiles.push({id,name,emoji:'🧑'});saveProfiles();$('newProfileName').value='';switchProfile(id);}
+function deleteProfile(id){if(id==='me')return;if(!confirm('Видалити профіль «'+((profiles.find(p=>p.id===id)||{}).name||id)+'» разом з його даними?'))return;profiles=profiles.filter(p=>p.id!==id);saveProfiles();if(sb)sb.from('solo').delete().eq('id','profile_'+id);if(PROFILE===id)switchProfile('me');else renderProfiles();}
+/* ===== МОДУЛІ (вмик/вимик блоків для профілю) ===== */
+function mod(n){const m=state.settings.modules;return !m||m[n]!==false;}
+function applyModules(){document.querySelectorAll('[data-mod]').forEach(el=>{el.style.display=mod(el.dataset.mod)?'':'none';});}
+const MODULES=[['water','💧 Вода'],['activity','💪 Активність'],['limits','🚫 Ліміти'],['counters','🔢 Лічильники'],['sleep','😴 Сон'],['weight','⚖️ Вага'],['finance','💰 Фінанси'],['notes','📝 Нотатка'],['tasks','🎯 Таски'],['game','🎮 Гра']];
+function renderModuleToggles(){$('setModules').innerHTML=MODULES.map(([k,lab])=>`<label><input type="checkbox" data-modk="${k}" ${mod(k)?'checked':''}>${lab}</label>`).join('');}
 let saveTimer=null, dirty=false;
 function scheduleSync(){ dirty=true; localStorage.setItem(cacheKey,JSON.stringify(state)); setSync('busy'); clearTimeout(saveTimer); saveTimer=setTimeout(pushState,700); }
 async function pushState(){
@@ -622,10 +666,10 @@ function delTask(id){state.tasks=state.tasks.filter(x=>x.id!==id);save();}
 
 function limitMaxOn(l,k){const h=l&&l.maxHist;if(!h||!h.length)return l?l.max:0;let m=h[0].max;for(const e of h){if(e.d<=k)m=e.max;else break;}return m;}
 function dayScore(k){const d=state.days[k];if(!d)return null;const S=state.settings;let t=0,ok=0;
-  t++;if(d.water>=S.waterGoal)ok++;
-  S.exercises.forEach(ex=>{t++;if((d.exercises[ex.id]||0)>=exTarget(ex,k))ok++;});
-  S.limitHabits.forEach(l=>{if(l.mode==='week')return;t++;if((d.limits[l.id]||0)<=limitMaxOn(l,k))ok++;});
-  S.counters.forEach(c=>{t++;if((d.counters[c.id]||0)>=c.goal)ok++;});
+  if(mod('water')){t++;if(d.water>=S.waterGoal)ok++;}
+  if(mod('activity'))S.exercises.forEach(ex=>{t++;if((d.exercises[ex.id]||0)>=exTarget(ex,k))ok++;});
+  if(mod('limits'))S.limitHabits.forEach(l=>{if(l.mode==='week')return;t++;if((d.limits[l.id]||0)<=limitMaxOn(l,k))ok++;});
+  if(mod('counters'))S.counters.forEach(c=>{t++;if((d.counters[c.id]||0)>=c.goal)ok++;});
   return t?Math.round(ok/t*100):0;}
 function weekMonday(d){const x=new Date(d);const dow=(x.getDay()+6)%7;x.setDate(x.getDate()-dow);x.setHours(0,0,0,0);return x;}
 function weekMondayKey(d){return dayKey(weekMonday(d));}
@@ -637,10 +681,10 @@ function toggleRest(){if(!state.restDays)state.restDays={};const k=todayKey();if
 function selectDay(k){if(k>todayKey())return;selDay=(k===todayKey())?null:k;render();const dt=new Date(k+'T00:00:00');toast(k===todayKey()?'Сьогодні':('✏️ Редагуєш '+dt.toLocaleDateString(LOC(),{day:'numeric',month:'long'})+' — тапни сьогоднішній день, щоб повернутись'));}
 
 function dayComponents(k){const d=state.days[k];if(!d)return null;const S=state.settings,a=[];
-  a.push({label:'Вода',kind:'goal',ok:d.water>=S.waterGoal,pct:d.water/S.waterGoal,txt:(d.water/1000).toFixed(1)+'л / '+(S.waterGoal/1000)+'л'});
-  S.exercises.forEach(ex=>{const t=exTarget(ex,k),v=d.exercises[ex.id]||0;a.push({label:ex.name,kind:'goal',ok:v>=t,pct:t?v/t:0,txt:v+' / '+t});});
-  S.limitHabits.forEach(l=>{if(l.mode==='week')return;const v=d.limits[l.id]||0,mx=limitMaxOn(l,k);a.push({label:l.name,kind:'limit',ok:v<=mx,pct:0,txt:v+' < '+mx+(l.unit?(' '+l.unit):'')});});
-  S.counters.forEach(c=>{const v=d.counters[c.id]||0;a.push({label:c.name,kind:'goal',ok:v>=c.goal,pct:c.goal?v/c.goal:0,txt:fmt(v)+' / '+fmt(c.goal)});});
+  if(mod('water'))a.push({label:'Вода',kind:'goal',ok:d.water>=S.waterGoal,pct:d.water/S.waterGoal,txt:(d.water/1000).toFixed(1)+'л / '+(S.waterGoal/1000)+'л'});
+  if(mod('activity'))S.exercises.forEach(ex=>{const t=exTarget(ex,k),v=d.exercises[ex.id]||0;a.push({label:ex.name,kind:'goal',ok:v>=t,pct:t?v/t:0,txt:v+' / '+t});});
+  if(mod('limits'))S.limitHabits.forEach(l=>{if(l.mode==='week')return;const v=d.limits[l.id]||0,mx=limitMaxOn(l,k);a.push({label:l.name,kind:'limit',ok:v<=mx,pct:0,txt:v+' < '+mx+(l.unit?(' '+l.unit):'')});});
+  if(mod('counters'))S.counters.forEach(c=>{const v=d.counters[c.id]||0;a.push({label:c.name,kind:'goal',ok:v>=c.goal,pct:c.goal?v/c.goal:0,txt:fmt(v)+' / '+fmt(c.goal)});});
   return a;}
 function compColor(c){if(c.ok)return 'var(--green)';if(c.kind!=='limit'&&c.pct>=.5)return 'var(--yellow)';return 'var(--red)';}
 function dayBadges(k){return Object.keys(state.badges||{}).filter(id=>state.badges[id]===k).map(id=>'\n🏅 '+badgeName(id)).join('');}
@@ -649,6 +693,7 @@ function dayTitle(k){const bg=dayBadges(k);const comps=dayComponents(k);if(!comp
 /* ===== РЕНДЕР ===== */
 function render(){
   Object.keys(_c).forEach(k=>delete _c[k]);
+  applyModules();
   applySteam(); applyScreen(); applySleepDB(); applyStepsDB();
   const tk=todayKey(),ad=activeDay(),d=getDay(ad),S=state.settings;
   $('todayLabel').textContent=new Date().toLocaleDateString(LOC(),{weekday:'long',day:'numeric',month:'long',year:'numeric'});
@@ -1055,7 +1100,7 @@ function renderFinance(){
 
 /* ===== НАЛАШТУВАННЯ ===== */
 function setTab(name){['gen','act','lim','cnt','loan','rem','data'].forEach(t=>$('tab-'+t).classList.toggle('on',t===name));[...$('setTabs').children].forEach(b=>b.className='sm'+(b.getAttribute('onclick').includes("'"+name+"'")?' acc':''));}
-function openSettings(){const S=state.settings,R=S.reminders||{};$('setWaterGoal').value=S.waterGoal;$('setSleepGoal').value=S.sleepGoal||8;$('setCurrency').value=S.currency;$('remOn').checked=!!R.on;$('remEvery').value=R.everyMin||120;$('remFrom').value=R.from??9;$('remTo').value=R.to??21;rl('setExercises',S.exercises,'ex');rl('setLimits',S.limitHabits,'lim');rl('setCounters',S.counters,'cnt');rl('setLoans',S.loans,'loan');setTab('gen');applyLang();settings.showModal();}
+function openSettings(){const S=state.settings,R=S.reminders||{};$('setWaterGoal').value=S.waterGoal;$('setSleepGoal').value=S.sleepGoal||8;$('setCurrency').value=S.currency;$('remOn').checked=!!R.on;$('remEvery').value=R.everyMin||120;$('remFrom').value=R.from??9;$('remTo').value=R.to??21;rl('setExercises',S.exercises,'ex');rl('setLimits',S.limitHabits,'lim');rl('setCounters',S.counters,'cnt');rl('setLoans',S.loans,'loan');renderModuleToggles();setTab('gen');applyLang();settings.showModal();}
 function rl(elId,arr,type){$(elId).innerHTML=arr.map((it,i)=>{const del=`<button class="del" onclick="delItem('${type}',${i})">✕</button>`;
   if(type==='ex')return `<div class="settings-item"><input value="${it.name}" data-f="name" placeholder="Назва"><input type="number" value="${it.base}" data-f="base" style="width:66px" title="норма"><input type="number" value="${it.penalty}" data-f="penalty" step="0.5" style="width:58px" title="штраф ×"><input type="number" value="${it.grow||0}" data-f="grow" style="width:58px" title="зростання/день">${del}</div>`;
   if(type==='lim')return `<div class="settings-item"><input value="${it.name}" data-f="name" placeholder="Назва" style="min-width:90px"><select data-f="mode" style="width:auto"><option value="day"${it.mode!=='week'?' selected':''}>на день</option><option value="week"${it.mode==='week'?' selected':''}>на тиждень ↓</option></select><select data-f="entry" style="width:auto" title="як вводити значення"><option value="input"${it.entry!=='buttons'?' selected':''}>поле</option><option value="buttons"${it.entry==='buttons'?' selected':''}>кнопки ±</option></select><input type="number" value="${it.max??2}" data-f="max" step="0.5" style="width:56px" title="макс на день"><input type="number" value="${it.startPerWeek??5}" data-f="startPerWeek" style="width:48px" title="старт: скільки на тиждень"><input type="number" value="${it.stepPerWeek??1}" data-f="stepPerWeek" style="width:44px" title="мінус за тиждень"><input type="number" value="${it.minPerWeek??2}" data-f="minPerWeek" style="width:44px" title="мінімум на тиждень"><input value="${it.unit||''}" data-f="unit" style="width:56px" placeholder="од.">${del}</div>`;
@@ -1072,7 +1117,7 @@ function addLimit(){state.settings.limitHabits.push({id:uid(),name:'Новий �
 function addCounter(){state.settings.counters.push({id:uid(),name:'Лічильник',goal:100,unit:''});rl('setCounters',state.settings.counters,'cnt');}
 function addLoan(){state.settings.loans.push({id:uid(),name:'Кредит'});rl('setLoans',state.settings.loans,'loan');}
 function delItem(type,i){const map={ex:'exercises',lim:'limitHabits',cnt:'counters',loan:'loans'},el={ex:'setExercises',lim:'setLimits',cnt:'setCounters',loan:'setLoans'};state.settings[map[type]].splice(i,1);rl(el[type],state.settings[map[type]],type);}
-function saveSettings(){const S=state.settings,keep=(a,o)=>a.map((n,i)=>o[i]?{...n,id:o[i].id}:n);S.exercises=keep(readL('setExercises','ex'),S.exercises);S.limitHabits=readL('setLimits','lim').map((n,i)=>{const o=S.limitHabits[i];if(!o)return {...n,maxHist:[{d:'2000-01-01',max:n.max}]};let mh=o.maxHist||[{d:'2000-01-01',max:o.max}];if(n.mode!=='week'&&n.max!==o.max){mh=(n.max>o.max)?[{d:'2000-01-01',max:n.max}]:mh.concat([{d:todayKey(),max:n.max}]);}return {...n,id:o.id,maxHist:mh,startDate:(n.mode==='week'?(o.mode==='week'&&o.startDate?o.startDate:n.startDate):undefined)};});S.counters=keep(readL('setCounters','cnt'),S.counters);S.loans=keep(readL('setLoans','loan'),S.loans);S.waterGoal=+$('setWaterGoal').value||2000;S.sleepGoal=+$('setSleepGoal').value||8;S.currency=$('setCurrency').value||'₴';S.reminders={on:$('remOn').checked,everyMin:Math.max(15,+$('remEvery').value||120),from:Math.min(23,Math.max(0,+$('remFrom').value||9)),to:Math.min(24,Math.max(1,+$('remTo').value||21))};settings.close();save();startReminders();}
+function saveSettings(){const S=state.settings,keep=(a,o)=>a.map((n,i)=>o[i]?{...n,id:o[i].id}:n);S.exercises=keep(readL('setExercises','ex'),S.exercises);S.limitHabits=readL('setLimits','lim').map((n,i)=>{const o=S.limitHabits[i];if(!o)return {...n,maxHist:[{d:'2000-01-01',max:n.max}]};let mh=o.maxHist||[{d:'2000-01-01',max:o.max}];if(n.mode!=='week'&&n.max!==o.max){mh=(n.max>o.max)?[{d:'2000-01-01',max:n.max}]:mh.concat([{d:todayKey(),max:n.max}]);}return {...n,id:o.id,maxHist:mh,startDate:(n.mode==='week'?(o.mode==='week'&&o.startDate?o.startDate:n.startDate):undefined)};});S.counters=keep(readL('setCounters','cnt'),S.counters);S.loans=keep(readL('setLoans','loan'),S.loans);S.waterGoal=+$('setWaterGoal').value||2000;S.sleepGoal=+$('setSleepGoal').value||8;S.currency=$('setCurrency').value||'₴';S.reminders={on:$('remOn').checked,everyMin:Math.max(15,+$('remEvery').value||120),from:Math.min(23,Math.max(0,+$('remFrom').value||9)),to:Math.min(24,Math.max(1,+$('remTo').value||21))};const mods={};document.querySelectorAll('#setModules input[data-modk]').forEach(cb=>{mods[cb.dataset.modk]=cb.checked;});S.modules=mods;settings.close();save();startReminders();}
 function resetAll(){if(confirm('Скинути ВСІ дані?')){localStorage.removeItem(cacheKey);state=structuredClone(defaults);if(sb)sb.from('solo').upsert({id:SOLO_ID,data:state,updated_at:new Date().toISOString()});settings.close();render();}}
 
 function exportData(){const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='lifeos-backup-'+todayKey()+'.json';a.click();}
