@@ -38,7 +38,8 @@
 </head>
 <body>
 <div class="top">
-  <a class="back" href="./index.html">← Назад</a>
+  <a class="back" id="backLink" href="./index.html">← Назад</a>
+  <script>(function(){var u=new URLSearchParams(location.search).get('u');document.getElementById('backLink').href='./index.html'+(u?('?u='+encodeURIComponent(u)):'');})();</script>
   <h1>LIFE&nbsp;<span>RUN</span></h1>
   <div class="best" id="best">рекорд: 0</div>
 </div>

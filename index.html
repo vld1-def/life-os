@@ -357,7 +357,7 @@
     <h2><span class="dot" style="background:var(--cyan)"></span>Перерва — гра</h2>
     <div class="between">
       <div class="muted" style="font-size:13px">🏃 Раннер: біжи, стрибай, лови 🪙 і 💧×2</div>
-      <a href="./game.html" style="text-decoration:none;padding:10px 18px;border-radius:12px;font-weight:700;color:#06121a;white-space:nowrap;background:linear-gradient(90deg,var(--cyan),var(--purple));border:1px solid rgba(92,201,221,.5)">▶ Грати</a>
+      <a id="gameLink" href="./game.html" style="text-decoration:none;padding:10px 18px;border-radius:12px;font-weight:700;color:#06121a;white-space:nowrap;background:linear-gradient(90deg,var(--cyan),var(--purple));border:1px solid rgba(92,201,221,.5)">▶ Грати</a>
     </div>
   </div>
  </div>
@@ -572,6 +572,7 @@ async function boot(){
 }
 function enterApp(){
   $('app').classList.remove('hidden');
+  {const gl=$('gameLink');if(gl)gl.href='./game.html?u='+encodeURIComponent(PROFILE);}
   localStorage.setItem(cacheKey,JSON.stringify(state));
   render(); loadProfiles(); initTip(); startReminders();
   loadScreen(); loadStepsDB(); // айфон-дані по користувачу (колонка who)
@@ -585,7 +586,7 @@ async function loadProfilesRegistry(){ if(!sb)return; try{const {data}=await sb.
 async function loadProfiles(){ await loadProfilesRegistry(); if(!profiles.find(p=>p.id===PROFILE)){profiles.push({id:PROFILE,name:(urlU||PROFILE),emoji:'🧑'});await saveProfiles();} }
 async function saveProfiles(){ if(!sb)return; try{await sb.from('solo').upsert({id:'__profiles__',data:{list:profiles}});}catch(e){} }
 async function showProfileGate(){ await loadProfilesRegistry(); renderGate(); applyLang(); $('gate').classList.remove('hidden'); }
-function renderGate(){$('gateList').innerHTML=profiles.map(p=>`<div class="gate-card" onclick="switchProfile('${p.id}')"><div class="ge">${p.avatar||p.emoji||'👤'}</div><div class="gn">${p.name}</div>`+(p.id==='me'?'<div class="gtag">твої дані</div>':`<button class="gdel" onclick="event.stopPropagation();deleteProfile('${p.id}')" title="Видалити">🗑</button>`)+`</div>`).join('');}
+function renderGate(){$('gateList').innerHTML=profiles.map(p=>`<div class="gate-card" onclick="switchProfile('${p.id}')"><div class="ge">${p.avatar||p.emoji||'👤'}</div><div class="gn">${p.name}</div>`+(p.id==='me'?'<div class="gtag">твої дані</div>':'')+`</div>`).join('');}
 function switchProfile(id){localStorage.setItem('lifeos_profile',id);location.href=location.pathname+'?u='+encodeURIComponent(id);}
 function addProfile(){const name=($('newProfileName').value||'').trim();if(!name)return;let id=slugify(name);if(id==='me'||profiles.find(p=>p.id===id))id=id+'-'+Math.random().toString(36).slice(2,5);profiles.push({id,name,emoji:'🧑'});saveProfiles();$('newProfileName').value='';switchProfile(id);}
 function deleteProfile(id){if(id==='me')return;if(!confirm('Видалити профіль «'+((profiles.find(p=>p.id===id)||{}).name||id)+'» разом з його даними?'))return;profiles=profiles.filter(p=>p.id!==id);saveProfiles();if(sb){const clean=structuredClone(defaults);clean.badges={};sb.from('solo').upsert({id:'profile_'+id,data:clean,updated_at:new Date().toISOString()}).then(()=>sb.from('solo').delete().eq('id','profile_'+id));}if(PROFILE===id)switchProfile('me');else if($('gate')&&!$('gate').classList.contains('hidden'))renderGate();}
@@ -831,7 +832,7 @@ function badgeStats(){
     monthPush:mx(mPush),monthSquat:mx(mSquat),monthPlank:mx(mPlank),monthWaterL:Math.round(mx(mWater)/1000),
     bestStreak:Math.max(bestRun(goodArr),computeStreak()),noCS2Streak:bestRun(Object.keys(steamPlay).filter(k=>steamPlay[k]===0)),coffeeStreak:bestRun(coffeeZero),loanClosed,bestGame};
 }
-const BADGE_GROUPS=[['streak','🔥 Серії','🔥 Streaks'],['score','⭐ Ідеал','⭐ Perfection'],['strength','💪 Сила','💪 Strength'],['steps','👣 Кроки','👣 Steps'],['water','💧 Вода','💧 Water'],['sleep','😴 Сон','😴 Sleep'],['games','🎮 Ігри','🎮 Games'],['coffee','☕ Кава','☕ Coffee'],['tenure','📅 Стаж','📅 Tenure'],['finance','💰 Гроші','💰 Money'],['game','🎯 Раннер','🎯 Runner']];
+const BADGE_GROUPS=[['streak','🔥 Серії','🔥 Streaks'],['score','⭐ Ідеал','⭐ Perfection'],['strength','💪 Сила','💪 Strength'],['steps','👣 Кроки','👣 Steps'],['water','💧 Вода','💧 Water'],['sleep','😴 Сон','😴 Sleep'],['games','🎮 Ігри','🎮 Games'],['coffee','☕ Кава','☕ Coffee'],['read','📖 Читання','📖 Reading'],['tenure','📅 Стаж','📅 Tenure'],['finance','💰 Гроші','💰 Money'],['game','🎯 Раннер','🎯 Runner']];
 const BADGE_DEFS=[
  {id:'streak7',g:'streak',e:'🔥',n:'Тижнева серія',ne:'Weekly streak',f:'Тиждень без відмазок 💥',fe:'A week, zero excuses 💥',need:7,u:'днів поспіль',ue:'days in a row',k:'bestStreak'},
  {id:'streak14',g:'streak',e:'💪',n:'Два тижні',ne:'Two weeks',f:'Воля з титану',fe:'Titanium willpower',need:14,u:'днів поспіль',ue:'days in a row',k:'bestStreak'},
@@ -878,9 +879,17 @@ const BADGE_DEFS=[
  {id:'days365',g:'tenure',e:'🎖️',n:'Рік!',ne:'A year!',f:'365 днів легенди',fe:'365 days of legend',need:365,u:'днів з даними',ue:'days tracked',k:'tracked'},
  {id:'loan',g:'finance',e:'💳',n:'Кредит закрито',ne:'Loan closed',f:'Банк плаче, ти святкуєш',fe:'The bank weeps, you party',need:1,u:'закритий борг',ue:'closed loan',k:'loanClosed'},
  {id:'runner20k',g:'game',e:'🎯',n:'Раннер-зірка',ne:'Runner star',f:'Біг, стрибав, вижив, розбагатів',fe:'Ran, jumped, survived, got rich',need:20000,u:'очок у грі',ue:'points in the game',k:'bestGame'},
+ {id:'book1',g:'read',prof:'bodia',manual:true,e:'📚',n:'Прочитав книгу',ne:'Read a book',f:'Ціла книга — від першої до останньої сторінки',fe:'A whole book, cover to cover',need:1,u:'книга',ue:'book'},
 ];
 function badgeName(id){const b=BADGE_DEFS.find(x=>x.id===id);return b?b.e+' '+TT(b.n,b.ne):id;}
-function badgeList(){const s=badgeStats();return BADGE_DEFS.map(b=>({...b,val:s[b.k]||0}));}
+function badgeVisible(b){
+  if(b.prof)return b.prof===PROFILE;              // персональний бейдж (напр. книга → Бодя)
+  if(b.g==='games')return PROFILE==='me';          // CS2/Steam — лише Влад
+  if(b.g==='coffee')return PROFILE==='me';         // кава-ліміт — лише Влад
+  if(b.g==='finance')return mod('finance');        // фінанси — лише Влад
+  if(b.g==='water')return PROFILE==='me'?mod('water'):false; // воду ховаємо для інших профілів
+  return true;}
+function badgeList(){const s=badgeStats();return BADGE_DEFS.filter(badgeVisible).map(b=>({...b,val:b.manual?b.need:(s[b.k]||0)}));}
 function confetti(){const c=['#5cc9dd','#9d8ad6','#4fc596','#e3bd68','#e56b7b'];for(let i=0;i<46;i++){const p=document.createElement('div');p.className='confetti';p.style.left=Math.random()*100+'vw';p.style.background=c[i%c.length];p.style.animationDuration=(1.4+Math.random()*.9)+'s';p.style.animationDelay=(Math.random()*.25)+'s';document.body.appendChild(p);setTimeout(()=>p.remove(),2600);}}
 function claimBadge(id){const b=badgeList().find(x=>x.id===id);if(!b||b.val<b.need||(state.badges&&state.badges[id]))return;if(!state.badges)state.badges={};state.badges[id]=todayKey();save();confetti();toast(TT('🏅 Вітаємо! Ви відкрили бейдж: ','🏅 Congrats! Badge unlocked: ')+TT(b.n,b.ne));if(typeof notify==='function')notify(TT('🏅 Новий бейдж!','🏅 New badge!'),b.e+' '+TT(b.n,b.ne));openBadges(id);}
 function openBadges(justId){
