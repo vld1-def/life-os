@@ -270,8 +270,8 @@
 
   <!-- АКТИВНІСТЬ -->
   <div class="glass card" style="--o:5" data-mod="activity">
-    <h2><span class="dot" style="background:var(--green)"></span>Активність</h2>
-    <div id="exList"></div>
+    <div class="between"><h2 style="margin:0"><span class="dot" style="background:var(--green)"></span>Активність</h2><button class="sm" onclick="openActRecords()" title="Рекорди за підхід — хто топ">🏆 Рекорди</button></div>
+    <div id="exList" style="margin-top:14px"></div>
   </div>
 
   <!-- ФІНАНСИ -->
@@ -467,6 +467,12 @@
 <dialog id="badges">
   <div class="between"><h2 style="margin:0">🏅 Бейджі <span id="badgeCount" style="text-transform:none;letter-spacing:0;color:var(--muted)"></span></h2><button class="sm" onclick="badges.close()">✕</button></div>
   <div id="badgeBody" style="margin-top:12px"></div>
+</dialog>
+
+<dialog id="actRecords">
+  <div class="between"><h2 style="margin:0">🏆 Рекорди за підхід</h2><button class="sm" onclick="actRecords.close()">✕</button></div>
+  <div class="muted" style="margin:6px 0 4px;font-size:13px">Найбільше повторень за один підхід — по кожній вправі.</div>
+  <div id="actRecordsBody" style="margin-top:8px"></div>
 </dialog>
 
 <div class="toast" id="toast"></div>
@@ -717,6 +723,28 @@ function addSet(id){const inp=$('setin-'+id);const v=Math.round(+inp.value||0);i
   if(v>oldRec&&oldRec>0)onNewRecord(id,v,oldRec);}
 function onNewRecord(id,v,old){const nm=exNameOf(id);toast('🎉 Новий рекорд: '+v+' '+nm+' (було '+old+')');if(typeof notify==='function')notify('🎉 Новий рекорд!',profileName()+': '+v+' '+nm);
   if(sb)sb.from('record_events').insert({who:profileName(),ex:nm,reps:v}).then(()=>{},()=>{});}
+async function openActRecords(){
+  $('actRecordsBody').innerHTML='<div class="empty">Завантаження…</div>';
+  actRecords.showModal();
+  let rows=[];
+  try{const {data}=await sb.from('solo').select('id,data');rows=data||[];}catch(e){}
+  const agg={}; // назва вправи -> [{pid,name,reps}]
+  rows.forEach(row=>{const id=row.id;let pid=null;
+    if(id==='me')pid='me';else if(id.indexOf('profile_')===0)pid=id.slice(8);else return;
+    if(!profiles.find(p=>p.id===pid))return; // лише профілі з реєстру (без сиріток-тестів)
+    const d=row.data;if(!d||!d.settings)return;
+    const exName={};(d.settings.exercises||[]).forEach(e=>exName[e.id]=e.name);
+    const best={};Object.values(d.days||{}).forEach(day=>{const es=(day&&day.exSets)||{};Object.keys(es).forEach(exId=>{const m=Math.max(0,...(es[exId]||[0]));if(m>(best[exId]||0))best[exId]=m;});});
+    const pname=(profiles.find(p=>p.id===pid)||{}).name||pid;
+    Object.keys(best).forEach(exId=>{const nm=exName[exId];if(!nm||!best[exId])return;(agg[nm]=agg[nm]||[]).push({pid,name:pname,reps:best[exId]});});
+  });
+  const names=Object.keys(agg);
+  if(!names.length){$('actRecordsBody').innerHTML='<div class="empty">Ще немає рекордів. Логуй підходи (+ підхід) в Активності 💪</div>';return;}
+  $('actRecordsBody').innerHTML=names.map(nm=>{const list=agg[nm].sort((a,b)=>b.reps-a.reps);
+    return `<div class="sec-title" style="margin-top:14px">${nm}</div>`+list.map((r,i)=>{const me=r.pid===PROFILE,rank=['🥇','🥈','🥉'][i]||('<span class="lb-num">'+(i+1)+'</span>');
+      return `<div class="lb-row${me?' me':''}" style="padding:9px 12px;margin-bottom:7px"><span class="lb-rank" style="font-size:18px">${rank}</span><span class="lb-name">${r.name}${me?' <span class="muted" style="font-weight:400">(ти)</span>':''}</span><span class="lb-score">${r.reps}<small> за підхід</small></span></div>`;}).join('');
+  }).join('');
+}
 let runScores=[];
 async function loadRunScores(){if(!sb)return;const {data,error}=await sb.from('run_scores').select('*').order('points',{ascending:false});if(error||!data)return;runScores=data;renderRunLb();}
 function renderRunLb(){const el=$('lbTable');if(!el)return;
