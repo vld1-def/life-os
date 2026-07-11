@@ -46,7 +46,7 @@
     <div id="sub">Тисни, коли поле стане <b style="color:#7dffc0">зеленим</b>. Не поспішай — за фальстарт раунд не рахується. Раундів: 5.</div>
     <div class="dots" id="dots"></div>
   </div>
-  <div class="lb"><div class="lbttl">🏆 Найшвидші (менше = краще)</div><div id="lb"></div></div>
+  <div class="lb"><div class="lbttl" style="display:flex;justify-content:space-between;align-items:center">🏆 Найшвидші (менше = краще) <button onclick="resetMyScore()" style="background:rgba(229,107,123,.15);border:1px solid var(--red);color:var(--text);border-radius:9px;padding:5px 10px;font-size:11px;cursor:pointer">🗑 Скинути мій рекорд</button></div><div id="lb"></div></div>
 </div>
 
 <script>
@@ -101,6 +101,7 @@ function sbFetch(path,opt){return fetch(SB_URL+'/rest/v1/'+path,Object.assign({h
 function renderLb(d){const el=$('lb');if(!el)return;if(!d||!d.length){el.innerHTML='<div class="lbrow" style="border:none;background:none;color:var(--muted)">Ще ніхто не грав — стань першим!</div>';return;}el.innerHTML=d.map((r,i)=>`<div class="lbrow${r.profile===PROFILE?' me':''}"><span>${['🥇','🥈','🥉'][i]||('#'+(i+1))} ${r.name||r.profile}${r.profile===PROFILE?' (ти)':''}</span><span>${r.ms} мс</span></div>`).join('');}
 async function loadLb(){try{const r=await sbFetch('reaction_scores?select=*&order=ms.asc.nullslast');renderLb(await r.json());}catch(e){}}
 async function saveScore(ms){try{await sbFetch('reaction_scores',{method:'POST',headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates'},body:JSON.stringify([{profile:PROFILE,name:PNAME,ms:ms}])});loadLb();}catch(e){}}
+async function resetMyScore(){ if(!confirm('Скинути свій рекорд реакції?'))return; best=0; localStorage.removeItem(RKEY); showBest(); try{await sbFetch('reaction_scores?profile=eq.'+encodeURIComponent(PROFILE),{method:'DELETE'});}catch(e){} loadLb(); }
 async function initBestFromServer(){try{const r=await sbFetch('reaction_scores?select=ms&profile=eq.'+encodeURIComponent(PROFILE));const d=await r.json();if(d&&d[0]&&d[0].ms&&(!best||d[0].ms<best)){best=d[0].ms;localStorage.setItem(RKEY,String(best));showBest();}}catch(e){}}
 loadLb(); initBestFromServer();
 </script>
