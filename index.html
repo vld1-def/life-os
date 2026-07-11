@@ -150,6 +150,7 @@
   .sync-dot{width:8px;height:8px;border-radius:50%;background:var(--green);transition:.3s}
   .sync-dot.busy{background:var(--yellow)} .sync-dot.off{background:var(--red)}
   #notifBadge{position:absolute; top:-5px; right:-5px; background:var(--red); color:#fff; font-size:10px; min-width:17px; height:17px; border-radius:9px; display:none; align-items:center; justify-content:center; padding:0 4px; font-weight:800}
+  #badgeReady{position:absolute; top:-5px; right:-5px; background:var(--yellow); color:#2a1e02; font-size:10px; min-width:17px; height:17px; border-radius:9px; display:none; align-items:center; justify-content:center; padding:0 4px; font-weight:800}
   .badge-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(116px,1fr)); gap:9px; margin-bottom:8px}
   .badge-card{border:1px solid var(--stroke); border-radius:14px; padding:11px 7px; text-align:center; opacity:.5; transition:.15s; overflow:hidden}
   .badge-card.on{opacity:1; background:linear-gradient(160deg,rgba(92,201,221,.14),rgba(157,138,214,.14)); border-color:rgba(92,201,221,.4)}
@@ -235,7 +236,7 @@
       <div class="glass pill" style="min-width:auto;padding:11px" title="Синхронізація: зелений — збережено, жовтий — зберігаю, червоний — немає зв'язку"><span class="sync-dot" id="syncDot"></span></div>
       <button class="acc" onclick="openNotifs()" style="position:relative">🔔<span id="notifBadge">0</span></button>
       <button class="acc" id="langBtn" onclick="toggleLang()">EN</button>
-      <button class="acc" onclick="openBadges()">🏅</button>
+      <button class="acc" onclick="openBadges()" style="position:relative">🏅<span id="badgeReady">0</span></button>
       <button class="acc" onclick="openSettings()">⚙️</button>
     </div>
   </div>
@@ -839,7 +840,7 @@ function render(){
   $('scoreVal').textContent=(dayScore(tk)??0)+'%';
   $('streakVal').textContent=computeStreak();
   $('debtVal').textContent=fmt(Math.round(totalDebtNow()));
-  renderNotifBadge();
+  renderNotifBadge(); updateBadgeReady();
   applyLang();
 }
 function buildNotifs(){const tk=todayKey(),d=getDay(tk),S=state.settings;const todo=[],over=[],pen=[];
@@ -850,6 +851,7 @@ function buildNotifs(){const tk=todayKey(),d=getDay(tk),S=state.settings;const t
   return{todo,over,pen};}
 function notifCount(){const n=buildNotifs();return n.todo.length+n.over.length+n.pen.length;}
 function renderNotifBadge(){const b=$('notifBadge');if(!b)return;const c=notifCount();b.textContent=c;b.style.display=c?'flex':'none';}
+function updateBadgeReady(){const b=$('badgeReady');if(!b)return;const c=badgeList().filter(x=>x.val>=x.need&&!(state.badges&&state.badges[x.id])).length;b.textContent=c;b.style.display=c?'flex':'none';}
 function openNotifs(){const n=buildNotifs();const sec=(t,arr,empty)=>`<div class="sec-title">${t}</div>`+(arr.length?arr.map(x=>`<div class="row" style="padding:7px 0">${x}</div>`).join(''):`<div class="empty">${empty}</div>`);
   $('notifBody').innerHTML=sec('📋 Зробити сьогодні',n.todo,'усе виконано 🎉')+sec('⚠️ Перевищені ліміти',n.over,'лімітів не перевищено 👍')+sec('🔥 Активні штрафи',n.pen,'штрафів немає');
   applyLang(); notifs.showModal();}
@@ -880,7 +882,7 @@ function badgeStats(){
   let loanClosed=0;Object.keys(state.loanLog||{}).forEach(id=>{if(Object.values(state.loanLog[id]).some(v=>v===0))loanClosed=1;});
   let bestGame=0;try{bestGame=(JSON.parse(localStorage.getItem('run_best3'+(PROFILE==='me'?'':'_'+PROFILE)))||{}).p||0;}catch(e){}
   return {perfect,good,tracked,waterHits,sleepHits,bestSteps,totalSteps,bestPlank,bestPush,bestSquat,totalPush,totalSquat,totalPlank,
-    recPushSet:pushEx?exRecord(pushEx.id):0,recSquatSet:squatEx?exRecord(squatEx.id):0,
+    recPushSet:pushEx?exRecord(pushEx.id):0,recSquatSet:squatEx?exRecord(squatEx.id):0,recPlankSet:plankEx?exRecord(plankEx.id):0,
     monthPush:mx(mPush),monthSquat:mx(mSquat),monthPlank:mx(mPlank),monthWaterL:Math.round(mx(mWater)/1000),
     bestStreak:Math.max(bestRun(goodArr),computeStreak()),noCS2Streak:bestRun(Object.keys(steamPlay).filter(k=>steamPlay[k]===0)),coffeeStreak:bestRun(coffeeZero),loanClosed,bestGame};
 }
@@ -900,19 +902,22 @@ const BADGE_DEFS=[
  {id:'squat_d100',g:'strength',e:'🏋️',n:'Присід 100',ne:'Squat 100',f:'Ноги з бетону',fe:'Concrete legs',need:100,u:'присідань за день',ue:'squats a day',k:'bestSquat'},
  {id:'squat_m1000',g:'strength',e:'📅',n:'1000 за місяць',ne:'1000 a month',f:'Місяць присідав як не в себе',fe:'Squatted all month',need:1000,u:'присідань за місяць',ue:'squats a month',k:'monthSquat'},
  {id:'squat_t5000',g:'strength',e:'🏆',n:'5000 присідань',ne:'5000 squats',f:'Легенда присіду',fe:'Squat legend',need:5000,u:'присідань усього',ue:'squats total',k:'totalSquat'},
- {id:'plank_d60',g:'strength',e:'🧘',n:'Планка 60с',ne:'Plank 60s',f:'Хвилина, що триває вічність',fe:'The eternal minute',need:60,u:'сек планки за день',ue:'sec plank a day',k:'bestPlank'},
- {id:'plank_d120',g:'strength',e:'🧘',n:'Планка 120с',ne:'Plank 120s',f:'Дві хвилини дзену',fe:'Two minutes of zen',need:120,u:'сек планки за день',ue:'sec plank a day',k:'bestPlank'},
+ {id:'plankset60',g:'strength',e:'🧘',n:'Планка 60с',ne:'Plank 60s',f:'Хвилина, що триває вічність',fe:'The eternal minute',need:60,u:'сек планки за підхід',ue:'sec plank in one hold',k:'recPlankSet'},
+ {id:'plankset90',g:'strength',e:'🧘',n:'Планка 90с',ne:'Plank 90s',f:'Півтори хвилини витримки',fe:'A minute and a half of grit',need:90,u:'сек планки за підхід',ue:'sec plank in one hold',k:'recPlankSet'},
+ {id:'plankset120',g:'strength',e:'🧘',n:'Планка 120с',ne:'Plank 120s',f:'Дві хвилини дзену',fe:'Two minutes of zen',need:120,u:'сек планки за підхід',ue:'sec plank in one hold',k:'recPlankSet'},
+ {id:'plankset240',g:'strength',e:'🏆',n:'Планка 240с',ne:'Plank 240s',f:'Чотири хвилини сталевого корпусу',fe:'Four minutes of a steel core',need:240,u:'сек планки за підхід',ue:'sec plank in one hold',k:'recPlankSet'},
  {id:'plank_m1000',g:'strength',e:'📅',n:'1000с за місяць',ne:'1000s a month',f:'Місяць тремтячих ліктів',fe:'A month of shaky elbows',need:1000,u:'сек планки за місяць',ue:'sec plank a month',k:'monthPlank'},
  {id:'plank_t3600',g:'strength',e:'🏆',n:'Година планки',ne:'An hour of plank',f:'3600 секунд болю',fe:'3600 seconds of pain',need:3600,u:'сек планки усього',ue:'sec plank total',k:'totalPlank'},
  {id:'pushset30',g:'strength',e:'🔥',n:'Підхід 30',ne:'Set of 30',f:'30 віджимань без зупинки',fe:'30 push-ups nonstop',need:30,u:'віджимань за підхід',ue:'push-ups in one set',k:'recPushSet'},
  {id:'pushset50',g:'strength',e:'⚡',n:'Підхід 50',ne:'Set of 50',f:'Груди з чавуну',fe:'Cast-iron chest',need:50,u:'віджимань за підхід',ue:'push-ups in one set',k:'recPushSet'},
  {id:'squatset50',g:'strength',e:'🔥',n:'Присід-підхід 50',ne:'Squat set 50',f:'50 присідань поспіль',fe:'50 squats in a row',need:50,u:'присідань за підхід',ue:'squats in one set',k:'recSquatSet'},
  {id:'squatset80',g:'strength',e:'⚡',n:'Присід-підхід 80',ne:'Squat set 80',f:'Ноги не здаються',fe:'Legs never quit',need:80,u:'присідань за підхід',ue:'squats in one set',k:'recSquatSet'},
- {id:'steps8k',g:'steps',e:'👣',n:'Ходок',ne:'Walker',f:'8 тисяч і жодного таксі',fe:'8k steps, no taxi',need:8000,u:'кроків за день',ue:'steps a day',k:'bestSteps'},
+ {id:'steps8k',g:'steps',e:'👣',n:'Ходок',ne:'Walker',f:'10 тисяч кроків — і жодного таксі',fe:'10k steps, no taxi',need:10000,u:'кроків за день',ue:'steps a day',k:'bestSteps'},
  {id:'steps15k',g:'steps',e:'🚶',n:'Марафонець дня',ne:'Day marathoner',f:'Хтось загубив пульт?',fe:'Lost the remote again?',need:15000,u:'кроків за день',ue:'steps a day',k:'bestSteps'},
  {id:'steps20k',g:'steps',e:'🏃',n:'20 тисяч',ne:'20k steps',f:'Ноги в режимі турбо',fe:'Legs in turbo mode',need:20000,u:'кроків за день',ue:'steps a day',k:'bestSteps'},
  {id:'steps30k',g:'steps',e:'🥇',n:'30 тисяч',ne:'30k steps',f:'Ти точно не кур`єр?',fe:'Sure you are not a courier?',need:30000,u:'кроків за день',ue:'steps a day',k:'bestSteps'},
  {id:'steps100k',g:'steps',e:'🗺️',n:'100 тисяч',ne:'100k total',f:'Пішки до сусіднього міста',fe:'Walked to the next town',need:100000,u:'кроків усього',ue:'steps total',k:'totalSteps'},
+ {id:'steps500k',g:'steps',e:'🧭',n:'500 тисяч',ne:'500k total',f:'Півмільйона кроків за плечима',fe:'Half a million steps behind you',need:500000,u:'кроків усього',ue:'steps total',k:'totalSteps'},
  {id:'steps1m',g:'steps',e:'🌍',n:'Мільйон кроків',ne:'A million steps',f:'Можна було дійти до Парижа',fe:'Could have walked to Paris',need:1000000,u:'кроків усього',ue:'steps total',k:'totalSteps'},
  {id:'water15',g:'water',e:'💧',n:'Гідратація',ne:'Hydration',f:'Кактус би позаздрив',fe:'A cactus is jealous',need:15,u:'днів з ціллю води',ue:'days at water goal',k:'waterHits'},
  {id:'water30',g:'water',e:'🌊',n:'Водний майстер',ne:'Water master',f:'Всередині — маленьке море',fe:'A little sea within',need:30,u:'днів з ціллю води',ue:'days at water goal',k:'waterHits'},
