@@ -207,6 +207,12 @@
   .lb-name{flex:1; min-width:0; font-weight:700; font-size:15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
   .lb-score{font-weight:800; font-size:17px; font-variant-numeric:tabular-nums; text-align:right; color:var(--cyan)}
   .lb-score small{display:block; font-size:11px; font-weight:600; color:var(--muted)}
+  .game-menu{display:flex; flex-direction:column; gap:10px; margin-top:14px}
+  .game-opt{display:flex; align-items:center; gap:14px; padding:16px; border:1px solid var(--stroke); border-radius:16px; text-decoration:none; color:var(--text); background:rgba(255,255,255,.03); transition:.15s}
+  .game-opt:hover{border-color:var(--cyan); transform:translateY(-2px); background:rgba(92,201,221,.08)}
+  .game-opt .ge{font-size:36px; line-height:1}
+  .game-opt .gt{font-weight:800; font-size:16px}
+  .game-opt .gd{font-size:12px; color:var(--muted); margin-top:2px}
 </style>
 </head>
 <body>
@@ -365,10 +371,10 @@
 
   <!-- ГРА -->
   <div class="glass card" data-mod="game">
-    <h2><span class="dot" style="background:var(--cyan)"></span>Перерва — гра</h2>
+    <h2><span class="dot" style="background:var(--cyan)"></span>Перерва — ігри</h2>
     <div class="between">
-      <div class="muted" style="font-size:13px">🏃 Раннер: біжи, стрибай, лови 🪙 і 💧×2</div>
-      <a id="gameLink" href="./game.html" style="text-decoration:none;padding:10px 18px;border-radius:12px;font-weight:700;color:#06121a;white-space:nowrap;background:linear-gradient(90deg,var(--cyan),var(--purple));border:1px solid rgba(92,201,221,.5)">▶ Грати</a>
+      <div class="muted" style="font-size:13px">🎮 Тест реакції або раннер</div>
+      <button class="acc" onclick="openGamePick()" style="padding:10px 18px;border-radius:12px;font-weight:700;white-space:nowrap;border:1px solid rgba(92,201,221,.5)">▶ Грати</button>
     </div>
   </div>
  </div>
@@ -462,6 +468,14 @@
 <dialog id="badges">
   <div class="between"><h2 style="margin:0">🏅 Бейджі <span id="badgeCount" style="text-transform:none;letter-spacing:0;color:var(--muted)"></span></h2><div class="flex"><button class="sm del" onclick="resetBadges()">🗑 Очистити</button><button class="sm" onclick="badges.close()">✕</button></div></div>
   <div id="badgeBody" style="margin-top:12px"></div>
+</dialog>
+
+<dialog id="gamePick">
+  <div class="between"><h2 style="margin:0">🎮 Обери гру</h2><button class="sm" onclick="gamePick.close()">✕</button></div>
+  <div class="game-menu">
+    <a id="lnkReaction" class="game-opt" href="./reaction.html"><span class="ge">⚡</span><div><div class="gt">Тест реакції</div><div class="gd">Тисни щойно позеленіє — міряй мілісекунди</div></div></a>
+    <a id="lnkRunner" class="game-opt" href="./game.html"><span class="ge">🏃</span><div><div class="gt">Раннер</div><div class="gd">Біжи, стрибай, лови монетки за 30 сек</div></div></a>
+  </div>
 </dialog>
 
 <dialog id="actRecords">
@@ -712,10 +726,12 @@ function exTarget(ex,k){const ck=ex.id+'|'+k;if(_c[ck]!=null)return _c[ck];if(!s
 function addWater(n){const d=getDay(activeDay());d.water=Math.max(0,d.water+n);save();}
 function addEx(id,n){const d=getDay(activeDay());d.exercises[id]=Math.max(0,(d.exercises[id]||0)+n);save();}
 function profileName(){return (profiles.find(p=>p.id===PROFILE)||{}).name||PROFILE;}
-function updateGameLink(){const gl=$('gameLink');if(gl)gl.href='./game.html?u='+encodeURIComponent(PROFILE)+'&n='+encodeURIComponent(profileName());}
+function updateGameLink(){const q='?u='+encodeURIComponent(PROFILE)+'&n='+encodeURIComponent(profileName());const r=$('lnkRunner');if(r)r.href='./game.html'+q;const a=$('lnkReaction');if(a)a.href='./reaction.html'+q;}
+function openGamePick(){updateGameLink();gamePick.showModal();}
 function exNameOf(id){const e=state.settings.exercises.find(x=>x.id===id);return e?e.name:'вправа';}
-function addSet(id){const inp=$('setin-'+id);const v=Math.round(+inp.value||0);if(v<=0)return;const d=getDay(activeDay());d.exSets=d.exSets||{};const oldRec=exRecord(id);(d.exSets[id]=d.exSets[id]||[]).push(v);d.exercises[id]=(d.exercises[id]||0)+v;inp.value='';save();
-  if(v>oldRec&&oldRec>0)onNewRecord(id,v,oldRec);}
+function addSet(id){const inp=$('setin-'+id);const v=Math.round(+inp.value||0);if(v<=0)return;const d=getDay(activeDay());d.exSets=d.exSets||{};const oldRec=exRecord(id);(d.exSets[id]=d.exSets[id]||[]).push(v);d.exercises[id]=(d.exercises[id]||0)+v;inp.value='';
+  const isRec=v>oldRec&&oldRec>0;if(isRec)d.recs=(d.recs||0)+1;save();
+  if(isRec)onNewRecord(id,v,oldRec);}
 function onNewRecord(id,v,old){const nm=exNameOf(id);toast('🎉 Новий рекорд: '+v+' '+nm+' (було '+old+')');if(typeof notify==='function')notify('🎉 Новий рекорд!',profileName()+': '+v+' '+nm);
   if(sb)sb.from('record_events').insert({who:profileName(),ex:nm,reps:v}).then(()=>{},()=>{});}
 async function openActRecords(){
@@ -851,7 +867,7 @@ function buildNotifs(){const tk=todayKey(),d=getDay(tk),S=state.settings;const t
   return{todo,over,pen};}
 function notifCount(){const n=buildNotifs();return n.todo.length+n.over.length+n.pen.length;}
 function renderNotifBadge(){const b=$('notifBadge');if(!b)return;const c=notifCount();b.textContent=c;b.style.display=c?'flex':'none';}
-function updateBadgeReady(){const b=$('badgeReady');if(!b)return;const c=badgeList().filter(x=>x.val>=x.need&&!(state.badges&&state.badges[x.id])).length;b.textContent=c;b.style.display=c?'flex':'none';}
+function updateBadgeReady(){const b=$('badgeReady');if(!b)return;const c=badgeList().filter(x=>badgeReached(x)&&!(state.badges&&state.badges[x.id])).length;b.textContent=c;b.style.display=c?'flex':'none';}
 function openNotifs(){const n=buildNotifs();const sec=(t,arr,empty)=>`<div class="sec-title">${t}</div>`+(arr.length?arr.map(x=>`<div class="row" style="padding:7px 0">${x}</div>`).join(''):`<div class="empty">${empty}</div>`);
   $('notifBody').innerHTML=sec('📋 Зробити сьогодні',n.todo,'усе виконано 🎉')+sec('⚠️ Перевищені ліміти',n.over,'лімітів не перевищено 👍')+sec('🔥 Активні штрафи',n.pen,'штрафів немає');
   applyLang(); notifs.showModal();}
@@ -864,11 +880,12 @@ function badgeStats(){
   const stepC=S.counters.find(c=>/крок|steps/i.test(c.name));
   const plankEx=S.exercises.find(e=>/планк|plank/i.test(e.name)),pushEx=S.exercises.find(e=>/віджим|push/i.test(e.name)),squatEx=S.exercises.find(e=>/присід|squat/i.test(e.name));
   const coffeeL=S.limitHabits.find(l=>/кав|coffee/i.test(l.name));
-  let perfect=0,good=0,tracked=0,waterHits=0,sleepHits=0,bestSteps=0,totalSteps=0,bestPlank=0,bestPush=0,bestSquat=0,totalPush=0,totalSquat=0,totalPlank=0;
+  let perfect=0,good=0,tracked=0,waterHits=0,sleepHits=0,bestSteps=0,totalSteps=0,bestPlank=0,bestPush=0,bestSquat=0,totalPush=0,totalSquat=0,totalPlank=0,maxRecDay=0;
   const goodArr=[],coffeeZero=[],mPush={},mSquat={},mPlank={},mWater={};
   days.forEach(k=>{const sc=dayScore(k),rest=!!(state.restDays&&state.restDays[k]),ym=k.slice(0,7);
     if(sc!=null){tracked++;if(sc>=70||rest)good++;if(sc===100)perfect++;}
     const d=state.days[k],ex=d.exercises||{};
+    if((d.recs||0)>maxRecDay)maxRecDay=d.recs||0;
     if(d.water>=S.waterGoal)waterHits++;
     const sh=sleepHours(k);if(sh>0&&sh>=(S.sleepGoal||8))sleepHits++;
     if(stepC){const v=(d.counters&&d.counters[stepC.id])||0;if(v>bestSteps)bestSteps=v;totalSteps+=v;}
@@ -880,13 +897,16 @@ function badgeStats(){
     if(coffeeL&&sc!=null&&(((d.limits&&d.limits[coffeeL.id])||0)===0))coffeeZero.push(k);});
   const mx=o=>Object.values(o).reduce((a,b)=>Math.max(a,b),0);
   let loanClosed=0;Object.keys(state.loanLog||{}).forEach(id=>{if(Object.values(state.loanLog[id]).some(v=>v===0))loanClosed=1;});
-  let bestGame=0;try{bestGame=(JSON.parse(localStorage.getItem('run_best3'+(PROFILE==='me'?'':'_'+PROFILE)))||{}).p||0;}catch(e){}
+  const pkey=PROFILE==='me'?'':'_'+PROFILE;
+  let bestGame=0;try{bestGame=(JSON.parse(localStorage.getItem('run_best3'+pkey))||{}).p||0;}catch(e){}
+  let reactBest=0;try{reactBest=+localStorage.getItem('react_best'+pkey)||0;}catch(e){}
   return {perfect,good,tracked,waterHits,sleepHits,bestSteps,totalSteps,bestPlank,bestPush,bestSquat,totalPush,totalSquat,totalPlank,
     recPushSet:pushEx?exRecord(pushEx.id):0,recSquatSet:squatEx?exRecord(squatEx.id):0,recPlankSet:plankEx?exRecord(plankEx.id):0,
-    monthPush:mx(mPush),monthSquat:mx(mSquat),monthPlank:mx(mPlank),monthWaterL:Math.round(mx(mWater)/1000),
+    monthPush:mx(mPush),monthSquat:mx(mSquat),monthPlank:mx(mPlank),monthWaterL:Math.round(mx(mWater)/1000),maxRecDay,
+    claimedCount:Object.keys(state.badges||{}).length,reactBest,
     bestStreak:Math.max(bestRun(goodArr),computeStreak()),noCS2Streak:bestRun(Object.keys(steamPlay).filter(k=>steamPlay[k]===0)),coffeeStreak:bestRun(coffeeZero),loanClosed,bestGame};
 }
-const BADGE_GROUPS=[['streak','🔥 Серії','🔥 Streaks'],['score','⭐ Ідеал','⭐ Perfection'],['push','💪 Віджимання','💪 Push-ups'],['squat','🦵 Присідання','🦵 Squats'],['plank','🧘 Планка','🧘 Plank'],['steps','👣 Кроки','👣 Steps'],['water','💧 Вода','💧 Water'],['sleep','😴 Сон','😴 Sleep'],['games','🎮 Ігри','🎮 Games'],['coffee','☕ Кава','☕ Coffee'],['read','📖 Читання','📖 Reading'],['tenure','📅 Стаж','📅 Tenure'],['finance','💰 Гроші','💰 Money'],['game','🎯 Раннер','🎯 Runner']];
+const BADGE_GROUPS=[['streak','🔥 Серії','🔥 Streaks'],['score','⭐ Ідеал','⭐ Perfection'],['push','💪 Віджимання','💪 Push-ups'],['squat','🦵 Присідання','🦵 Squats'],['plank','🧘 Планка','🧘 Plank'],['steps','👣 Кроки','👣 Steps'],['water','💧 Вода','💧 Water'],['sleep','😴 Сон','😴 Sleep'],['games','🎮 Ігри','🎮 Games'],['coffee','☕ Кава','☕ Coffee'],['read','📖 Читання','📖 Reading'],['tenure','📅 Стаж','📅 Tenure'],['finance','💰 Гроші','💰 Money'],['game','🎮 Міні-ігри','🎮 Mini-games'],['meta','👑 Майстерність','👑 Mastery']];
 const BADGE_DEFS=[
  {id:'streak7',g:'streak',e:'🔥',n:'Тижнева серія',ne:'Weekly streak',f:'Тиждень без відмазок 💥',fe:'A week, zero excuses 💥',need:7,u:'днів поспіль',ue:'days in a row',k:'bestStreak'},
  {id:'streak14',g:'streak',e:'💪',n:'Два тижні',ne:'Two weeks',f:'Воля з титану',fe:'Titanium willpower',need:14,u:'днів поспіль',ue:'days in a row',k:'bestStreak'},
@@ -936,9 +956,17 @@ const BADGE_DEFS=[
  {id:'days365',g:'tenure',e:'🎖️',n:'Рік!',ne:'A year!',f:'365 днів легенди',fe:'365 days of legend',need:365,u:'днів з даними',ue:'days tracked',k:'tracked'},
  {id:'loan',g:'finance',e:'💳',n:'Кредит закрито',ne:'Loan closed',f:'Банк плаче, ти святкуєш',fe:'The bank weeps, you party',need:1,u:'закритий борг',ue:'closed loan',k:'loanClosed'},
  {id:'runner20k',g:'game',e:'🎯',n:'Раннер-зірка',ne:'Runner star',f:'Біг, стрибав, вижив, розбагатів',fe:'Ran, jumped, survived, got rich',need:20000,u:'очок у грі',ue:'points in the game',k:'bestGame'},
+ {id:'react500',g:'game',e:'⚡',n:'Реакція <500мс',ne:'Reaction <500ms',f:'Прокинувся швидше за каву',fe:'Faster than your coffee',need:500,lower:true,u:'мс реакції',ue:'ms reaction',k:'reactBest'},
+ {id:'react350',g:'game',e:'⚡',n:'Реакція <350мс',ne:'Reaction <350ms',f:'Рефлекси прокинулись',fe:'Reflexes online',need:350,lower:true,u:'мс реакції',ue:'ms reaction',k:'reactBest'},
+ {id:'react250',g:'game',e:'🚀',n:'Реакція <250мс',ne:'Reaction <250ms',f:'Майже читаєш майбутнє',fe:'Almost reading the future',need:250,lower:true,u:'мс реакції',ue:'ms reaction',k:'reactBest'},
+ {id:'react200',g:'game',e:'🥷',n:'Реакція <200мс',ne:'Reaction <200ms',f:'Кіберспортивні рефлекси',fe:'Esports reflexes',need:200,lower:true,u:'мс реакції',ue:'ms reaction',k:'reactBest'},
+ {id:'collector',g:'meta',e:'📦',n:'Колекціонер',ne:'Collector',f:'Ціла полиця бейджів',fe:'A whole shelf of badges',need:20,u:'відкритих бейджів',ue:'badges unlocked',k:'claimedCount'},
+ {id:'combo3',g:'meta',e:'🔥',n:'Комбо-майстер',ne:'Combo master',f:'Три рекорди за один день',fe:'Three records in one day',need:3,u:'рекорди за день',ue:'records in a day',k:'maxRecDay'},
  {id:'book1',g:'read',prof:'bodia',manual:true,e:'📚',n:'Прочитав книгу',ne:'Read a book',f:'Ціла книга — від першої до останньої сторінки',fe:'A whole book, cover to cover',need:1,u:'книга',ue:'book'},
 ];
-function badgeName(id){const b=BADGE_DEFS.find(x=>x.id===id);return b?b.e+' '+TT(b.n,b.ne):id;}
+function badgeName(id){if(id.indexOf('master_')===0)return '👑 Майстер';const b=BADGE_DEFS.find(x=>x.id===id);return b?b.e+' '+TT(b.n,b.ne):id;}
+function badgeReached(b){return b.manual?true:(b.lower?(b.val>0&&b.val<=b.need):(b.val>=b.need));}
+function badgePct(b){if(b.lower)return b.val<=0?0:(b.val<=b.need?100:Math.max(0,Math.round(b.need/b.val*100)));return b.need?Math.min(100,Math.round(b.val/b.need*100)):0;}
 function badgeVisible(b){
   if(b.prof)return b.prof===PROFILE;              // персональний бейдж (напр. книга → Бодя)
   if(b.g==='games')return PROFILE==='me';          // CS2/Steam — лише Влад
@@ -946,22 +974,25 @@ function badgeVisible(b){
   if(b.g==='finance')return mod('finance');        // фінанси — лише Влад
   if(b.g==='water')return PROFILE==='me'?mod('water'):false; // воду ховаємо для інших профілів
   return true;}
-function badgeList(){const s=badgeStats();return BADGE_DEFS.filter(badgeVisible).map(b=>({...b,val:b.manual?b.need:(s[b.k]||0)}));}
+function badgeList(){const s=badgeStats();
+  const base=BADGE_DEFS.filter(badgeVisible).map(b=>({...b,val:b.manual?b.need:(s[b.k]||0)}));
+  BADGE_GROUPS.forEach(([g,lu,le])=>{if(g==='meta')return;const sibs=base.filter(x=>x.g===g);if(sibs.length>=2){const un=lu.replace(/^\S+\s/,''),en=le.replace(/^\S+\s/,'');base.push({id:'master_'+g,g:'meta',e:'👑',n:'Майстер: '+un,ne:'Master: '+en,f:'Уся група «'+un+'» відкрита',fe:'Whole "'+en+'" group unlocked',need:sibs.length,u:'бейджів у групі',ue:'badges in group',val:sibs.filter(badgeReached).length});}});
+  return base;}
 function confetti(){const c=['#5cc9dd','#9d8ad6','#4fc596','#e3bd68','#e56b7b'];for(let i=0;i<46;i++){const p=document.createElement('div');p.className='confetti';p.style.left=Math.random()*100+'vw';p.style.background=c[i%c.length];p.style.animationDuration=(1.4+Math.random()*.9)+'s';p.style.animationDelay=(Math.random()*.25)+'s';document.body.appendChild(p);setTimeout(()=>p.remove(),2600);}}
 function resetBadges(){if(!confirm('Очистити всі відкриті бейджі? Зможеш відкрити їх знову.'))return;state.badges={};save();openBadges();toast('Бейджі очищено — відкривай заново 🏅');}
-function claimBadge(id){const b=badgeList().find(x=>x.id===id);if(!b||b.val<b.need||(state.badges&&state.badges[id]))return;if(!state.badges)state.badges={};state.badges[id]=todayKey();save();confetti();toast(TT('🏅 Вітаємо! Ви відкрили бейдж: ','🏅 Congrats! Badge unlocked: ')+TT(b.n,b.ne));if(typeof notify==='function')notify(TT('🏅 Новий бейдж!','🏅 New badge!'),b.e+' '+TT(b.n,b.ne));openBadges(id);}
+function claimBadge(id){const b=badgeList().find(x=>x.id===id);if(!b||!badgeReached(b)||(state.badges&&state.badges[id]))return;if(!state.badges)state.badges={};state.badges[id]=todayKey();save();confetti();toast(TT('🏅 Вітаємо! Ви відкрили бейдж: ','🏅 Congrats! Badge unlocked: ')+TT(b.n,b.ne));if(typeof notify==='function')notify(TT('🏅 Новий бейдж!','🏅 New badge!'),b.e+' '+TT(b.n,b.ne));openBadges(id);}
 function openBadges(justId){
   const list=badgeList(),done=id=>state.badges&&state.badges[id];
   $('badgeCount').textContent=list.filter(b=>done(b.id)).length+' / '+list.length;
-  const card=b=>{const cl=done(b.id),rd=b.val>=b.need&&!cl,pct=Math.min(100,Math.round(b.val/b.need*100));
+  const card=b=>{const cl=done(b.id),rd=badgeReached(b)&&!cl,pct=badgePct(b);
     let st;if(cl)st='<span style="color:var(--green);font-weight:700">🗓 '+state.badges[b.id]+'</span>';
     else if(rd)st='<span style="color:var(--yellow);font-weight:800">'+TT('🎉 Відкрити!','🎉 Unlock!')+'</span>';
-    else st=`<div class="bar" style="height:4px;margin-top:4px"><i class="g-cyan" style="width:${pct}%"></i></div><div class="muted" style="font-size:9px;margin-top:2px">${fmt(b.val)}/${fmt(b.need)}</div>`;
-    return `<div class="badge-card ${cl?'on':''} ${rd?'ready':''} ${justId===b.id?'pop':''}" ${rd?`onclick="claimBadge('${b.id}')"`:''} title="${TT('Потрібно','Need')}: ${fmt(b.need)} ${TT(b.u,b.ue)}"><div class="be">${b.e}</div><div class="bn">${TT(b.n,b.ne)}</div><div class="bf">${TT(b.f,b.fe)}</div><div class="bstat">${st}</div></div>`;};
+    else st=`<div class="bar" style="height:4px;margin-top:4px"><i class="g-cyan" style="width:${pct}%"></i></div><div class="muted" style="font-size:9px;margin-top:2px">${b.lower?'≤':''}${fmt(b.val)}/${fmt(b.need)}</div>`;
+    return `<div class="badge-card ${cl?'on':''} ${rd?'ready':''} ${justId===b.id?'pop':''}" ${rd?`onclick="claimBadge('${b.id}')"`:''} title="${TT('Потрібно','Need')}: ${b.lower?'≤':''}${fmt(b.need)} ${TT(b.u,b.ue)}"><div class="be">${b.e}</div><div class="bn">${TT(b.n,b.ne)}</div><div class="bf">${TT(b.f,b.fe)}</div><div class="bstat">${st}</div></div>`;};
   const grid=arr=>`<div class="badge-grid">${arr.map(card).join('')}</div>`;
   let html='';
-  const ready=list.filter(b=>b.val>=b.need&&!done(b.id));
-  const almost=list.filter(b=>b.val<b.need&&!done(b.id)&&b.val/b.need>=0.7).sort((a,b)=>b.val/b.need-a.val/a.need);
+  const ready=list.filter(b=>badgeReached(b)&&!done(b.id));
+  const almost=list.filter(b=>!badgeReached(b)&&!done(b.id)&&badgePct(b)>=70).sort((a,b)=>badgePct(b)-badgePct(a));
   if(ready.length)html+=`<div class="sec-title" style="color:var(--yellow)">${TT('🎉 Можна відкрити','🎉 Ready to unlock')} (${ready.length})</div>`+grid(ready);
   if(almost.length)html+=`<div class="sec-title">${TT('🔜 Майже відкрито','🔜 Almost there')}</div>`+grid(almost);
   BADGE_GROUPS.forEach(([g,lu,le])=>{const bs=list.filter(b=>b.g===g);if(bs.length)html+=`<div class="sec-title">${TT(lu,le)}</div>`+grid(bs);});

@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>LIFE ⚡ REACTION</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230a0c14'/%3E%3Ctext x='32' y='45' font-size='36' text-anchor='middle'%3E%E2%9A%A1%3C/text%3E%3C/svg%3E">
+<style>
+  :root{--text:#e7ecf3;--muted:#8791a3;--cyan:#5cc9dd;--purple:#9d8ad6;--stroke:rgba(255,255,255,.1);--green:#4fc596;--red:#e56b7b}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;font-family:'Inter','Segoe UI',system-ui,sans-serif;color:var(--text);background:radial-gradient(1200px 600px at 50% -10%,#141a30,#0a0c14 70%);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:16px}
+  .top{width:100%;max-width:640px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+  a.back{color:var(--text);text-decoration:none;background:rgba(255,255,255,.07);border:1px solid var(--stroke);border-radius:12px;padding:8px 14px;font-size:14px;font-weight:600}
+  h1{font-size:20px;margin:0;letter-spacing:1px}
+  h1 span{background:linear-gradient(90deg,var(--cyan),var(--purple));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .best{font-size:12px;color:var(--muted)}
+  .wrap{width:100%;max-width:640px}
+  #zone{height:340px;border-radius:20px;border:1px solid var(--stroke);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;cursor:pointer;user-select:none;text-align:center;padding:20px;transition:background .05s}
+  #zone.idle{background:linear-gradient(180deg,#141a30,#0e1120)}
+  #zone.waiting{background:linear-gradient(180deg,#7a2233,#5a1826)}
+  #zone.go{background:linear-gradient(180deg,#2f8b66,#1f6d4e)}
+  #zone.done{background:linear-gradient(180deg,#1a2340,#12172a)}
+  #big{font-size:52px;font-weight:800;line-height:1}
+  #sub{font-size:16px;color:var(--text);opacity:.85;max-width:420px}
+  .dots{display:flex;gap:7px;justify-content:center;margin:14px 0}
+  .dots i{width:12px;height:12px;border-radius:50%;background:rgba(255,255,255,.14)}
+  .dots i.on{background:var(--cyan)}
+  .lb{margin-top:16px}
+  .lbttl{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+  .lbrow{display:flex;justify-content:space-between;gap:10px;padding:9px 13px;font-size:14px;border:1px solid var(--stroke);border-radius:12px;margin-bottom:6px;background:rgba(255,255,255,.03)}
+  .lbrow.me{border-color:var(--cyan);background:rgba(92,201,221,.1)}
+  .lbrow span:last-child{color:var(--cyan);font-weight:800;font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<div class="top">
+  <a class="back" id="backLink" href="./index.html">← Назад</a>
+  <script>(function(){var u=new URLSearchParams(location.search).get('u');document.getElementById('backLink').href='./index.html'+(u?('?u='+encodeURIComponent(u)):'');})();</script>
+  <h1>LIFE&nbsp;<span>REACTION</span></h1>
+  <div class="best" id="best">рекорд: —</div>
+</div>
+
+<div class="wrap">
+  <div id="zone" class="idle">
+    <div id="big">⚡</div>
+    <div id="sub">Тисни, коли поле стане <b style="color:#7dffc0">зеленим</b>. Не поспішай — за фальстарт раунд не рахується. Раундів: 5.</div>
+    <div class="dots" id="dots"></div>
+  </div>
+  <div class="lb"><div class="lbttl">🏆 Найшвидші (менше = краще)</div><div id="lb"></div></div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const _qp=new URLSearchParams(location.search), PROFILE=_qp.get('u')||'me', PNAME=_qp.get('n')||PROFILE;
+const RKEY='react_best'+(PROFILE==='me'?'':'_'+PROFILE);
+let best=+localStorage.getItem(RKEY)||0;
+function showBest(){ $('best').textContent='рекорд ('+PNAME+'): '+(best?best+' мс':'—'); }
+showBest();
+
+const ROUNDS=5;
+let state='idle', roundIdx=0, results=[], goAt=0, timer=null;
+function renderDots(){ let h=''; for(let i=0;i<ROUNDS;i++)h+='<i class="'+(i<results.length?'on':'')+'"></i>'; $('dots').innerHTML=h; }
+renderDots();
+
+function setZone(cls,big,sub){ const z=$('zone'); z.className=cls; $('big').textContent=big; if(sub!=null)$('sub').innerHTML=sub; }
+
+function armRound(){
+  state='waiting';
+  setZone('waiting','Чекай…','Приготуйся… тисни, щойно стане зеленим');
+  const delay=1100+Math.random()*3200;
+  timer=setTimeout(()=>{ state='go'; goAt=performance.now(); setZone('go','ТИСНИ!','⚡'); }, delay);
+}
+
+function finish(){
+  state='done';
+  const b=Math.min(...results), avg=Math.round(results.reduce((a,c)=>a+c,0)/results.length);
+  let msg='Найкращий: <b>'+b+' мс</b> · середній: <b>'+avg+' мс</b>';
+  if(!best||b<best){ best=b; localStorage.setItem(RKEY,String(best)); showBest(); saveScore(b); msg='🎉 Новий рекорд: <b>'+b+' мс</b>!<br>середній: '+avg+' мс'; }
+  setZone('done','🏁',msg+'<br><span style="color:var(--muted);font-size:14px">Тисни, щоб зіграти ще</span>');
+}
+
+function tap(){
+  if(state==='idle'){ roundIdx=0; results=[]; renderDots(); armRound(); return; }
+  if(state==='waiting'){ clearTimeout(timer); setZone('idle','🙈','Зарано! Раунд не зараховано. Тисни, щоб спробувати ще'); state='idle'; return; }
+  if(state==='go'){
+    const ms=Math.round(performance.now()-goAt);
+    results.push(ms); renderDots();
+    if(results.length>=ROUNDS){ finish(); }
+    else { state='between'; setZone('done',ms+' мс','Раунд '+results.length+'/'+ROUNDS+' ✓ — тисни для наступного'); }
+    return;
+  }
+  if(state==='between'){ armRound(); return; }
+  if(state==='done'){ state='idle'; setZone('idle','⚡','Тисни, коли стане зеленим'); tap(); return; }
+}
+$('zone').addEventListener('pointerdown',e=>{ e.preventDefault(); tap(); });
+document.addEventListener('keydown',e=>{ if(e.code==='Space'){ e.preventDefault(); tap(); } });
+
+/* ===== Таблиця рекордів (Supabase reaction_scores; менше = краще) ===== */
+const SB_URL='https://xezhbqcteaihrlrykbkr.supabase.co', SB_KEY='sb_publishable_qNcUyFxMlWAWAry3uSHndg_ADVMCE3a';
+function sbFetch(path,opt){return fetch(SB_URL+'/rest/v1/'+path,Object.assign({headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY,'Content-Type':'application/json'}},opt||{}));}
+function renderLb(d){const el=$('lb');if(!el)return;if(!d||!d.length){el.innerHTML='<div class="lbrow" style="border:none;background:none;color:var(--muted)">Ще ніхто не грав — стань першим!</div>';return;}el.innerHTML=d.map((r,i)=>`<div class="lbrow${r.profile===PROFILE?' me':''}"><span>${['🥇','🥈','🥉'][i]||('#'+(i+1))} ${r.name||r.profile}${r.profile===PROFILE?' (ти)':''}</span><span>${r.ms} мс</span></div>`).join('');}
+async function loadLb(){try{const r=await sbFetch('reaction_scores?select=*&order=ms.asc.nullslast');renderLb(await r.json());}catch(e){}}
+async function saveScore(ms){try{await sbFetch('reaction_scores',{method:'POST',headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates'},body:JSON.stringify([{profile:PROFILE,name:PNAME,ms:ms}])});loadLb();}catch(e){}}
+async function initBestFromServer(){try{const r=await sbFetch('reaction_scores?select=ms&profile=eq.'+encodeURIComponent(PROFILE));const d=await r.json();if(d&&d[0]&&d[0].ms&&(!best||d[0].ms<best)){best=d[0].ms;localStorage.setItem(RKEY,String(best));showBest();}}catch(e){}}
+loadLb(); initBestFromServer();
+</script>
+</body>
+</html>
