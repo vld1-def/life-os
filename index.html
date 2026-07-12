@@ -252,17 +252,16 @@
  <div class="main">
   <!-- ПРОГРЕС -->
   <div class="glass card" style="--o:1">
-    <div class="between" style="flex-wrap:wrap; gap:10px">
+    <div class="between" style="flex-wrap:wrap; gap:8px">
       <h2 style="margin:0"><span class="dot" style="background:var(--cyan)"></span>Мій прогрес</h2>
-      <div class="flex" style="flex-wrap:wrap; gap:8px">
-        <div class="chip-row" id="metricBar"></div>
-        <div style="width:1px; height:22px; background:var(--stroke)"></div>
+      <div class="flex" style="gap:6px">
         <button class="sm" id="btnCal" onclick="setMonthView('cal')">🗓 Календар</button>
         <button class="sm" id="btnLine" onclick="setMonthView('line')">📈 Графік</button>
         <button class="sm" id="btnRest" onclick="toggleRest()" title="Зробити сьогодні вихідним — серія 🔥 не перерветься">🛡</button>
       </div>
     </div>
-    <div id="monthBody" style="margin-top:16px"></div>
+    <div class="chip-row" id="metricBar" style="margin-top:10px"></div>
+    <div id="monthBody" style="margin-top:10px"></div>
     <div class="muted" id="monthLegend" style="margin-top:10px"></div>
   </div>
 

@@ -1,5 +1,5 @@
 // LIFE OS service worker — кеш оболонки (швидкий старт) + сповіщення
-const CACHE = 'lifeos-v34';
+const CACHE = 'lifeos-v35';
 const CDN = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
 const SHELL = ['./', './index.html', './game.html', './reaction.html', './manifest.json', CDN];
 
