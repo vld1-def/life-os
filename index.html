@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="LIFE OS">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230a0c14'/%3E%3Ctext x='32' y='45' font-size='36' text-anchor='middle' font-family='sans-serif' fill='%235cc9dd'%3E%E2%9A%A1%3C/text%3E%3C/svg%3E">
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230a0c14'/%3E%3Ctext x='32' y='45' font-size='36' text-anchor='middle' font-family='sans-serif' fill='%235cc9dd'%3E%E2%9A%A1%3C/text%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="icon.svg">
 <title>LIFE OS — мій дашборд</title>
 <style>
   :root{
@@ -879,12 +879,15 @@ function badgeStats(){
   const stepC=S.counters.find(c=>/крок|steps/i.test(c.name));
   const plankEx=S.exercises.find(e=>/планк|plank/i.test(e.name)),pushEx=S.exercises.find(e=>/віджим|push/i.test(e.name)),squatEx=S.exercises.find(e=>/присід|squat/i.test(e.name));
   const coffeeL=S.limitHabits.find(l=>/кав|coffee/i.test(l.name));
-  let perfect=0,good=0,tracked=0,waterHits=0,sleepHits=0,bestSteps=0,totalSteps=0,bestPlank=0,bestPush=0,bestSquat=0,totalPush=0,totalSquat=0,totalPlank=0,maxRecDay=0;
+  let perfect=0,good=0,tracked=0,waterHits=0,sleepHits=0,bestSteps=0,totalSteps=0,bestPlank=0,bestPush=0,bestSquat=0,totalPush=0,totalSquat=0,totalPlank=0,maxRecDay=0,maxPushSets=0,maxSquatSets=0,maxPlankSets=0;
   const goodArr=[],coffeeZero=[],mPush={},mSquat={},mPlank={},mWater={};
   days.forEach(k=>{const sc=dayScore(k),rest=!!(state.restDays&&state.restDays[k]),ym=k.slice(0,7);
     if(sc!=null){tracked++;if(sc>=70||rest)good++;if(sc===100)perfect++;}
-    const d=state.days[k],ex=d.exercises||{};
+    const d=state.days[k],ex=d.exercises||{},es=d.exSets||{};
     if((d.recs||0)>maxRecDay)maxRecDay=d.recs||0;
+    if(pushEx&&(es[pushEx.id]||[]).length>maxPushSets)maxPushSets=(es[pushEx.id]||[]).length;
+    if(squatEx&&(es[squatEx.id]||[]).length>maxSquatSets)maxSquatSets=(es[squatEx.id]||[]).length;
+    if(plankEx&&(es[plankEx.id]||[]).length>maxPlankSets)maxPlankSets=(es[plankEx.id]||[]).length;
     if(d.water>=S.waterGoal)waterHits++;
     const sh=sleepHours(k);if(sh>0&&sh>=(S.sleepGoal||8))sleepHits++;
     if(stepC){const v=(d.counters&&d.counters[stepC.id])||0;if(v>bestSteps)bestSteps=v;totalSteps+=v;}
@@ -901,7 +904,7 @@ function badgeStats(){
   let reactBest=0;try{reactBest=+localStorage.getItem('react_best'+pkey)||0;}catch(e){}
   return {perfect,good,tracked,waterHits,sleepHits,bestSteps,totalSteps,bestPlank,bestPush,bestSquat,totalPush,totalSquat,totalPlank,
     recPushSet:pushEx?exRecord(pushEx.id):0,recSquatSet:squatEx?exRecord(squatEx.id):0,recPlankSet:plankEx?exRecord(plankEx.id):0,
-    monthPush:mx(mPush),monthSquat:mx(mSquat),monthPlank:mx(mPlank),monthWaterL:Math.round(mx(mWater)/1000),maxRecDay,
+    monthPush:mx(mPush),monthSquat:mx(mSquat),monthPlank:mx(mPlank),monthWaterL:Math.round(mx(mWater)/1000),maxRecDay,maxPushSets,maxSquatSets,maxPlankSets,
     claimedCount:Object.keys(state.badges||{}).length,reactBest,
     bestStreak:Math.max(bestRun(goodArr),computeStreak()),noCS2Streak:bestRun(Object.keys(steamPlay).filter(k=>steamPlay[k]===0)),coffeeStreak:bestRun(coffeeZero),loanClosed,bestGame};
 }
@@ -919,18 +922,21 @@ const BADGE_DEFS=[
  {id:'push_d100',g:'push',e:'🦾',n:'Віджим 100',ne:'Push 100',f:'Руки-базуки активовано',fe:'Bazooka arms unlocked',need:100,u:'віджимань за день',ue:'push-ups a day',k:'bestPush'},
  {id:'push_m500',g:'push',e:'📅',n:'500 за місяць',ne:'500 a month',f:'Місяць проти гравітації',fe:'A month against gravity',need:500,u:'віджимань за місяць',ue:'push-ups a month',k:'monthPush'},
  {id:'push_t1000',g:'push',e:'🏆',n:'1000 віджимань',ne:'1000 push-ups',f:'Тисяча — і не спітнів',fe:'A thousand, barely sweating',need:1000,u:'віджимань усього',ue:'push-ups total',k:'totalPush'},
+ {id:'pushsets5',g:'push',e:'🔁',n:'5 підходів',ne:'5 sets',f:'П`ять підходів за день',fe:'Five sets in a day',need:5,u:'підходів за день',ue:'sets in a day',k:'maxPushSets'},
  {id:'squatset50',g:'squat',e:'🔥',n:'Підхід 50',ne:'Set of 50',f:'50 присідань поспіль',fe:'50 squats in a row',need:50,u:'присідань за підхід',ue:'squats in one set',k:'recSquatSet'},
  {id:'squat_d50',g:'squat',e:'🦵',n:'Присід 50',ne:'Squat 50',f:'Ноги сказали дякую',fe:'Legs said thank you',need:50,u:'присідань за день',ue:'squats a day',k:'bestSquat'},
  {id:'squatset80',g:'squat',e:'⚡',n:'Підхід 80',ne:'Set of 80',f:'Ноги не здаються',fe:'Legs never quit',need:80,u:'присідань за підхід',ue:'squats in one set',k:'recSquatSet'},
  {id:'squat_d100',g:'squat',e:'🏋️',n:'Присід 100',ne:'Squat 100',f:'Ноги з бетону',fe:'Concrete legs',need:100,u:'присідань за день',ue:'squats a day',k:'bestSquat'},
  {id:'squat_m1000',g:'squat',e:'📅',n:'1000 за місяць',ne:'1000 a month',f:'Місяць присідав як не в себе',fe:'Squatted all month',need:1000,u:'присідань за місяць',ue:'squats a month',k:'monthSquat'},
  {id:'squat_t5000',g:'squat',e:'🏆',n:'5000 присідань',ne:'5000 squats',f:'Легенда присіду',fe:'Squat legend',need:5000,u:'присідань усього',ue:'squats total',k:'totalSquat'},
+ {id:'squatsets5',g:'squat',e:'🔁',n:'5 підходів',ne:'5 sets',f:'П`ять підходів присідань за день',fe:'Five squat sets in a day',need:5,u:'підходів за день',ue:'sets in a day',k:'maxSquatSets'},
  {id:'plankset60',g:'plank',e:'🧘',n:'Планка 60с',ne:'Plank 60s',f:'Хвилина, що триває вічність',fe:'The eternal minute',need:60,u:'сек планки за підхід',ue:'sec plank in one hold',k:'recPlankSet'},
  {id:'plankset90',g:'plank',e:'🧘',n:'Планка 90с',ne:'Plank 90s',f:'Півтори хвилини витримки',fe:'A minute and a half of grit',need:90,u:'сек планки за підхід',ue:'sec plank in one hold',k:'recPlankSet'},
  {id:'plankset120',g:'plank',e:'🧘',n:'Планка 120с',ne:'Plank 120s',f:'Дві хвилини дзену',fe:'Two minutes of zen',need:120,u:'сек планки за підхід',ue:'sec plank in one hold',k:'recPlankSet'},
  {id:'plankset240',g:'plank',e:'🏆',n:'Планка 240с',ne:'Plank 240s',f:'Чотири хвилини сталевого корпусу',fe:'Four minutes of a steel core',need:240,u:'сек планки за підхід',ue:'sec plank in one hold',k:'recPlankSet'},
  {id:'plank_m1000',g:'plank',e:'📅',n:'1000с за місяць',ne:'1000s a month',f:'Місяць тремтячих ліктів',fe:'A month of shaky elbows',need:1000,u:'сек планки за місяць',ue:'sec plank a month',k:'monthPlank'},
  {id:'plank_t3600',g:'plank',e:'🏆',n:'Година планки',ne:'An hour of plank',f:'3600 секунд болю',fe:'3600 seconds of pain',need:3600,u:'сек планки усього',ue:'sec plank total',k:'totalPlank'},
+ {id:'planksets5',g:'plank',e:'🔁',n:'5 підходів',ne:'5 sets',f:'П`ять підходів планки за день',fe:'Five plank sets in a day',need:5,u:'підходів за день',ue:'sets in a day',k:'maxPlankSets'},
  {id:'steps8k',g:'steps',e:'👣',n:'Ходок',ne:'Walker',f:'10 тисяч кроків — і жодного таксі',fe:'10k steps, no taxi',need:10000,u:'кроків за день',ue:'steps a day',k:'bestSteps'},
  {id:'steps15k',g:'steps',e:'🚶',n:'Марафонець дня',ne:'Day marathoner',f:'Хтось загубив пульт?',fe:'Lost the remote again?',need:15000,u:'кроків за день',ue:'steps a day',k:'bestSteps'},
  {id:'steps20k',g:'steps',e:'🏃',n:'20 тисяч',ne:'20k steps',f:'Ноги в режимі турбо',fe:'Legs in turbo mode',need:20000,u:'кроків за день',ue:'steps a day',k:'bestSteps'},
@@ -958,7 +964,6 @@ const BADGE_DEFS=[
  {id:'react200',g:'game',e:'🥷',n:'Реакція <200мс',ne:'Reaction <200ms',f:'Кіберспортивні рефлекси',fe:'Esports reflexes',need:200,lower:true,u:'мс реакції',ue:'ms reaction',k:'reactBest'},
  {id:'react150',g:'game',e:'🚀',n:'Реакція <150мс',ne:'Reaction <150ms',f:'На межі людських можливостей',fe:'At the edge of human limits',need:150,lower:true,u:'мс реакції',ue:'ms reaction',k:'reactBest'},
  {id:'react100',g:'game',e:'🤖',n:'Реакція <100мс',ne:'Reaction <100ms',f:'Ти точно людина?',fe:'Are you even human?',need:100,lower:true,u:'мс реакції',ue:'ms reaction',k:'reactBest'},
- {id:'react50',g:'game',e:'👽',n:'Реакція <50мс',ne:'Reaction <50ms',f:'Позаземна швидкість',fe:'Alien-tier speed',need:50,lower:true,u:'мс реакції',ue:'ms reaction',k:'reactBest'},
  {id:'collector',g:'meta',e:'📦',n:'Колекціонер',ne:'Collector',f:'Ціла полиця бейджів',fe:'A whole shelf of badges',need:20,u:'відкритих бейджів',ue:'badges unlocked',k:'claimedCount'},
  {id:'combo3',g:'meta',e:'🔥',n:'Комбо-майстер',ne:'Combo master',f:'Три рекорди за один день',fe:'Three records in one day',need:3,u:'рекорди за день',ue:'records in a day',k:'maxRecDay'},
  {id:'book1',g:'read',prof:'bodia',manual:true,e:'📚',n:'Прочитав книгу',ne:'Read a book',f:'Ціла книга — від першої до останньої сторінки',fe:'A whole book, cover to cover',need:1,u:'книга',ue:'book'},
