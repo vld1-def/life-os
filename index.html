@@ -880,7 +880,7 @@ function badgeStats(){
   const plankEx=S.exercises.find(e=>/планк|plank/i.test(e.name)),pushEx=S.exercises.find(e=>/віджим|push/i.test(e.name)),squatEx=S.exercises.find(e=>/присід|squat/i.test(e.name));
   const coffeeL=S.limitHabits.find(l=>/кав|coffee/i.test(l.name));
   let perfect=0,good=0,tracked=0,waterHits=0,sleepHits=0,bestSteps=0,totalSteps=0,bestPlank=0,bestPush=0,bestSquat=0,totalPush=0,totalSquat=0,totalPlank=0,maxRecDay=0,maxPushSets=0,maxSquatSets=0,maxPlankSets=0;
-  const goodArr=[],coffeeZero=[],mPush={},mSquat={},mPlank={},mWater={};
+  const goodArr=[],coffeeZero=[],mPush={},mSquat={},mPlank={},mWater={},mSteps={};
   days.forEach(k=>{const sc=dayScore(k),rest=!!(state.restDays&&state.restDays[k]),ym=k.slice(0,7);
     if(sc!=null){tracked++;if(sc>=70||rest)good++;if(sc===100)perfect++;}
     const d=state.days[k],ex=d.exercises||{},es=d.exSets||{};
@@ -890,7 +890,7 @@ function badgeStats(){
     if(plankEx&&(es[plankEx.id]||[]).length>maxPlankSets)maxPlankSets=(es[plankEx.id]||[]).length;
     if(d.water>=S.waterGoal)waterHits++;
     const sh=sleepHours(k);if(sh>0&&sh>=(S.sleepGoal||8))sleepHits++;
-    if(stepC){const v=(d.counters&&d.counters[stepC.id])||0;if(v>bestSteps)bestSteps=v;totalSteps+=v;}
+    if(stepC){const v=(d.counters&&d.counters[stepC.id])||0;if(v>bestSteps)bestSteps=v;totalSteps+=v;mSteps[ym]=(mSteps[ym]||0)+v;}
     const pv=pushEx?(ex[pushEx.id]||0):0,sv=squatEx?(ex[squatEx.id]||0):0,plv=plankEx?(ex[plankEx.id]||0):0;
     totalPush+=pv;totalSquat+=sv;totalPlank+=plv;
     if(pv>bestPush)bestPush=pv;if(sv>bestSquat)bestSquat=sv;if(plv>bestPlank)bestPlank=plv;
@@ -904,7 +904,7 @@ function badgeStats(){
   let reactBest=0;try{reactBest=+localStorage.getItem('react_best'+pkey)||0;}catch(e){}
   return {perfect,good,tracked,waterHits,sleepHits,bestSteps,totalSteps,bestPlank,bestPush,bestSquat,totalPush,totalSquat,totalPlank,
     recPushSet:pushEx?exRecord(pushEx.id):0,recSquatSet:squatEx?exRecord(squatEx.id):0,recPlankSet:plankEx?exRecord(plankEx.id):0,
-    monthPush:mx(mPush),monthSquat:mx(mSquat),monthPlank:mx(mPlank),monthWaterL:Math.round(mx(mWater)/1000),maxRecDay,maxPushSets,maxSquatSets,maxPlankSets,
+    monthPush:mx(mPush),monthSquat:mx(mSquat),monthPlank:mx(mPlank),monthWaterL:Math.round(mx(mWater)/1000),monthSteps:mx(mSteps),maxRecDay,maxPushSets,maxSquatSets,maxPlankSets,
     claimedCount:Object.keys(state.badges||{}).length,reactBest,
     bestStreak:Math.max(bestRun(goodArr),computeStreak()),noCS2Streak:bestRun(Object.keys(steamPlay).filter(k=>steamPlay[k]===0)),coffeeStreak:bestRun(coffeeZero),loanClosed,bestGame};
 }
@@ -944,6 +944,9 @@ const BADGE_DEFS=[
  {id:'steps100k',g:'steps',e:'🗺️',n:'100 тисяч',ne:'100k total',f:'Пішки до сусіднього міста',fe:'Walked to the next town',need:100000,u:'кроків усього',ue:'steps total',k:'totalSteps'},
  {id:'steps500k',g:'steps',e:'🧭',n:'500 тисяч',ne:'500k total',f:'Півмільйона кроків за плечима',fe:'Half a million steps behind you',need:500000,u:'кроків усього',ue:'steps total',k:'totalSteps'},
  {id:'steps1m',g:'steps',e:'🌍',n:'Мільйон кроків',ne:'A million steps',f:'Можна було дійти до Парижа',fe:'Could have walked to Paris',need:1000000,u:'кроків усього',ue:'steps total',k:'totalSteps'},
+ {id:'steps_m100k',g:'steps',e:'📅',n:'100к за місяць',ne:'100k a month',f:'Місяць на ногах',fe:'A month on your feet',need:100000,u:'кроків за місяць',ue:'steps a month',k:'monthSteps'},
+ {id:'steps_m150k',g:'steps',e:'📅',n:'150к за місяць',ne:'150k a month',f:'Ноги не знають слова «стоп»',fe:'Your legs never stop',need:150000,u:'кроків за місяць',ue:'steps a month',k:'monthSteps'},
+ {id:'steps_m200k',g:'steps',e:'📅',n:'200к за місяць',ne:'200k a month',f:'Місячний марафонець',fe:'Monthly marathoner',need:200000,u:'кроків за місяць',ue:'steps a month',k:'monthSteps'},
  {id:'water15',g:'water',e:'💧',n:'Гідратація',ne:'Hydration',f:'Кактус би позаздрив',fe:'A cactus is jealous',need:15,u:'днів з ціллю води',ue:'days at water goal',k:'waterHits'},
  {id:'water30',g:'water',e:'🌊',n:'Водний майстер',ne:'Water master',f:'Всередині — маленьке море',fe:'A little sea within',need:30,u:'днів з ціллю води',ue:'days at water goal',k:'waterHits'},
  {id:'water_m60',g:'water',e:'🚰',n:'60 літрів за місяць',ne:'60L a month',f:'Ходячий акведук',fe:'A walking aqueduct',need:60,u:'літрів за місяць',ue:'liters a month',k:'monthWaterL'},
