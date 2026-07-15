@@ -213,6 +213,56 @@
   .game-opt .ge{font-size:36px; line-height:1}
   .game-opt .gt{font-weight:800; font-size:16px}
   .game-opt .gd{font-size:12px; color:var(--muted); margin-top:2px}
+
+  /* ===== Мобільна навігація (нижні таби) + компактна шапка ===== */
+  .mod-off{display:none!important}
+  #bottomNav{display:none}
+  .hdr-menu-wrap{display:none; position:relative}
+  .hdr-menu{display:none; position:absolute; right:0; top:calc(100% + 8px); z-index:210; flex-direction:column; gap:4px; min-width:210px; padding:8px; background:rgba(18,20,32,.97); backdrop-filter:blur(22px) saturate(150%); -webkit-backdrop-filter:blur(22px) saturate(150%); border:1px solid var(--stroke); border-radius:16px; box-shadow:var(--shadow)}
+  .hdr-menu.on{display:flex}
+  .hdr-menu button{display:flex; justify-content:space-between; align-items:center; gap:10px; width:100%; text-align:left}
+  .hdr-menu button .cnt{color:var(--cyan)}
+  .hdr-dot{position:absolute; top:-4px; right:-4px; width:10px; height:10px; border-radius:50%; background:var(--red); display:none}
+  @media(max-width:900px){
+    #bottomNav{display:flex; position:fixed; left:0; right:0; bottom:0; z-index:120; gap:4px; padding:6px 8px calc(6px + env(safe-area-inset-bottom)); background:rgba(14,16,26,.82); backdrop-filter:blur(22px) saturate(140%); -webkit-backdrop-filter:blur(22px) saturate(140%); border-top:1px solid var(--stroke)}
+    #bottomNav .navbtn{flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; background:transparent; border:none; border-radius:14px; padding:7px 4px; color:var(--muted); font-size:10.5px; font-weight:700}
+    #bottomNav .navbtn .ni{font-size:21px; line-height:1}
+    #bottomNav .navbtn.on{color:var(--cyan); background:rgba(92,201,221,.12)}
+    #bottomNav .navbtn:active{transform:scale(.94)}
+    .card.tab-off{display:none!important}
+    .toast{bottom:calc(84px + env(safe-area-inset-bottom))}
+  }
+  @media(max-width:640px){
+    .hdr-actions{display:none}
+    .hdr-menu-wrap{display:block}
+    header{margin-bottom:14px; gap:10px}
+    header h1{font-size:18px}
+    .sub{font-size:11px}
+    .top-stats{gap:7px}
+    .pill{padding:8px 11px; min-width:60px; border-radius:13px}
+    .pill .big{font-size:17px}
+    .pill .lbl{font-size:9px}
+  }
+
+  /* --- апдейти: шапка в рядок / компактна вода / іконки навбару / згортання фільтрів --- */
+  .hdr-title-row{display:flex; align-items:baseline; gap:12px}
+  .hdr-title-row .sub{margin-top:0; white-space:nowrap}
+  .water-num{font-size:19px; font-weight:800; font-variant-numeric:tabular-nums}
+  .water-btns{flex-wrap:nowrap; gap:6px}
+  .water-btns button.sm{padding:7px 10px}
+  #bottomNav .navbtn .ni{display:flex; align-items:center; justify-content:center}
+  #bottomNav .navbtn .ni svg{width:23px; height:23px; display:block}
+  .metric-toggle{display:inline-flex; align-items:center; gap:7px}
+  .metric-toggle .chev{display:inline-flex; transition:transform .2s ease}
+  .metric-toggle.open .chev{transform:rotate(180deg)}
+  #metricBar.collapsed{display:none}
+  @media(max-width:640px){
+    .hdr-title-row{flex:1 1 100%; justify-content:space-between}
+  }
+  @media(max-width:400px){
+    .water-num{font-size:17px}
+    .water-btns button.sm{padding:6px 8px; font-size:11px}
+  }
 </style>
 </head>
 <body>
@@ -233,17 +283,28 @@
 
 <div id="app" class="hidden">
 <header>
-  <div><h1>LIFE&nbsp;<span>OS</span></h1><div class="sub" id="todayLabel"></div></div>
+  <div class="hdr-title-row"><h1>LIFE&nbsp;<span>OS</span></h1><div class="sub" id="todayLabel"></div></div>
   <div class="top-stats">
     <div class="glass pill"><div class="big neon-purple" id="streakVal">0</div><div class="lbl">🔥 серія</div></div>
     <div class="glass pill"><div class="big neon-cyan" id="scoreVal">0%</div><div class="lbl">⭐ бал дня</div></div>
     <div class="glass pill"><div class="big neon-red" id="debtVal">0</div><div class="lbl">💳 борг</div></div>
     <div class="flex">
       <div class="glass pill" style="min-width:auto;padding:11px" title="Синхронізація: зелений — збережено, жовтий — зберігаю, червоний — немає зв'язку"><span class="sync-dot" id="syncDot"></span></div>
-      <button class="acc" onclick="openNotifs()" style="position:relative">🔔<span id="notifBadge">0</span></button>
-      <button class="acc" id="langBtn" onclick="toggleLang()">EN</button>
-      <button class="acc" onclick="openBadges()" style="position:relative">🏅<span id="badgeReady">0</span></button>
-      <button class="acc" onclick="openSettings()">⚙️</button>
+      <div class="hdr-actions flex">
+        <button class="acc" onclick="openNotifs()" style="position:relative">🔔<span id="notifBadge">0</span></button>
+        <button class="acc" id="langBtn" onclick="toggleLang()">EN</button>
+        <button class="acc" onclick="openBadges()" style="position:relative">🏅<span id="badgeReady">0</span></button>
+        <button class="acc" onclick="openSettings()">⚙️</button>
+      </div>
+      <div class="hdr-menu-wrap">
+        <button class="acc" onclick="toggleHdrMenu(event)" style="position:relative">⋯<span class="hdr-dot" id="hdrDot"></span></button>
+        <div class="hdr-menu" id="hdrMenu">
+          <button onclick="hdrMenuAction(openNotifs)">🔔 Сповіщення<span class="cnt" id="hdrNotif"></span></button>
+          <button onclick="hdrMenuAction(openBadges)">🏅 Бейджі<span class="cnt" id="hdrBadge"></span></button>
+          <button onclick="hdrMenuAction(toggleLang)"><span id="hdrLang">🌐 English</span></button>
+          <button onclick="hdrMenuAction(openSettings)">⚙️ Налаштування</button>
+        </div>
+      </div>
     </div>
   </div>
 </header>
@@ -251,7 +312,7 @@
 <div class="layout">
  <div class="main">
   <!-- ПРОГРЕС -->
-  <div class="glass card" style="--o:1">
+  <div class="glass card" style="--o:1" data-tab="progress">
     <div class="between" style="flex-wrap:wrap; gap:8px">
       <h2 style="margin:0"><span class="dot" style="background:var(--cyan)"></span>Мій прогрес</h2>
       <div class="flex" style="gap:6px">
@@ -260,13 +321,14 @@
         <button class="sm" id="btnRest" onclick="toggleRest()" title="Зробити сьогодні вихідним — серія 🔥 не перерветься">🛡</button>
       </div>
     </div>
-    <div class="chip-row" id="metricBar" style="margin-top:10px"></div>
+    <button class="sm metric-toggle" id="metricToggle" onclick="toggleMetricBar()" style="margin-top:10px" title="Показник для календаря/графіка"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="opacity:.75"><path d="M6 20V10M12 20V4M18 20v-6"/></svg><span id="metricCur">Усі</span><svg class="chev" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+    <div class="chip-row collapsed" id="metricBar" style="margin-top:10px"></div>
     <div id="monthBody" style="margin-top:10px"></div>
     <div class="muted" id="monthLegend" style="margin-top:10px"></div>
   </div>
 
   <!-- ОГЛЯД (тиждень/місяць) -->
-  <div class="glass card" style="--o:2">
+  <div class="glass card" style="--o:2" data-tab="progress">
     <div class="between" style="flex-wrap:wrap;gap:8px">
       <h2 style="margin:0"><span class="dot" style="background:var(--yellow)"></span>Огляд <span id="ovRange" style="text-transform:none;letter-spacing:0;color:var(--muted);font-weight:600"></span></h2>
       <div class="flex"><button class="sm" id="ovWeekBtn" onclick="setOverview('week')">Тиждень</button><button class="sm" id="ovMonthBtn" onclick="setOverview('month')">Місяць</button></div>
@@ -275,13 +337,13 @@
   </div>
 
   <!-- АКТИВНІСТЬ -->
-  <div class="glass card" style="--o:5" data-mod="activity">
+  <div class="glass card" style="--o:5" data-mod="activity" data-tab="today">
     <div class="between"><h2 style="margin:0"><span class="dot" style="background:var(--green)"></span>Активність</h2><button class="sm" onclick="openActRecords()" title="Рекорди за підхід — хто топ">🏆 Рекорди</button></div>
     <div id="exList" style="margin-top:14px"></div>
   </div>
 
   <!-- ФІНАНСИ -->
-  <div class="glass card" data-mod="finance">
+  <div class="glass card" data-mod="finance" data-tab="finance">
     <h2><span class="dot" style="background:var(--green)"></span>Фінанси (Влад) — <span id="finMonthLabel" style="text-transform:none;letter-spacing:0;color:var(--text)"></span></h2>
     <div class="fin-grid">
       <div class="fin-box"><div class="lbl">Витрати цього місяця</div><div class="big-num neon-red" id="finExpenses">—</div><div class="delta" id="expenseDelta"></div></div>
@@ -305,11 +367,11 @@
 
  <div class="side">
   <!-- ВОДА -->
-  <div class="glass card" style="--o:3" data-mod="water">
+  <div class="glass card" style="--o:3" data-mod="water" data-tab="today">
     <h2><span class="dot" style="background:var(--cyan)"></span>Вода</h2>
     <div class="between">
-      <div><span class="cnt big-num neon-cyan" id="waterCnt">0</span> <span class="muted">/ <span id="waterGoal">2</span> Л</span><div class="muted" id="waterMl">0 мл</div></div>
-      <div class="flex" style="flex-wrap:wrap;justify-content:flex-end">
+      <div><span class="cnt water-num neon-cyan" id="waterCnt">0</span> <span class="muted">/ <span id="waterGoal">2</span> Л</span><div class="muted" id="waterMl">0 мл</div></div>
+      <div class="flex water-btns" style="justify-content:flex-end">
         <button class="sm" onclick="addWater(-250)">−250</button>
         <button class="acc sm" onclick="addWater(250)">+250</button>
         <button class="acc sm" onclick="addWater(500)">+500</button>
@@ -319,19 +381,19 @@
   </div>
 
   <!-- ЛІМІТИ -->
-  <div class="glass card" style="--o:6" data-mod="limits">
+  <div class="glass card" style="--o:6" data-mod="limits" data-tab="today">
     <h2><span class="dot" style="background:var(--red)"></span>Ліміти</h2>
     <div id="limitList"></div>
   </div>
 
   <!-- ЛІЧИЛЬНИКИ -->
-  <div class="glass card" style="--o:4" data-mod="counters">
+  <div class="glass card" style="--o:4" data-mod="counters" data-tab="today">
     <h2><span class="dot" style="background:var(--yellow)"></span>Лічильники</h2>
     <div id="counterList"></div>
   </div>
 
   <!-- СОН -->
-  <div class="glass card" style="--o:7" data-mod="sleep">
+  <div class="glass card" style="--o:7" data-mod="sleep" data-tab="today">
     <h2><span class="dot" style="background:var(--purple)"></span>Сон</h2>
     <div class="flex" style="margin-bottom:8px"><button class="sm acc" onclick="sleepBedNow()" style="flex:1">😴 Ліг зараз</button><button class="sm acc" onclick="sleepWakeNow()" style="flex:1">☀️ Встав зараз</button></div>
     <div id="sleepPending" class="muted" style="margin-bottom:8px"></div>
@@ -344,7 +406,7 @@
   </div>
 
   <!-- ВАГА -->
-  <div class="glass card" style="--o:8" data-mod="weight">
+  <div class="glass card" style="--o:8" data-mod="weight" data-tab="today">
     <h2><span class="dot" style="background:var(--green)"></span>Вага</h2>
     <div class="between">
       <div class="flex"><input type="number" id="weightInput" step="0.1" min="0" placeholder="—" style="width:100px" onchange="setWeight(this.value)"><span class="muted">кг</span></div>
@@ -353,13 +415,13 @@
   </div>
 
   <!-- НОТАТКА -->
-  <div class="glass card" data-mod="notes">
+  <div class="glass card" data-mod="notes" data-tab="today">
     <h2><span class="dot" style="background:var(--blue)"></span>Нотатка дня</h2>
     <textarea id="noteInput" placeholder="Як пройшов день? Що завадило / що вдалось..." onchange="saveNote(this.value)"></textarea>
   </div>
 
   <!-- ТАСКИ -->
-  <div class="glass card" data-mod="tasks">
+  <div class="glass card" data-mod="tasks" data-tab="today">
     <h2><span class="dot" style="background:var(--purple)"></span>Мої цілі / таски</h2>
     <div class="flex" style="margin-bottom:8px">
       <input id="taskInput" placeholder="Нова ціль..." onkeydown="if(event.key==='Enter')addTask()">
@@ -369,7 +431,7 @@
   </div>
 
   <!-- ГРА -->
-  <div class="glass card" data-mod="game">
+  <div class="glass card" data-mod="game" data-tab="more">
     <h2><span class="dot" style="background:var(--cyan)"></span>Перерва — ігри</h2>
     <div class="between">
       <div class="muted" style="font-size:13px">🎮 Тест реакції або раннер</div>
@@ -378,6 +440,13 @@
   </div>
  </div>
 </div>
+
+<nav id="bottomNav">
+  <button class="navbtn" data-t="today" onclick="setMobTab('today')"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="2.5"/><path d="M3 9h18M8 3v3M16 3v3"/><path d="M8.5 14.5l2 2 4-4.5"/></svg></span><span>Сьогодні</span></button>
+  <button class="navbtn" data-t="progress" onclick="setMobTab('progress')"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v15a1 1 0 0 0 1 1h15"/><path d="M7.5 14.5l3.5-4 3 2.5 4.5-5.5"/></svg></span><span>Прогрес</span></button>
+  <button class="navbtn" data-t="finance" onclick="setMobTab('finance')"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H17a1 1 0 0 1 1 1v1.5"/><rect x="3" y="7.5" width="18" height="12" rx="2.5"/><circle cx="16.5" cy="13.5" r="1.4" fill="currentColor" stroke="none"/></svg></span><span>Фінанси</span></button>
+  <button class="navbtn" data-t="more" onclick="setMobTab('more')"><span class="ni"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6"/></svg></span><span>Ще</span></button>
+</nav>
 </div>
 
 <dialog id="settings">
@@ -626,7 +695,31 @@ function addProfile(){const name=($('newProfileName').value||'').trim();if(!name
 function deleteProfile(id){if(id==='me')return;if(!confirm('Видалити профіль «'+((profiles.find(p=>p.id===id)||{}).name||id)+'» разом з його даними?'))return;profiles=profiles.filter(p=>p.id!==id);saveProfiles();if(sb){const clean=structuredClone(defaults);clean.badges={};sb.from('solo').upsert({id:'profile_'+id,data:clean,updated_at:new Date().toISOString()}).then(()=>sb.from('solo').delete().eq('id','profile_'+id));}if(PROFILE===id)switchProfile('me');else if($('gate')&&!$('gate').classList.contains('hidden'))renderGate();}
 /* ===== МОДУЛІ (вмик/вимик блоків для профілю) ===== */
 function mod(n){if(n==='finance'&&PROFILE!=='me')return false;const m=state.settings.modules;return !m||m[n]!==false;}
-function applyModules(){document.querySelectorAll('[data-mod]').forEach(el=>{el.style.display=mod(el.dataset.mod)?'':'none';});}
+function applyModules(){document.querySelectorAll('[data-mod]').forEach(el=>{el.classList.toggle('mod-off',!mod(el.dataset.mod));});}
+
+/* ===== Мобільні таби + меню шапки ===== */
+let curTab=localStorage.getItem('lifeos_tab')||'today';
+function isMobileNav(){return window.matchMedia('(max-width:900px)').matches;}
+function setMobTab(t){curTab=t;localStorage.setItem('lifeos_tab',t);applyTab();window.scrollTo({top:0,behavior:'smooth'});}
+function applyTab(){
+  const mob=isMobileNav(),avail={};
+  document.querySelectorAll('.card[data-tab]').forEach(el=>{if(!el.classList.contains('mod-off'))avail[el.dataset.tab]=true;});
+  if(mob&&!avail[curTab])curTab='today';
+  const nav=$('bottomNav');
+  if(nav)nav.querySelectorAll('.navbtn').forEach(b=>{const t=b.dataset.t;b.style.display=avail[t]?'':'none';b.classList.toggle('on',t===curTab);});
+  document.querySelectorAll('.card[data-tab]').forEach(el=>{el.classList.toggle('tab-off',mob&&el.dataset.tab!==curTab);});
+}
+function toggleHdrMenu(e){if(e)e.stopPropagation();const m=$('hdrMenu');if(m)m.classList.toggle('on');}
+function hdrMenuAction(fn){const m=$('hdrMenu');if(m)m.classList.remove('on');fn();}
+function updateHdrMenu(){
+  const hl=$('hdrLang');if(hl)hl.textContent=lang==='en'?'🌐 Українською':'🌐 English';
+  const nc=notifCount(),bc=badgeList().filter(x=>badgeReached(x)&&!(state.badges&&state.badges[x.id])).length;
+  const hn=$('hdrNotif');if(hn)hn.textContent=nc||'';
+  const hb=$('hdrBadge');if(hb)hb.textContent=bc||'';
+  const dot=$('hdrDot');if(dot)dot.style.display=(nc||bc)?'block':'none';
+}
+document.addEventListener('click',e=>{const m=$('hdrMenu');if(m&&m.classList.contains('on')&&!e.target.closest('.hdr-menu-wrap'))m.classList.remove('on');});
+window.addEventListener('resize',applyTab);
 const MODULES=[['water','💧 Вода'],['activity','💪 Активність'],['limits','🚫 Ліміти'],['counters','🔢 Лічильники'],['sleep','😴 Сон'],['weight','⚖️ Вага'],['finance','💰 Фінанси'],['notes','📝 Нотатка'],['tasks','🎯 Таски'],['game','🎮 Гра']];
 function renderModuleToggles(){$('setModules').innerHTML=MODULES.filter(([k])=>!(k==='finance'&&PROFILE!=='me')).map(([k,lab])=>`<label><input type="checkbox" data-modk="${k}" ${mod(k)?'checked':''}>${lab}</label>`).join('');}
 function renderOverviewToggles(){$('setOverview').innerHTML=OVSTATS.filter(([k])=>ovAvail(k)).map(([k,lab])=>`<label><input type="checkbox" data-ovk="${k}" ${ovOn(k)?'checked':''}>${lab}</label>`).join('');}
@@ -857,6 +950,7 @@ function render(){
   $('debtVal').textContent=fmt(Math.round(totalDebtNow()));
   renderNotifBadge(); updateBadgeReady();
   applyLang();
+  applyTab(); updateHdrMenu();
 }
 function buildNotifs(){const tk=todayKey(),d=getDay(tk),S=state.settings;const todo=[],over=[],pen=[];
   if(d.water<S.waterGoal)todo.push(`💧 Вода — лишилось ${S.waterGoal-d.water} мл`);
@@ -1061,9 +1155,11 @@ function svgMultiLine({series,labels,w=800,h=190,unit='',hidden={},toggle=false}
 }
 
 /* ===== ПРОГРЕС ===== */
-let metricSel='all', monthView='cal', hiddenLines={};
+let metricSel='all', monthView='cal', hiddenLines={}, metricOpen=false;
 function toggleLine(name){hiddenLines[name]=!hiddenLines[name];renderMonth();}
-function setMetric(id){metricSel=id;renderMonth();}
+function toggleMetricBar(){metricOpen=!metricOpen;applyMetricBar();}
+function applyMetricBar(){const bar=$('metricBar'),tog=$('metricToggle'),cur=$('metricCur');if(bar)bar.classList.toggle('collapsed',!metricOpen);if(tog)tog.classList.toggle('open',metricOpen);if(cur)cur.textContent=curMetric().label;}
+function setMetric(id){metricSel=id;metricOpen=false;renderMonth();}
 function setMonthView(v){monthView=v;renderMonth();}
 function metricList(){const S=state.settings;const a=[{id:'all',label:'Усі',kind:'all'},{id:'score',label:'Бал дня',unit:'%',kind:'score'}];if(mod('water'))a.push({id:'water',label:'Вода',unit:'мл',kind:'goal'});if(mod('sleep'))a.push({id:'sleep',label:'Сон',unit:'год',kind:'sleep'});if(mod('weight'))a.push({id:'weight',label:'Вага',unit:'кг',kind:'weight'});if(mod('counters'))S.counters.forEach(c=>a.push({id:'cnt:'+c.id,label:c.name,unit:c.unit,kind:'goal',ref:c}));if(mod('limits'))S.limitHabits.forEach(l=>{if(l.mode==='week')return;a.push({id:'lim:'+l.id,label:l.name,unit:l.unit,kind:'limit',ref:l});});if(mod('activity')&&S.exercises.length)a.push({id:'exmaxAll',label:'🏆 Макс/підхід',unit:'реп',kind:'exmaxAll'});return a;}
 function curMetric(){return metricList().find(m=>m.id===metricSel)||metricList()[0];}
@@ -1087,6 +1183,7 @@ function metricColor(mt,r){if(!r.has)return{bg:'rgba(255,255,255,.05)',col:'var(
 function metricValTxt(mt,v){if(mt.id==='water')return(v/1000).toFixed(1)+'л';if(mt.id==='sleep')return v+'г';if(mt.id==='weight')return v+'кг';if(mt.id==='score')return v+'%';return fmt(v)+(mt.unit?(' '+mt.unit):'');}
 function renderMonth(){
   $('metricBar').innerHTML=metricList().map(m=>`<button class="sm ${m.id===metricSel?'acc':''}" onclick="setMetric('${m.id}')">${m.label}</button>`).join('');
+  applyMetricBar();
   $('btnCal').className='sm '+(monthView==='cal'?'acc':'');
   $('btnLine').className='sm '+(monthView==='line'?'acc':'');
   $('btnRest').className='sm '+(state.restDays&&state.restDays[todayKey()]?'acc':'');
