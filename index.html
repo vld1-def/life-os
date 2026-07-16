@@ -1168,7 +1168,7 @@ let metricSel='all', monthView='cal', hiddenLines={}, metricOpen=false;
 function toggleLine(name){hiddenLines[name]=!hiddenLines[name];renderMonth();}
 function toggleMetricBar(){metricOpen=!metricOpen;applyMetricBar();}
 function applyMetricBar(){const bar=$('metricBar'),tog=$('metricToggle'),cur=$('metricCur');if(bar)bar.classList.toggle('collapsed',!metricOpen);if(tog)tog.classList.toggle('open',metricOpen);if(cur)cur.textContent=curMetric().label;}
-function setMetric(id){metricSel=id;metricOpen=false;renderMonth();}
+function setMetric(id){metricSel=id;renderMonth();}
 function setMonthView(v){monthView=v;renderMonth();}
 function metricList(){const S=state.settings;const a=[{id:'all',label:'Усі',kind:'all'},{id:'score',label:'Бал дня',unit:'%',kind:'score'}];if(mod('water'))a.push({id:'water',label:'Вода',unit:'мл',kind:'goal'});if(mod('sleep'))a.push({id:'sleep',label:'Сон',unit:'год',kind:'sleep'});if(mod('weight'))a.push({id:'weight',label:'Вага',unit:'кг',kind:'weight'});if(mod('counters'))S.counters.forEach(c=>a.push({id:'cnt:'+c.id,label:c.name,unit:c.unit,kind:'goal',ref:c}));if(mod('limits'))S.limitHabits.forEach(l=>{if(l.mode==='week')return;a.push({id:'lim:'+l.id,label:l.name,unit:l.unit,kind:'limit',ref:l});});if(mod('activity')&&S.exercises.length)a.push({id:'exmaxAll',label:'🏆 Макс/підхід',unit:'реп',kind:'exmaxAll'});return a;}
 function curMetric(){return metricList().find(m=>m.id===metricSel)||metricList()[0];}
@@ -1217,7 +1217,7 @@ function renderMonth(){
         cells+=`<div class="d" data-tip="${tip}" onclick="selectDay('${k}')" style="cursor:pointer;background:${c.bg};color:${c.col};${ol}"><b>${num}</b>${r.has?`<small>${metricValTxt(mt,r.v)}</small>`:''}</div>`;}
     }
     $('monthBody').innerHTML=`<div class="calbig">${head}</div><div class="calbig">${cells}</div>`;
-    $('monthLegend').textContent=mt.id==='all'?'Кожна крапка = один пункт дня (🟢 виконано · 🟡 частково · 🔴 ні). Наведи на день — побачиш деталі й нотатку.':(mt.kind==='limit'?'🟩 в межах ліміту · 🟥 перебір · ▫️ немає даних':'🟩 ціль виконана · 🟨 частково · 🟥 мало · ▫️ немає даних');
+    $('monthLegend').textContent=mt.id==='all'?'':(mt.kind==='limit'?'🟩 в межах ліміту · 🟥 перебір · ▫️ немає даних':'🟩 ціль виконана · 🟨 частково · 🟥 мало · ▫️ немає даних');
   } else {
     const gm=mt.id==='all'?metricList().find(m=>m.id==='score'):mt;
     const msh=now.toLocaleDateString(LOC(),{month:'short'});
@@ -1288,29 +1288,31 @@ function monthReportStats(){
   return {...s,totSteps,avgSteps:activeDays?Math.round(totSteps/activeDays):0,bestStepsDay,waterL:Math.round(waterMl/100)/10,activeDays,
     recPush:bs.recPushSet,recSquat:bs.recSquatSet,recPlank:bs.recPlankSet,streak:computeStreak()};
 }
-function tileSvg(x,y,w,h,big,lbl,color){return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="20" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.1)"/><text x="${x+w/2}" y="${y+h/2+2}" font-size="44" font-weight="800" text-anchor="middle" fill="${color}">${big}</text><text x="${x+w/2}" y="${y+h-20}" font-size="17" text-anchor="middle" fill="#8791a3">${lbl}</text>`;}
 function buildMonthReportSVG(){
   const r=monthReportStats(),mn=new Date().toLocaleDateString('uk-UA',{month:'long',year:'numeric'});
-  const W=720,H=1060,pad=40,gap=20,colW=(W-pad*2-gap)/2,tileH=130,ty=250;
+  const W=800,H=1000,pad=60;  // 4:5
   const C={green:'#4fc596',cyan:'#5cc9dd',purple:'#9d8ad6',blue:'#7cc5ff',yellow:'#e3bd68',white:'#e7ecf3'};
-  const tiles=[[C.green,r.good+'/'+r.daysIn,'Хороші дні'],[C.cyan,r.avg+'%','Середній бал'],[C.white,fmt(r.totSteps),'👣 Кроків за місяць'],[C.cyan,fmt(r.avgSteps),'Середньо/день'],[C.blue,r.waterL+' л','💧 Води випито'],[C.yellow,r.gamesH+' год','🎮 CS2'],[C.purple,r.streak,'🔥 Серія (днів)'],[C.green,fmt(r.bestStepsDay),'🏅 Найкращий день']];
-  let tsvg='';tiles.forEach((t,i)=>{const col=i%2,row=(i-col)/2,x=pad+col*(colW+gap),y=ty+row*(tileH+gap);tsvg+=tileSvg(x,y,colW,tileH,t[1],t[2],t[0]);});
-  const recY=ty+4*(tileH+gap)+6;
-  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;border-radius:18px">
+  const stats=[[C.white,fmt(r.totSteps),'кроків за місяць'],[C.cyan,fmt(r.avgSteps),'середньо/день'],[C.blue,r.waterL+' л','води випито'],[C.yellow,r.gamesH+' год','CS2'],[C.green,r.good+'/'+r.daysIn,'хороші дні'],[C.purple,r.streak+' дн','серія 🔥']];
+  const colX=[W*0.28,W*0.72],rowY=[300,450,600];
+  let sg='';stats.forEach((s,i)=>{const cx=colX[i%2],y=rowY[(i-i%2)/2];
+    sg+=`<text x="${cx}" y="${y}" font-size="52" font-weight="800" text-anchor="middle" fill="${s[0]}" font-family="Arial,sans-serif">${s[1]}</text><text x="${cx}" y="${y+36}" font-size="19" text-anchor="middle" fill="#8791a3" font-family="Arial,sans-serif">${s[2]}</text>`;});
+  const dv=y=>`<line x1="${pad}" y1="${y}" x2="${W-pad}" y2="${y}" stroke="rgba(255,255,255,0.09)" stroke-width="1"/>`;
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;border-radius:16px">
     <defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5cc9dd"/><stop offset="1" stop-color="#9d8ad6"/></linearGradient></defs>
-    <rect width="${W}" height="${H}" rx="28" fill="#0a0c14"/>
-    <text x="${pad}" y="72" font-size="26" font-weight="800" fill="url(#rg)" letter-spacing="3" font-family="Arial,sans-serif">LIFE OS</text>
-    <text x="${pad}" y="142" font-size="46" font-weight="800" fill="#e7ecf3" font-family="Arial,sans-serif">📊 Звіт місяця</text>
-    <text x="${pad}" y="186" font-size="25" fill="#8791a3" font-family="Arial,sans-serif">${mn} · ${profileName()}</text>
-    ${tsvg}
-    <rect x="${pad}" y="${recY}" width="${W-pad*2}" height="118" rx="20" fill="rgba(92,201,221,0.08)" stroke="rgba(92,201,221,0.3)"/>
-    <text x="${W/2}" y="${recY+40}" font-size="18" text-anchor="middle" fill="#8791a3" letter-spacing="1" font-family="Arial,sans-serif">🏆 ТВОЇ РЕКОРДИ ЗА ПІДХІД</text>
-    <text x="${W/2}" y="${recY+88}" font-size="30" font-weight="800" text-anchor="middle" fill="#e7ecf3" font-family="Arial,sans-serif">💪 ${r.recPush}   ·   🦵 ${r.recSquat}   ·   🧘 ${r.recPlank}с</text>
-    <text x="${W/2}" y="${H-38}" font-size="17" text-anchor="middle" fill="#5a6273" font-family="Arial,sans-serif">life-os · ${todayKey()}</text>
+    <rect width="${W}" height="${H}" fill="#0a0c14"/>
+    <text x="${pad}" y="84" font-size="24" font-weight="800" fill="url(#rg)" letter-spacing="5" font-family="Arial,sans-serif">LIFE OS</text>
+    <text x="${pad}" y="152" font-size="46" font-weight="800" fill="#e7ecf3" font-family="Arial,sans-serif">${mn}</text>
+    <text x="${pad}" y="190" font-size="21" fill="#8791a3" font-family="Arial,sans-serif">${profileName()} · ${r.activeDays} днів активності</text>
+    ${dv(226)}
+    ${sg}
+    ${dv(690)}
+    <text x="${W/2}" y="750" font-size="17" text-anchor="middle" fill="#8791a3" letter-spacing="2" font-family="Arial,sans-serif">РЕКОРДИ ЗА ПІДХІД</text>
+    <text x="${W/2}" y="808" font-size="38" font-weight="800" text-anchor="middle" fill="#e7ecf3" font-family="Arial,sans-serif">💪 ${r.recPush}   ·   🦵 ${r.recSquat}   ·   🧘 ${r.recPlank}с</text>
+    <text x="${W/2}" y="954" font-size="17" text-anchor="middle" fill="#5a6273" font-family="Arial,sans-serif">life-os · ${todayKey()}</text>
   </svg>`;
 }
 function openMonthReport(){$('monthReportBody').innerHTML=buildMonthReportSVG()+'<div style="text-align:center;margin-top:14px"><button class="acc" onclick="downloadReport()">⬇ Зберегти картинкою</button></div>';monthReport.showModal();}
-function downloadReport(){const svgEl=$('monthReportBody').querySelector('svg');const xml=new XMLSerializer().serializeToString(svgEl);const url='data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(xml)));const vb=svgEl.viewBox.baseVal,sc=2;const img=new Image();img.onload=function(){const c=document.createElement('canvas');c.width=vb.width*sc;c.height=vb.height*sc;const x=c.getContext('2d');x.scale(sc,sc);x.drawImage(img,0,0);try{const a=document.createElement('a');a.download='life-os-'+monthKey()+'.png';a.href=c.toDataURL('image/png');a.click();toast('Звіт збережено 📸');}catch(e){toast('Не вдалось зберегти');}};img.onerror=function(){toast('Помилка рендеру');};img.src=url;}
+function downloadReport(){const svgEl=$('monthReportBody').querySelector('svg');const xml=new XMLSerializer().serializeToString(svgEl);const url='data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(xml)));const vb=svgEl.viewBox.baseVal,sc=2,W=vb.width*sc,H=vb.height*sc;const img=new Image();img.width=vb.width;img.height=vb.height;img.onload=function(){const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');x.fillStyle='#0a0c14';x.fillRect(0,0,W,H);x.drawImage(img,0,0,W,H);try{const a=document.createElement('a');a.download='life-os-'+monthKey()+'.png';a.href=c.toDataURL('image/png');a.click();toast('Звіт збережено 📸');}catch(e){toast('Не вдалось зберегти');}};img.onerror=function(){toast('Помилка рендеру');};img.src=url;}
 function renderOverview(){
   const cur=state.settings.currency;
   $('ovWeekBtn').className='sm '+(overviewMode==='week'?'acc':'');
