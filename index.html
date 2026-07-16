@@ -983,15 +983,15 @@ function badgeStats(){
   const plankEx=S.exercises.find(e=>/планк|plank/i.test(e.name)),pushEx=S.exercises.find(e=>/віджим|push/i.test(e.name)),squatEx=S.exercises.find(e=>/присід|squat/i.test(e.name));
   const coffeeL=S.limitHabits.find(l=>/кав|coffee/i.test(l.name));
   let perfect=0,good=0,tracked=0,waterHits=0,sleepHits=0,bestSteps=0,totalSteps=0,bestPlank=0,bestPush=0,bestSquat=0,totalPush=0,totalSquat=0,totalPlank=0,maxRecDay=0,maxPushSets=0,maxSquatSets=0,maxPlankSets=0;
-  const goodArr=[],coffeeZero=[],mPush={},mSquat={},mPlank={},mWater={},mSteps={};
+  const goodArr=[],coffeeZero=[],mPush={},mSquat={},mPlank={},mWater={},mSteps={},waterDays=[],perfDays=[];
   days.forEach(k=>{const sc=dayScore(k),rest=!!(state.restDays&&state.restDays[k]),ym=k.slice(0,7);
-    if(sc!=null){tracked++;if(sc>=70||rest)good++;if(sc===100)perfect++;}
+    if(sc!=null){tracked++;if(sc>=70||rest)good++;if(sc===100){perfect++;perfDays.push(k);}}
     const d=state.days[k],ex=d.exercises||{},es=d.exSets||{};
     if((d.recs||0)>maxRecDay)maxRecDay=d.recs||0;
-    if(pushEx&&(es[pushEx.id]||[]).length>maxPushSets)maxPushSets=(es[pushEx.id]||[]).length;
-    if(squatEx&&(es[squatEx.id]||[]).length>maxSquatSets)maxSquatSets=(es[squatEx.id]||[]).length;
-    if(plankEx&&(es[plankEx.id]||[]).length>maxPlankSets)maxPlankSets=(es[plankEx.id]||[]).length;
-    if(d.water>=S.waterGoal)waterHits++;
+    if(pushEx){const c=(es[pushEx.id]||[]).filter(v=>v>=10).length;if(c>maxPushSets)maxPushSets=c;}
+    if(squatEx){const c=(es[squatEx.id]||[]).filter(v=>v>=20).length;if(c>maxSquatSets)maxSquatSets=c;}
+    if(plankEx){const c=(es[plankEx.id]||[]).filter(v=>v>=15).length;if(c>maxPlankSets)maxPlankSets=c;}
+    if(d.water>=S.waterGoal){waterHits++;waterDays.push(k);}
     const sh=sleepHours(k);if(sh>0&&sh>=(S.sleepGoal||8))sleepHits++;
     if(stepC){const v=(d.counters&&d.counters[stepC.id])||0;if(v>bestSteps)bestSteps=v;totalSteps+=v;mSteps[ym]=(mSteps[ym]||0)+v;}
     const pv=pushEx?(ex[pushEx.id]||0):0,sv=squatEx?(ex[squatEx.id]||0):0,plv=plankEx?(ex[plankEx.id]||0):0;
@@ -1009,7 +1009,7 @@ function badgeStats(){
     recPushSet:pushEx?exRecord(pushEx.id):0,recSquatSet:squatEx?exRecord(squatEx.id):0,recPlankSet:plankEx?exRecord(plankEx.id):0,
     monthPush:mx(mPush),monthSquat:mx(mSquat),monthPlank:mx(mPlank),monthWaterL:Math.round(mx(mWater)/1000),monthSteps:mx(mSteps),maxRecDay,maxPushSets,maxSquatSets,maxPlankSets,
     claimedCount:Object.keys(state.badges||{}).length,reactBest,
-    bestStreak:Math.max(bestRun(goodArr),computeStreak()),noCS2Streak:bestRun(Object.keys(steamPlay).filter(k=>steamPlay[k]===0)),coffeeStreak:bestRun(coffeeZero),loanClosed,bestGame};
+    bestStreak:Math.max(bestRun(goodArr),computeStreak()),noCS2Streak:bestRun(Object.keys(steamPlay).filter(k=>steamPlay[k]===0)),coffeeStreak:bestRun(coffeeZero),waterStreak:bestRun(waterDays),perfectStreak:bestRun(perfDays),loanClosed,bestGame};
 }
 const BADGE_GROUPS=[['streak','🔥 Серії','🔥 Streaks'],['score','⭐ Ідеал','⭐ Perfection'],['push','💪 Віджимання','💪 Push-ups'],['squat','🦵 Присідання','🦵 Squats'],['plank','🧘 Планка','🧘 Plank'],['steps','👣 Кроки','👣 Steps'],['water','💧 Вода','💧 Water'],['sleep','😴 Сон','😴 Sleep'],['games','🎮 Ігри','🎮 Games'],['coffee','☕ Кава','☕ Coffee'],['read','📖 Читання','📖 Reading'],['tenure','📅 Стаж','📅 Tenure'],['finance','💰 Гроші','💰 Money'],['game','🎮 Міні-ігри','🎮 Mini-games'],['meta','👑 Майстерність','👑 Mastery']];
 const BADGE_DEFS=[
@@ -1019,27 +1019,28 @@ const BADGE_DEFS=[
  {id:'perfect1',g:'score',e:'⭐',n:'Ідеальний день',ne:'Perfect day',f:'100% — навіть кома на місці',fe:'100% — flawless',need:1,u:'день на 100%',ue:'perfect day',k:'perfect'},
  {id:'perfect5',g:'score',e:'🌟',n:'П`ять зірок',ne:'Five stars',f:'Мішленівський рівень',fe:'Michelin level',need:5,u:'днів на 100%',ue:'perfect days',k:'perfect'},
  {id:'good30',g:'score',e:'💚',n:'Хороша форма',ne:'In good shape',f:'30 днів у зеленій зоні',fe:'30 days in the green',need:30,u:'хороших днів',ue:'good days',k:'good'},
+ {id:'perfWeek',g:'score',e:'🗓️',n:'Ідеальний тиждень',ne:'Perfect week',f:'7 днів по 100% поспіль',fe:'7 flawless days in a row',need:7,u:'днів на 100% поспіль',ue:'perfect days in a row',k:'perfectStreak'},
  {id:'pushset30',g:'push',e:'🔥',n:'Підхід 30',ne:'Set of 30',f:'30 віджимань без зупинки',fe:'30 push-ups nonstop',need:30,u:'віджимань за підхід',ue:'push-ups in one set',k:'recPushSet'},
  {id:'push_d50',g:'push',e:'💪',n:'Віджим 50',ne:'Push 50',f:'Підлога тебе боїться',fe:'The floor fears you',need:50,u:'віджимань за день',ue:'push-ups a day',k:'bestPush'},
  {id:'pushset50',g:'push',e:'⚡',n:'Підхід 50',ne:'Set of 50',f:'Груди з чавуну',fe:'Cast-iron chest',need:50,u:'віджимань за підхід',ue:'push-ups in one set',k:'recPushSet'},
  {id:'push_d100',g:'push',e:'🦾',n:'Віджим 100',ne:'Push 100',f:'Руки-базуки активовано',fe:'Bazooka arms unlocked',need:100,u:'віджимань за день',ue:'push-ups a day',k:'bestPush'},
  {id:'push_m500',g:'push',e:'📅',n:'500 за місяць',ne:'500 a month',f:'Місяць проти гравітації',fe:'A month against gravity',need:500,u:'віджимань за місяць',ue:'push-ups a month',k:'monthPush'},
  {id:'push_t1000',g:'push',e:'🏆',n:'1000 віджимань',ne:'1000 push-ups',f:'Тисяча — і не спітнів',fe:'A thousand, barely sweating',need:1000,u:'віджимань усього',ue:'push-ups total',k:'totalPush'},
- {id:'pushsets5',g:'push',e:'🔁',n:'5 підходів',ne:'5 sets',f:'П`ять підходів за день',fe:'Five sets in a day',need:5,u:'підходів за день',ue:'sets in a day',k:'maxPushSets'},
+ {id:'pushsets5',g:'push',e:'🔁',n:'5 підходів',ne:'5 sets',f:'5 підходів по 10+ віджимань за день',fe:'5 sets of 10+ push-ups in a day',need:5,u:'підходів по 10+ за день',ue:'sets of 10+ a day',k:'maxPushSets'},
  {id:'squatset50',g:'squat',e:'🔥',n:'Підхід 50',ne:'Set of 50',f:'50 присідань поспіль',fe:'50 squats in a row',need:50,u:'присідань за підхід',ue:'squats in one set',k:'recSquatSet'},
  {id:'squat_d50',g:'squat',e:'🦵',n:'Присід 50',ne:'Squat 50',f:'Ноги сказали дякую',fe:'Legs said thank you',need:50,u:'присідань за день',ue:'squats a day',k:'bestSquat'},
  {id:'squatset80',g:'squat',e:'⚡',n:'Підхід 80',ne:'Set of 80',f:'Ноги не здаються',fe:'Legs never quit',need:80,u:'присідань за підхід',ue:'squats in one set',k:'recSquatSet'},
  {id:'squat_d100',g:'squat',e:'🏋️',n:'Присід 100',ne:'Squat 100',f:'Ноги з бетону',fe:'Concrete legs',need:100,u:'присідань за день',ue:'squats a day',k:'bestSquat'},
  {id:'squat_m1000',g:'squat',e:'📅',n:'1000 за місяць',ne:'1000 a month',f:'Місяць присідав як не в себе',fe:'Squatted all month',need:1000,u:'присідань за місяць',ue:'squats a month',k:'monthSquat'},
  {id:'squat_t5000',g:'squat',e:'🏆',n:'5000 присідань',ne:'5000 squats',f:'Легенда присіду',fe:'Squat legend',need:5000,u:'присідань усього',ue:'squats total',k:'totalSquat'},
- {id:'squatsets5',g:'squat',e:'🔁',n:'5 підходів',ne:'5 sets',f:'П`ять підходів присідань за день',fe:'Five squat sets in a day',need:5,u:'підходів за день',ue:'sets in a day',k:'maxSquatSets'},
+ {id:'squatsets5',g:'squat',e:'🔁',n:'5 підходів',ne:'5 sets',f:'5 підходів по 20+ присідань за день',fe:'5 sets of 20+ squats in a day',need:5,u:'підходів по 20+ за день',ue:'sets of 20+ a day',k:'maxSquatSets'},
  {id:'plankset60',g:'plank',e:'🧘',n:'Планка 60с',ne:'Plank 60s',f:'Хвилина, що триває вічність',fe:'The eternal minute',need:60,u:'сек планки за підхід',ue:'sec plank in one hold',k:'recPlankSet'},
  {id:'plankset90',g:'plank',e:'🧘',n:'Планка 90с',ne:'Plank 90s',f:'Півтори хвилини витримки',fe:'A minute and a half of grit',need:90,u:'сек планки за підхід',ue:'sec plank in one hold',k:'recPlankSet'},
  {id:'plankset120',g:'plank',e:'🧘',n:'Планка 120с',ne:'Plank 120s',f:'Дві хвилини дзену',fe:'Two minutes of zen',need:120,u:'сек планки за підхід',ue:'sec plank in one hold',k:'recPlankSet'},
  {id:'plankset240',g:'plank',e:'🏆',n:'Планка 240с',ne:'Plank 240s',f:'Чотири хвилини сталевого корпусу',fe:'Four minutes of a steel core',need:240,u:'сек планки за підхід',ue:'sec plank in one hold',k:'recPlankSet'},
  {id:'plank_m1000',g:'plank',e:'📅',n:'1000с за місяць',ne:'1000s a month',f:'Місяць тремтячих ліктів',fe:'A month of shaky elbows',need:1000,u:'сек планки за місяць',ue:'sec plank a month',k:'monthPlank'},
  {id:'plank_t3600',g:'plank',e:'🏆',n:'Година планки',ne:'An hour of plank',f:'3600 секунд болю',fe:'3600 seconds of pain',need:3600,u:'сек планки усього',ue:'sec plank total',k:'totalPlank'},
- {id:'planksets5',g:'plank',e:'🔁',n:'5 підходів',ne:'5 sets',f:'П`ять підходів планки за день',fe:'Five plank sets in a day',need:5,u:'підходів за день',ue:'sets in a day',k:'maxPlankSets'},
+ {id:'planksets5',g:'plank',e:'🔁',n:'5 підходів',ne:'5 sets',f:'5 підходів по 15+ сек планки за день',fe:'5 sets of 15+ sec plank in a day',need:5,u:'підходів по 15+с за день',ue:'sets of 15+s a day',k:'maxPlankSets'},
  {id:'steps8k',g:'steps',e:'👣',n:'Ходок',ne:'Walker',f:'10 тисяч кроків — і жодного таксі',fe:'10k steps, no taxi',need:10000,u:'кроків за день',ue:'steps a day',k:'bestSteps'},
  {id:'steps15k',g:'steps',e:'🚶',n:'Марафонець дня',ne:'Day marathoner',f:'Хтось загубив пульт?',fe:'Lost the remote again?',need:15000,u:'кроків за день',ue:'steps a day',k:'bestSteps'},
  {id:'steps20k',g:'steps',e:'🏃',n:'20 тисяч',ne:'20k steps',f:'Ноги в режимі турбо',fe:'Legs in turbo mode',need:20000,u:'кроків за день',ue:'steps a day',k:'bestSteps'},
@@ -1050,8 +1051,10 @@ const BADGE_DEFS=[
  {id:'steps_m100k',g:'steps',e:'📅',n:'100к за місяць',ne:'100k a month',f:'Місяць на ногах',fe:'A month on your feet',need:100000,u:'кроків за місяць',ue:'steps a month',k:'monthSteps'},
  {id:'steps_m150k',g:'steps',e:'📅',n:'150к за місяць',ne:'150k a month',f:'Ноги не знають слова «стоп»',fe:'Your legs never stop',need:150000,u:'кроків за місяць',ue:'steps a month',k:'monthSteps'},
  {id:'steps_m200k',g:'steps',e:'📅',n:'200к за місяць',ne:'200k a month',f:'Місячний марафонець',fe:'Monthly marathoner',need:200000,u:'кроків за місяць',ue:'steps a month',k:'monthSteps'},
+ {id:'marathon',g:'steps',e:'🏃',n:'Марафон',ne:'Marathon',f:'42 195 кроків за день — дистанція марафону',fe:'42,195 steps in a day — a marathon',need:42195,u:'кроків за день',ue:'steps a day',k:'bestSteps'},
  {id:'water15',g:'water',e:'💧',n:'Гідратація',ne:'Hydration',f:'Кактус би позаздрив',fe:'A cactus is jealous',need:15,u:'днів з ціллю води',ue:'days at water goal',k:'waterHits'},
  {id:'water30',g:'water',e:'🌊',n:'Водний майстер',ne:'Water master',f:'Всередині — маленьке море',fe:'A little sea within',need:30,u:'днів з ціллю води',ue:'days at water goal',k:'waterHits'},
+ {id:'waterWeek',g:'water',e:'🚿',n:'Тиждень води',ne:'Water week',f:'7 днів норми води поспіль',fe:'7 days at water goal in a row',need:7,u:'днів норми поспіль',ue:'days in a row',k:'waterStreak'},
  {id:'water_m60',g:'water',e:'🚰',n:'60 літрів за місяць',ne:'60L a month',f:'Ходячий акведук',fe:'A walking aqueduct',need:60,u:'літрів за місяць',ue:'liters a month',k:'monthWaterL'},
  {id:'sleep7',g:'sleep',e:'😴',n:'Сплюх',ne:'Sleeper',f:'7 ночей як немовля',fe:'7 nights like a baby',need:7,u:'ночей з нормою',ue:'nights at goal',k:'sleepHits'},
  {id:'sleep20',g:'sleep',e:'🛌',n:'Режим сну',ne:'Sleep mode',f:'Подушка тебе обожнює',fe:'Your pillow adores you',need:20,u:'ночей з нормою',ue:'nights at goal',k:'sleepHits'},
