@@ -124,7 +124,7 @@
   .todo.done span{text-decoration:line-through; color:var(--muted)}
   .chip-row{display:flex; flex-wrap:wrap; gap:6px}
 
-  dialog{background:rgba(18,20,32,.92); backdrop-filter:blur(30px) saturate(150%); color:var(--text); border:1px solid var(--stroke); border-radius:24px; padding:24px; width:min(620px,94vw); max-height:88vh; box-shadow:var(--shadow)}
+  dialog{background:rgba(18,20,32,.92); backdrop-filter:blur(30px) saturate(150%); color:var(--text); border:1px solid var(--stroke); border-radius:24px; padding:24px; width:min(620px,94vw); max-height:88vh; overflow-y:auto; box-shadow:var(--shadow)}
   dialog::backdrop{background:rgba(3,5,12,.6); backdrop-filter:blur(6px)}
   .sec-title{font-size:10.5px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin:20px 0 10px; font-weight:700}
   .settings-item{display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:wrap}
@@ -238,8 +238,9 @@
     header{margin-bottom:14px; gap:10px}
     header h1{font-size:18px}
     .sub{font-size:11px}
-    .top-stats{gap:7px}
-    .pill{padding:8px 11px; min-width:60px; border-radius:13px}
+    .top-stats{gap:7px; flex-wrap:nowrap; overflow-x:auto; overflow-y:visible; -webkit-overflow-scrolling:touch; padding-bottom:2px}
+    .top-stats>.flex{flex-shrink:0}
+    .pill{padding:8px 11px; min-width:60px; border-radius:13px; flex-shrink:0}
     .pill .big{font-size:17px}
     .pill .lbl{font-size:9px}
   }
@@ -329,11 +330,12 @@
 
   <!-- ОГЛЯД (тиждень/місяць) -->
   <div class="glass card" style="--o:2" data-tab="progress">
-    <div class="between" style="flex-wrap:wrap;gap:8px">
-      <h2 style="margin:0"><span class="dot" style="background:var(--yellow)"></span>Огляд <span id="ovRange" style="text-transform:none;letter-spacing:0;color:var(--muted);font-weight:600"></span></h2>
-      <div class="flex"><button class="sm" id="ovWeekBtn" onclick="setOverview('week')">Тиждень</button><button class="sm" id="ovMonthBtn" onclick="setOverview('month')">Місяць</button></div>
+    <div class="between" style="gap:8px">
+      <h2 style="margin:0"><span class="dot" style="background:var(--yellow)"></span>Огляд</h2>
+      <div class="flex" style="flex-shrink:0"><button class="sm" onclick="openMonthReport()" title="Звіт місяця картинкою">📸</button><button class="sm" id="ovWeekBtn" onclick="setOverview('week')">Тиждень</button><button class="sm" id="ovMonthBtn" onclick="setOverview('month')">Місяць</button></div>
     </div>
-    <div id="ovBody" style="margin-top:12px"></div>
+    <div class="muted" id="ovRange" style="text-transform:none;letter-spacing:0;font-size:12px;margin-top:6px;min-height:15px"></div>
+    <div id="ovBody" style="margin-top:8px"></div>
   </div>
 
   <!-- АКТИВНІСТЬ -->
@@ -397,9 +399,9 @@
     <h2><span class="dot" style="background:var(--purple)"></span>Сон</h2>
     <div class="flex" style="margin-bottom:8px"><button class="sm acc" onclick="sleepBedNow()" style="flex:1">😴 Ліг зараз</button><button class="sm acc" onclick="sleepWakeNow()" style="flex:1">☀️ Встав зараз</button></div>
     <div id="sleepPending" class="muted" style="margin-bottom:8px"></div>
-    <div class="flex" style="gap:12px">
-      <label class="muted" style="flex:1;font-size:12px">Заснув<input type="time" id="sleepBed" onchange="setSleep('b',this.value)" style="margin-top:4px"></label>
-      <label class="muted" style="flex:1;font-size:12px">Прокинувся<input type="time" id="sleepWake" onchange="setSleep('w',this.value)" style="margin-top:4px"></label>
+    <div class="flex" style="gap:10px">
+      <label class="muted" style="flex:1;min-width:0;font-size:12px">Заснув<input type="time" id="sleepBed" onchange="setSleep('b',this.value)" style="margin-top:4px;width:100%;box-sizing:border-box"></label>
+      <label class="muted" style="flex:1;min-width:0;font-size:12px">Прокинувся<input type="time" id="sleepWake" onchange="setSleep('w',this.value)" style="margin-top:4px;width:100%;box-sizing:border-box"></label>
     </div>
     <div class="between" style="margin-top:10px"><span class="muted">Тривалість</span><span class="cnt" id="sleepDur">—</span></div>
     <div class="bar"><i class="g-purple" id="sleepBar" style="width:0%"></i></div>
@@ -536,6 +538,11 @@
 <dialog id="badges">
   <div class="between"><h2 style="margin:0">🏅 Бейджі <span id="badgeCount" style="text-transform:none;letter-spacing:0;color:var(--muted)"></span></h2><div class="flex"><button class="sm del" onclick="resetBadges()">🗑 Очистити</button><button class="sm" onclick="badges.close()">✕</button></div></div>
   <div id="badgeBody" style="margin-top:12px"></div>
+</dialog>
+
+<dialog id="monthReport">
+  <div class="between"><h2 style="margin:0">📸 Звіт місяця</h2><button class="sm" onclick="monthReport.close()">✕</button></div>
+  <div id="monthReportBody" style="margin-top:12px"></div>
 </dialog>
 
 <dialog id="gamePick">
@@ -709,8 +716,10 @@ function applyTab(){
   if(nav)nav.querySelectorAll('.navbtn').forEach(b=>{const t=b.dataset.t;b.style.display=avail[t]?'':'none';b.classList.toggle('on',t===curTab);});
   document.querySelectorAll('.card[data-tab]').forEach(el=>{el.classList.toggle('tab-off',mob&&el.dataset.tab!==curTab);});
 }
-function toggleHdrMenu(e){if(e)e.stopPropagation();const m=$('hdrMenu');if(m)m.classList.toggle('on');}
+function toggleHdrMenu(e){if(e)e.stopPropagation();const m=$('hdrMenu');if(!m)return;const open=!m.classList.contains('on');m.classList.toggle('on',open);
+  if(open){const btn=(e&&e.currentTarget)||m.parentElement.querySelector('button');const r=btn.getBoundingClientRect();const w=Math.min(220,innerWidth-16);m.style.position='fixed';m.style.top=(r.bottom+8)+'px';m.style.left='auto';m.style.width=w+'px';m.style.right=Math.max(8,innerWidth-r.right)+'px';}}
 function hdrMenuAction(fn){const m=$('hdrMenu');if(m)m.classList.remove('on');fn();}
+document.addEventListener('click',e=>{const m=$('hdrMenu');if(m&&m.classList.contains('on')&&!e.target.closest('.hdr-menu-wrap'))m.classList.remove('on');});
 function updateHdrMenu(){
   const hl=$('hdrLang');if(hl)hl.textContent=lang==='en'?'🌐 Українською':'🌐 English';
   const nc=notifCount(),bc=badgeList().filter(x=>badgeReached(x)&&!(state.badges&&state.badges[x.id])).length;
@@ -917,7 +926,7 @@ function render(){
     const chips=sets.map((s,i)=>`<span class="setchip" onclick="delSet('${ex.id}',${i})" title="прибрати підхід">${s}<b>×</b></span>`).join('');
     return `<div class="row-ex"><div class="between"><span>${ex.name} ${tag}</span><span class="muted cnt">${done} / ${t}${ok?' ✅':''}</span></div>`+
       `<div class="bar" style="margin:6px 0"><i class="g-green" style="width:${Math.min(100,done/t*100)}%"></i></div>`+
-      `<div class="ex-sets">${chips}<input type="number" inputmode="numeric" id="setin-${ex.id}" class="setin" placeholder="підхід" onkeydown="if(event.key==='Enter')addSet('${ex.id}')"><button class="sm acc" onclick="addSet('${ex.id}')">+ підхід</button><span class="muted setrec">${maxSet?('макс '+maxSet+' · '):''}🏆 ${rec}</span></div></div>`;
+      `<div class="ex-sets">${chips}<input type="number" inputmode="numeric" id="setin-${ex.id}" class="setin" placeholder="підхід" onkeydown="if(event.key==='Enter')addSet('${ex.id}')"><button class="sm acc" onclick="addSet('${ex.id}')" title="Додати підхід">+</button><span class="muted setrec">${maxSet?('макс '+maxSet+' · '):''}🏆 ${rec}</span></div></div>`;
   }).join('')||'<div class="empty">Додай вправи в налаштуваннях</div>';
 
   $('limitList').innerHTML=S.limitHabits.map(l=>{
@@ -1268,13 +1277,47 @@ function monthStats(){
     if(steamPlay[k])gamesMin+=steamPlay[k];}
   return{daysIn,elapsed,good,avg:scN?Math.round(scSum/scN):0,waterOk,avgSleep:slpN?Math.round(slpSum/slpN*10)/10:0,spent:monthTotal(mk),gamesH:Math.round(gamesMin/60*10)/10};
 }
+/* ===== ЗВІТ МІСЯЦЯ КАРТИНКОЮ ===== */
+function monthReportStats(){
+  const s=monthStats(),mk=monthKey();const stepC=state.settings.counters.find(c=>/крок|steps/i.test(c.name));
+  let totSteps=0,bestStepsDay=0,waterMl=0,activeDays=0;
+  for(let dd=1;dd<=s.elapsed;dd++){const k=mk+'-'+String(dd).padStart(2,'0'),d=state.days[k];if(!d)continue;activeDays++;
+    if(stepC){const v=(d.counters&&d.counters[stepC.id])||0;totSteps+=v;if(v>bestStepsDay)bestStepsDay=v;}
+    waterMl+=d.water||0;}
+  const bs=badgeStats();
+  return {...s,totSteps,avgSteps:activeDays?Math.round(totSteps/activeDays):0,bestStepsDay,waterL:Math.round(waterMl/100)/10,activeDays,
+    recPush:bs.recPushSet,recSquat:bs.recSquatSet,recPlank:bs.recPlankSet,streak:computeStreak()};
+}
+function tileSvg(x,y,w,h,big,lbl,color){return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="20" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.1)"/><text x="${x+w/2}" y="${y+h/2+2}" font-size="44" font-weight="800" text-anchor="middle" fill="${color}">${big}</text><text x="${x+w/2}" y="${y+h-20}" font-size="17" text-anchor="middle" fill="#8791a3">${lbl}</text>`;}
+function buildMonthReportSVG(){
+  const r=monthReportStats(),mn=new Date().toLocaleDateString('uk-UA',{month:'long',year:'numeric'});
+  const W=720,H=1060,pad=40,gap=20,colW=(W-pad*2-gap)/2,tileH=130,ty=250;
+  const C={green:'#4fc596',cyan:'#5cc9dd',purple:'#9d8ad6',blue:'#7cc5ff',yellow:'#e3bd68',white:'#e7ecf3'};
+  const tiles=[[C.green,r.good+'/'+r.daysIn,'Хороші дні'],[C.cyan,r.avg+'%','Середній бал'],[C.white,fmt(r.totSteps),'👣 Кроків за місяць'],[C.cyan,fmt(r.avgSteps),'Середньо/день'],[C.blue,r.waterL+' л','💧 Води випито'],[C.yellow,r.gamesH+' год','🎮 CS2'],[C.purple,r.streak,'🔥 Серія (днів)'],[C.green,fmt(r.bestStepsDay),'🏅 Найкращий день']];
+  let tsvg='';tiles.forEach((t,i)=>{const col=i%2,row=(i-col)/2,x=pad+col*(colW+gap),y=ty+row*(tileH+gap);tsvg+=tileSvg(x,y,colW,tileH,t[1],t[2],t[0]);});
+  const recY=ty+4*(tileH+gap)+6;
+  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;border-radius:18px">
+    <defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5cc9dd"/><stop offset="1" stop-color="#9d8ad6"/></linearGradient></defs>
+    <rect width="${W}" height="${H}" rx="28" fill="#0a0c14"/>
+    <text x="${pad}" y="72" font-size="26" font-weight="800" fill="url(#rg)" letter-spacing="3" font-family="Arial,sans-serif">LIFE OS</text>
+    <text x="${pad}" y="142" font-size="46" font-weight="800" fill="#e7ecf3" font-family="Arial,sans-serif">📊 Звіт місяця</text>
+    <text x="${pad}" y="186" font-size="25" fill="#8791a3" font-family="Arial,sans-serif">${mn} · ${profileName()}</text>
+    ${tsvg}
+    <rect x="${pad}" y="${recY}" width="${W-pad*2}" height="118" rx="20" fill="rgba(92,201,221,0.08)" stroke="rgba(92,201,221,0.3)"/>
+    <text x="${W/2}" y="${recY+40}" font-size="18" text-anchor="middle" fill="#8791a3" letter-spacing="1" font-family="Arial,sans-serif">🏆 ТВОЇ РЕКОРДИ ЗА ПІДХІД</text>
+    <text x="${W/2}" y="${recY+88}" font-size="30" font-weight="800" text-anchor="middle" fill="#e7ecf3" font-family="Arial,sans-serif">💪 ${r.recPush}   ·   🦵 ${r.recSquat}   ·   🧘 ${r.recPlank}с</text>
+    <text x="${W/2}" y="${H-38}" font-size="17" text-anchor="middle" fill="#5a6273" font-family="Arial,sans-serif">life-os · ${todayKey()}</text>
+  </svg>`;
+}
+function openMonthReport(){$('monthReportBody').innerHTML=buildMonthReportSVG()+'<div style="text-align:center;margin-top:14px"><button class="acc" onclick="downloadReport()">⬇ Зберегти картинкою</button></div>';monthReport.showModal();}
+function downloadReport(){const svgEl=$('monthReportBody').querySelector('svg');const xml=new XMLSerializer().serializeToString(svgEl);const url='data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(xml)));const vb=svgEl.viewBox.baseVal,sc=2;const img=new Image();img.onload=function(){const c=document.createElement('canvas');c.width=vb.width*sc;c.height=vb.height*sc;const x=c.getContext('2d');x.scale(sc,sc);x.drawImage(img,0,0);try{const a=document.createElement('a');a.download='life-os-'+monthKey()+'.png';a.href=c.toDataURL('image/png');a.click();toast('Звіт збережено 📸');}catch(e){toast('Не вдалось зберегти');}};img.onerror=function(){toast('Помилка рендеру');};img.src=url;}
 function renderOverview(){
   const cur=state.settings.currency;
   $('ovWeekBtn').className='sm '+(overviewMode==='week'?'acc':'');
   $('ovMonthBtn').className='sm '+(overviewMode==='month'?'acc':'');
   if(overviewMode==='week'){
     const w=weekStats(),mon=weekMonday(new Date()),sun=new Date(mon);sun.setDate(sun.getDate()+6);
-    $('ovRange').textContent='· Пн–Нд · '+mon.toLocaleDateString(LOC(),{day:'numeric',month:'short'})+' – '+sun.toLocaleDateString(LOC(),{day:'numeric',month:'short'});
+    $('ovRange').textContent='Пн–Нд · '+mon.toLocaleDateString(LOC(),{day:'numeric',month:'short'})+' – '+sun.toLocaleDateString(LOC(),{day:'numeric',month:'short'});
     const wl=state.settings.limitHabits.filter(l=>l.mode==='week');
     let extra='';
     if(wl.length){extra='<div style="margin-top:12px">'+wl.map(l=>{const q=limitWeekQuota(l),c=weekConsumed(l.id),over=c>q,left=Math.max(0,q-c);
@@ -1282,7 +1325,7 @@ function renderOverview(){
     $('ovBody').innerHTML=`<div class="week-grid">${ovCards(w,7)}</div>`+extra;
   } else {
     const s=monthStats();
-    $('ovRange').textContent='· '+new Date().toLocaleDateString(LOC(),{month:'long'});
+    $('ovRange').textContent=new Date().toLocaleDateString(LOC(),{month:'long'});
     $('ovBody').innerHTML=`<div class="week-grid">${ovCards(s,s.daysIn)}</div>`;
   }
 }
