@@ -1148,21 +1148,27 @@ function svgBars({data,w=800,h=175,color='#5cc9dd'}){
   const yl=`<text x="6" y="${(pad.t+ih).toFixed(1)}" fill="#7d859c" font-size="10">0</text><text x="6" y="${pad.t+9}" fill="#7d859c" font-size="10">${fmt(Math.round(maxY*.9))}</text>`;
   return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;display:block">${bars}${yl}</svg>`;
 }
-function svgMultiLine({series,labels,w=800,h=190,unit='',hidden={},toggle=false}){
+function svgMultiLine({series,labels,w=800,h=190,unit='',hidden={},toggle=false,yMin=null,yMax=null,yFmt=null}){
   const n=series[0]?series[0].data.length:0;
   const leg=series.map(s=>{const off=!!hidden[s.name];return `<span ${toggle?`onclick="toggleLine('${String(s.name).replace(/'/g,'')}')"`:''} style="display:inline-flex;align-items:center;gap:5px;margin-right:14px;${toggle?'cursor:pointer;':''}opacity:${off?.35:1}"><span style="width:12px;height:3px;background:${s.color};display:inline-block;border-radius:2px"></span><span style="${off?'text-decoration:line-through':''}">${s.name}</span></span>`;}).join('');
   const legHtml=`<div class="muted" style="margin-bottom:6px">${leg}${toggle?' <span style="opacity:.5">· тисни, щоб приховати</span>':''}</div>`;
   const vis=series.filter(s=>!hidden[s.name]);
-  if(!n||!vis.some(s=>s.data.some(d=>d.y>0))) return legHtml+'<div class="empty">немає даних для показу</div>';
+  const vals=vis.flatMap(s=>s.data.map(d=>d.y)).filter(v=>v!=null&&!isNaN(v));
+  const hasData=yMin!=null?vals.length>0:vals.some(v=>v>0);
+  if(!n||!hasData) return legHtml+'<div class="empty">немає даних для показу</div>';
   const pad={l:44,r:14,t:14,b:26};
-  const maxY=Math.max(1,...vis.flatMap(s=>s.data.map(d=>d.y)))*1.12;
+  const lo=yMin!=null?yMin:0, hi=yMax!=null?yMax:Math.max(1,...vals)*1.12;
   const iw=w-pad.l-pad.r, ih=h-pad.t-pad.b;
   const X=i=>n<=1?pad.l+iw/2:pad.l+i/(n-1)*iw;
-  const Y=v=>pad.t+ih-(v/maxY)*ih;
-  let paths='';vis.forEach(s=>{const sw=s.name==='Всього'?3.4:2.2;const p=s.data.map((d,i)=>(i?'L':'M')+X(i).toFixed(1)+' '+Y(d.y).toFixed(1)).join(' ');paths+=`<path d="${p}" fill="none" stroke="${s.color}" stroke-width="${sw}" stroke-linejoin="round" stroke-linecap="round"/>`;if(n<=40)paths+=s.data.map((d,i)=>`<circle cx="${X(i).toFixed(1)}" cy="${Y(d.y).toFixed(1)}" r="2.4" fill="${s.color}"/>`).join('');});
+  const Y=v=>pad.t+ih-((v-lo)/(hi-lo||1))*ih;
+  let paths='';vis.forEach(s=>{const sw=s.name==='Всього'?3.4:2.2;let p='',pen=false;
+    s.data.forEach((d,i)=>{if(d.y==null){pen=false;return;}p+=(pen?'L':'M')+X(i).toFixed(1)+' '+Y(d.y).toFixed(1)+' ';pen=true;});
+    paths+=`<path d="${p}" fill="none" stroke="${s.color}" stroke-width="${sw}" stroke-linejoin="round" stroke-linecap="round"/>`;
+    if(n<=40)paths+=s.data.map((d,i)=>d.y==null?'':`<circle cx="${X(i).toFixed(1)}" cy="${Y(d.y).toFixed(1)}" r="2.4" fill="${s.color}"/>`).join('');});
   const step=Math.max(1,Math.ceil(n/9));let xl='';series[0].data.forEach((d,i)=>{if(i%step===0||i===n-1)xl+=`<text x="${X(i).toFixed(1)}" y="${h-8}" fill="#7d859c" font-size="10" text-anchor="middle">${d.x}</text>`;});
-  const yl=`<text x="8" y="${Y(0).toFixed(1)}" fill="#7d859c" font-size="10">0</text><text x="8" y="${(Y(maxY*.9)+3).toFixed(1)}" fill="#7d859c" font-size="10">${fmt(Math.round(maxY*.9))}${unit}</text>`;
-  const seg=n>1?iw/(n-1):iw;let hits='';series[0].data.forEach((d,i)=>{const tip=(labels?labels[i]:d.x)+'¶'+vis.map(s=>s.name+': '+fmt(s.data[i].y)+' '+unit).join('¶');hits+=`<rect x="${(X(i)-seg/2).toFixed(1)}" y="0" width="${seg.toFixed(1)}" height="${h}" fill="transparent" data-tip="${tip.replace(/"/g,'&quot;')}"/>`;});
+  const loT=yFmt?yFmt(lo):('0'), hiT=yFmt?yFmt(hi):(fmt(Math.round(hi*.9))+unit);
+  const yl=`<text x="8" y="${Y(lo).toFixed(1)}" fill="#7d859c" font-size="10">${loT}</text><text x="8" y="${(Y(yFmt?hi:hi*.9)+9).toFixed(1)}" fill="#7d859c" font-size="10">${hiT}</text>`;
+  const seg=n>1?iw/(n-1):iw;let hits='';series[0].data.forEach((d,i)=>{const tip=(labels?labels[i]:d.x)+'¶'+vis.map(s=>s.name+': '+(s.data[i].y==null?'—':(yFmt?yFmt(s.data[i].y):fmt(s.data[i].y)+' '+unit))).join('¶');hits+=`<rect x="${(X(i)-seg/2).toFixed(1)}" y="0" width="${seg.toFixed(1)}" height="${h}" fill="transparent" data-tip="${tip.replace(/"/g,'&quot;')}"/>`;});
   return legHtml+`<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;display:block">${paths}${xl}${yl}${hits}</svg>`;
 }
 
@@ -1226,7 +1232,23 @@ function renderMonth(){
     const msh=now.toLocaleDateString(LOC(),{month:'short'});
     const lastDay=new Date().getDate();
     const socId=screenLimitId();
-    if(gm.kind==='limit'&&gm.ref&&socId&&gm.ref.id===socId&&Object.keys(screenApps).length){
+    if(gm.id==='sleep'){
+      // дві лінії: коли заснув / коли прокинувся (вісь — час доби, ніч безперервна)
+      // вісь = години від 18:00 (вечір→ранок безперервно), тож відстань між лініями = тривалість сну
+      const norm=t=>{if(!t)return null;const p=String(t).split(':');const h=+p[0],m=+p[1]||0;if(isNaN(h))return null;return ((h+m/60)-18+24)%24;};
+      const bed={name:'Заснув',color:'#9d8ad6',data:[]},wake={name:'Прокинувся',color:'#e3bd68',data:[]},labels=[];
+      for(let dd=1;dd<=lastDay;dd++){const k=dayKey(new Date(y,mo,dd));labels.push(dd+' '+msh);
+        const s=(state.days[k]&&state.days[k].sleep)||{};
+        bed.data.push({x:dd,y:norm(s.b)});wake.data.push({x:dd,y:norm(s.w)});}
+      const all=bed.data.concat(wake.data).map(d=>d.y).filter(v=>v!=null);
+      if(!all.length){$('monthBody').innerHTML='<div class="empty">немає даних про сон</div>';$('monthLegend').textContent='';}
+      else{
+        const lo=Math.max(0,Math.floor(Math.min(...all))-1),hi=Math.min(24,Math.ceil(Math.max(...all))+1);
+        const yFmt=v=>{const hh=Math.round((v+18)%24);return String(((hh%24)+24)%24).padStart(2,'0')+':00';};
+        $('monthBody').innerHTML=svgMultiLine({series:[bed,wake],labels,h:200,hidden:hiddenLines,toggle:true,yMin:lo,yMax:hi,yFmt});
+        $('monthLegend').textContent='Час засинання і підйому по днях (відстань між лініями = тривалість сну). Розриви — дні без даних.';
+      }
+    } else if(gm.kind==='limit'&&gm.ref&&socId&&gm.ref.id===socId&&Object.keys(screenApps).length){
       const apps=['Instagram','TikTok','Threads'],colors={Instagram:'#e56b7b',TikTok:'#5cc9dd',Threads:'#9d8ad6'};
       const series=apps.map(a=>({name:a,color:colors[a],data:[]})),total={name:'Всього',color:'#e3bd68',data:[]},labels=[];
       for(let dd=1;dd<=lastDay;dd++){const k=dayKey(new Date(y,mo,dd));labels.push(dd+' '+msh);let t=0;apps.forEach((a,ai)=>{const v=Math.round((screenApps[k]&&screenApps[k][a])||0);series[ai].data.push({x:dd,y:v});t+=v;});total.data.push({x:dd,y:t});}
