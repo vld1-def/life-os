@@ -883,12 +883,7 @@ function toggleTask(id){const t=state.tasks.find(x=>x.id===id);if(t)t.done=!t.do
 function delTask(id){state.tasks=state.tasks.filter(x=>x.id!==id);save();}
 
 function limitMaxOn(l,k){const h=l&&l.maxHist;if(!h||!h.length)return l?l.max:0;let m=h[0].max;for(const e of h){if(e.d<=k)m=e.max;else break;}return m;}
-function dayScore(k){const d=state.days[k];if(!d)return null;const S=state.settings;let t=0,ok=0;
-  if(mod('water')){t++;if(d.water>=S.waterGoal)ok++;}
-  if(mod('activity'))S.exercises.forEach(ex=>{t++;if((d.exercises[ex.id]||0)>=exTarget(ex,k))ok++;});
-  if(mod('limits'))S.limitHabits.forEach(l=>{if(l.mode==='week')return;t++;if((d.limits[l.id]||0)<=limitMaxOn(l,k))ok++;});
-  if(mod('counters'))S.counters.forEach(c=>{t++;if((d.counters[c.id]||0)>=c.goal)ok++;});
-  return t?Math.round(ok/t*100):0;}
+function dayScore(k){const comps=dayComponents(k);if(!comps)return null;if(!comps.length)return 0;let s=0;comps.forEach(c=>s+=c.ratio);return Math.round(s/comps.length*100);}
 function weekMonday(d){const x=new Date(d);const dow=(x.getDay()+6)%7;x.setDate(x.getDate()-dow);x.setHours(0,0,0,0);return x;}
 function weekMondayKey(d){return dayKey(weekMonday(d));}
 function limitWeekQuota(l){const startK=l.startDate||weekMondayKey(new Date());const weeks=Math.max(0,Math.floor((weekMonday(new Date())-new Date(startK))/(7*86400000)));return Math.max(l.minPerWeek||1,(l.startPerWeek||7)-(l.stepPerWeek||1)*weeks);}
@@ -898,15 +893,19 @@ function computeStreak(){let s=0,d=new Date();for(let i=0;i<400;i++){const k=day
 function toggleRest(){if(!state.restDays)state.restDays={};const k=todayKey();if(state.restDays[k])delete state.restDays[k];else state.restDays[k]=true;save();}
 function selectDay(k){if(k>todayKey())return;selDay=(k===todayKey())?null:k;render();const dt=new Date(k+'T00:00:00');toast(k===todayKey()?'Сьогодні':('✏️ Редагуєш '+dt.toLocaleDateString(LOC(),{day:'numeric',month:'long'})+' — тапни сьогоднішній день, щоб повернутись'));}
 
+function compRatio(c){ // частка балу пункту (без обмеження зверху); ліміти дають бонус за «під нормою»
+  if(c.kind==='limit'){const mx=c.mx;if(mx<=0)return c.v<=0?1:0;return c.v<=mx?1+(1-c.v/mx)*0.5:Math.max(0,1-(c.v-mx)/mx);}
+  return c.goal>0?c.v/c.goal:(c.v>0?1:0);}
 function dayComponents(k){const d=state.days[k];if(!d)return null;const S=state.settings,a=[];
-  if(mod('water'))a.push({label:'Вода',kind:'goal',ok:d.water>=S.waterGoal,pct:d.water/S.waterGoal,txt:(d.water/1000).toFixed(1)+'л / '+(S.waterGoal/1000)+'л'});
-  if(mod('activity'))S.exercises.forEach(ex=>{const t=exTarget(ex,k),v=d.exercises[ex.id]||0;a.push({label:ex.name,kind:'goal',ok:v>=t,pct:t?v/t:0,txt:v+' / '+t});});
-  if(mod('limits'))S.limitHabits.forEach(l=>{if(l.mode==='week')return;const v=d.limits[l.id]||0,mx=limitMaxOn(l,k);a.push({label:l.name,kind:'limit',ok:v<=mx,pct:0,txt:v+' < '+mx+(l.unit?(' '+l.unit):'')});});
-  if(mod('counters'))S.counters.forEach(c=>{const v=d.counters[c.id]||0;a.push({label:c.name,kind:'goal',ok:v>=c.goal,pct:c.goal?v/c.goal:0,txt:fmt(v)+' / '+fmt(c.goal)});});
+  const add=o=>{o.ratio=compRatio(o);o.pct=o.ratio;o.ok=(o.kind==='limit')?(o.v<=o.mx):(o.v>=o.goal);a.push(o);};
+  if(mod('water'))add({label:'Вода',kind:'goal',v:d.water||0,goal:S.waterGoal,txt:((d.water||0)/1000).toFixed(1)+'л / '+(S.waterGoal/1000)+'л'});
+  if(mod('activity'))S.exercises.forEach(ex=>{const t=exTarget(ex,k),v=d.exercises[ex.id]||0;add({label:ex.name,kind:'goal',v,goal:t,txt:v+' / '+t});});
+  if(mod('limits'))S.limitHabits.forEach(l=>{if(l.mode==='week')return;const v=d.limits[l.id]||0,mx=limitMaxOn(l,k);add({label:l.name,kind:'limit',v,mx,txt:v+' / ≤'+mx+(l.unit?(' '+l.unit):'')});});
+  if(mod('counters'))S.counters.forEach(c=>{const v=d.counters[c.id]||0;add({label:c.name,kind:'goal',v,goal:c.goal,txt:fmt(v)+' / '+fmt(c.goal)});});
   return a;}
-function compColor(c){if(c.ok)return 'var(--green)';if(c.kind!=='limit'&&c.pct>=.5)return 'var(--yellow)';return 'var(--red)';}
+function compColor(c){if(c.pct>=1)return 'var(--green)';if(c.kind!=='limit'&&c.pct>=.5)return 'var(--yellow)';return 'var(--red)';}
 function dayBadges(k){return Object.keys(state.badges||{}).filter(id=>state.badges[id]===k).map(id=>'\n🏅 '+badgeName(id)).join('');}
-function dayTitle(k){const bg=dayBadges(k);const comps=dayComponents(k);if(!comps)return k+(bg?bg:' — немає даних');let s=k+' — бал '+(dayScore(k)??0)+'%';comps.forEach(c=>s+='\n'+(c.ok?'✅':'❌')+' '+c.label+': '+c.txt);const nt=state.days[k]&&state.days[k].note;if(nt)s+='\n📝 '+nt;return s+bg;}
+function dayTitle(k){const bg=dayBadges(k);const comps=dayComponents(k);if(!comps)return k+(bg?bg:' — немає даних');let s=k+' — бал '+(dayScore(k)??0)+'%';comps.forEach(c=>{const p=Math.round(c.ratio*100);s+='\n'+(c.pct>=1?'✅':(c.pct>=.5&&c.kind!=='limit'?'🟡':'❌'))+' '+c.label+': '+c.txt+' → '+p+'%';});const nt=state.days[k]&&state.days[k].note;if(nt)s+='\n📝 '+nt;return s+bg;}
 
 /* ===== РЕНДЕР ===== */
 function render(){
@@ -954,7 +953,7 @@ function render(){
   renderFinance();
   renderMonth();
   renderOverview();
-  $('scoreVal').textContent=(dayScore(tk)??0)+'%';
+  {const scv=dayScore(tk)??0,sel=$('scoreVal');sel.textContent=(scv>100?'🔥':'')+scv+'%';sel.style.color=scv>100?'#e3bd68':'';sel.style.textShadow=scv>100?'0 0 14px rgba(227,189,104,.55)':'';}
   $('streakVal').textContent=computeStreak();
   $('debtVal').textContent=fmt(Math.round(totalDebtNow()));
   renderNotifBadge(); updateBadgeReady();
@@ -985,7 +984,7 @@ function badgeStats(){
   let perfect=0,good=0,tracked=0,waterHits=0,sleepHits=0,bestSteps=0,totalSteps=0,bestPlank=0,bestPush=0,bestSquat=0,totalPush=0,totalSquat=0,totalPlank=0,maxRecDay=0,maxPushSets=0,maxSquatSets=0,maxPlankSets=0;
   const goodArr=[],coffeeZero=[],mPush={},mSquat={},mPlank={},mWater={},mSteps={},waterDays=[],perfDays=[];
   days.forEach(k=>{const sc=dayScore(k),rest=!!(state.restDays&&state.restDays[k]),ym=k.slice(0,7);
-    if(sc!=null){tracked++;if(sc>=70||rest)good++;if(sc===100){perfect++;perfDays.push(k);}}
+    if(sc!=null){tracked++;if(sc>=70||rest)good++;if(sc>=100){perfect++;perfDays.push(k);}}
     const d=state.days[k],ex=d.exercises||{},es=d.exSets||{};
     if((d.recs||0)>maxRecDay)maxRecDay=d.recs||0;
     if(pushEx){const c=(es[pushEx.id]||[]).filter(v=>v>=10).length;if(c>maxPushSets)maxPushSets=c;}
@@ -1255,7 +1254,7 @@ function renderMonth(){
       $('monthBody').innerHTML=svgMultiLine({series:[total].concat(series),labels,unit:'хв',h:200,hidden:hiddenLines,toggle:true});
       $('monthLegend').textContent='Жовта «Всього» — сума хв/день. Тисни лінію в легенді, щоб приховати.';
     } else {
-      const data=[];for(let dd=1;dd<=lastDay;dd++){const k=dayKey(new Date(y,mo,dd)),r=metricDay(gm,k);data.push({x:dd,y:r.has?r.v:0,tip:dd+' '+msh+': '+(r.has?metricValTxt(gm,r.v):'немає даних')});}
+      const data=[];for(let dd=1;dd<=lastDay;dd++){const k=dayKey(new Date(y,mo,dd)),r=metricDay(gm,k);const tip=gm.id==='score'?dayTitle(k).replace(/"/g,'&quot;').replace(/\n/g,'¶'):(dd+' '+msh+': '+(r.has?metricValTxt(gm,r.v):'немає даних'));data.push({x:dd,y:r.has?r.v:0,tip});}
       const color=gm.kind==='limit'?'#e56b7b':'#5cc9dd';
       $('monthBody').innerHTML=svgLine({data,color,goal:metricGoal(gm),goalLabel:gm.kind==='limit'?'ліміт':'ціль',h:180,avg:true});
       $('monthLegend').textContent=(gm.kind==='limit'?'Значення по днях; зелена пунктирна — ліміт.':'Значення по днях; зелена пунктирна — ціль.');
