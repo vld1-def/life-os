@@ -59,7 +59,9 @@
       "Bash(curl -s '__TRACKED_VAR__/rest/v1/steam_playtime?select=*&order=date.desc&limit=3' -H 'apikey: __TRACKED_VAR__' -H 'Authorization: Bearer __TRACKED_VAR__')",
       "Bash(curl -s 'https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=__TRACKED_VAR__&steamid=__TRACKED_VAR__&include_played_free_games=1&format=json')",
       "Bash(python -c \"import sys,json;d=json.load\\(sys.stdin\\);g=d['response']['games'];print\\('total:',sum\\(x.get\\('playtime_forever',0\\) for x in g\\)\\)\")",
-      "Bash(grep -n \"r.has?metricValTxt\\(gm,r.v\\):'немає даних'\\\\|svgLine\\({data,color,goal:metricGoal\" index.html)"
+      "Bash(grep -n \"r.has?metricValTxt\\(gm,r.v\\):'немає даних'\\\\|svgLine\\({data,color,goal:metricGoal\" index.html)",
+      "Bash(grep -n 'const tip=dayTitle\\(k,rest\\)\\\\|data-tip=\"\\\\${tip}\"\\\\|data-tip=' index.html)",
+      "Bash(grep -n \"const tip=gm.id==='score'?dayTitle\\\\|data.push\\({x:dd,y:r.has?r.v:0,tip}\\)\" index.html)"
     ]
   }
 }
