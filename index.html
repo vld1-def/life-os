@@ -141,7 +141,7 @@
   .auth-card button{width:100%; padding:14px; font-size:16px}
   .toast{position:fixed; bottom:calc(24px + env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); background:rgba(18,20,32,.92); backdrop-filter:blur(20px); border:1px solid var(--stroke); padding:12px 20px; border-radius:16px; font-size:13px; z-index:200; opacity:0; transition:.3s; pointer-events:none; box-shadow:var(--shadow)}
   .toast.show{opacity:1}
-  #tip{position:fixed; z-index:300; pointer-events:none; background:rgba(18,20,32,.97); backdrop-filter:blur(12px); border:1px solid var(--stroke); border-radius:14px; padding:11px 13px; font-size:12px; line-height:1.55; white-space:pre-line; max-width:300px; box-shadow:var(--shadow); opacity:0; transition:opacity .1s; left:0; top:0}
+  #tip{position:fixed; z-index:300; pointer-events:none; background:rgba(18,20,32,.97); backdrop-filter:blur(12px); border:1px solid var(--stroke); border-radius:14px; padding:11px 13px; font-size:12px; line-height:1.55; white-space:pre-line; max-width:min(330px,92vw); box-shadow:var(--shadow); opacity:0; transition:opacity .1s; left:0; top:0}
   #tip .tt{min-width:210px}
   #tip .tt-head{display:flex; align-items:center; gap:8px; margin-bottom:9px}
   #tip .tt-head b{font-size:13.5px; text-transform:capitalize}
@@ -152,7 +152,8 @@
   #tip .tt-row{display:grid; grid-template-columns:1fr auto; grid-template-areas:"l p" "bar bar"; align-items:center; gap:2px 8px}
   #tip .tt-l{grid-area:l; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:12px}
   #tip .tt-vv{display:none}
-  #tip .tt-p{grid-area:p; text-align:right; font-weight:800; font-size:12px; font-variant-numeric:tabular-nums}
+  #tip .tt-p{grid-area:p; text-align:right; font-weight:800; font-size:12px; font-variant-numeric:tabular-nums; white-space:nowrap}
+  #tip .tt-g{font-weight:600; font-size:10.5px; color:var(--muted)}
   #tip .tt-bar{grid-area:bar; height:5px; border-radius:3px; background:rgba(255,255,255,.1); overflow:hidden; margin-top:1px}
   #tip .tt-bar i{display:block; height:100%; border-radius:3px}
   #tip .tt-badges{display:flex; flex-wrap:wrap; gap:5px; margin-top:9px}
@@ -235,7 +236,7 @@
   .mod-off{display:none!important}
   #bottomNav{display:none}
   .hdr-menu-wrap{display:none; position:relative}
-  .hdr-menu{display:none; position:absolute; right:0; top:calc(100% + 8px); z-index:210; flex-direction:column; gap:4px; min-width:210px; padding:8px; background:rgba(18,20,32,.97); backdrop-filter:blur(22px) saturate(150%); -webkit-backdrop-filter:blur(22px) saturate(150%); border:1px solid var(--stroke); border-radius:16px; box-shadow:var(--shadow)}
+  .hdr-menu{display:none; position:absolute; right:0; top:calc(100% + 8px); z-index:520; flex-direction:column; gap:4px; min-width:210px; padding:8px; background:rgba(18,20,32,.97); backdrop-filter:blur(22px) saturate(150%); -webkit-backdrop-filter:blur(22px) saturate(150%); border:1px solid var(--stroke); border-radius:16px; box-shadow:var(--shadow)}
   .hdr-menu.on{display:flex}
   .hdr-menu button{display:flex; justify-content:space-between; align-items:center; gap:10px; width:100%; text-align:left}
   .hdr-menu button .cnt{color:var(--cyan)}
@@ -304,7 +305,7 @@
   <div class="hdr-title-row"><h1>LIFE&nbsp;<span>OS</span></h1><div class="sub" id="todayLabel"></div></div>
   <div class="top-stats">
     <div class="glass pill"><div class="big neon-purple" id="streakVal">0</div><div class="lbl">🔥 серія</div></div>
-    <div class="glass pill"><div class="big neon-cyan" id="scoreVal">0%</div><div class="lbl">⭐ бал дня</div></div>
+    <div class="glass pill" onclick="showDayTipEl(todayKey(),this)" style="cursor:pointer" title="Розклад балу за сьогодні"><div class="big neon-cyan" id="scoreVal">0%</div><div class="lbl">⭐ бал дня</div></div>
     <div class="glass pill"><div class="big neon-red" id="debtVal">0</div><div class="lbl">💳 борг</div></div>
     <div class="flex">
       <div class="glass pill" style="min-width:auto;padding:11px" title="Синхронізація: зелений — збережено, жовтий — зберігаю, червоний — немає зв'язку"><span class="sync-dot" id="syncDot"></span></div>
@@ -335,7 +336,8 @@
       <h2 style="margin:0"><span class="dot" style="background:var(--cyan)"></span>Мій прогрес</h2>
       <div class="flex" style="gap:6px">
         <button class="sm" id="btnCal" onclick="setMonthView('cal')">🗓 Календар</button>
-        <button class="sm" id="btnLine" onclick="setMonthView('line')">📈 Графік</button>
+        <button class="sm" id="btnLine" onclick="setMonthView('line')">📈 Лінія</button>
+        <button class="sm" id="btnBar" onclick="setMonthView('bar')">📊 Бар</button>
         <button class="sm" id="btnRest" onclick="toggleRest()" title="Зробити сьогодні вихідним — серія 🔥 не перерветься">🛡</button>
       </div>
     </div>
@@ -839,8 +841,9 @@ function debtMonthlySeries(n){const arr=[],now=new Date();for(let i=n-1;i>=0;i--
 
 /* ===== ДНІ ===== */
 function getDay(k){if(!state.days[k])state.days[k]={water:0,exercises:{},limits:{},counters:{},note:''};const d=state.days[k];d.counters=d.counters||{};d.limits=d.limits||{};d.exercises=d.exercises||{};d.note=d.note??'';return d;}
+function peekDay(k){return state.days[k]||{water:0,exercises:{},limits:{},counters:{},note:'',sleep:{}};} // читання без створення дня
 const _c={};
-function exTarget(ex,k){const ck=ex.id+'|'+k;if(_c[ck]!=null)return _c[ck];if(!state.days[prevKey(k)])return _c[ck]=ex.base;const p=prevKey(k),pt=exTarget(ex,p);const pd=(state.days[p].exercises&&state.days[p].exercises[ex.id])||0;const g=ex.grow||0;if(pd>=pt)return _c[ck]=Math.round(g?pt+g:ex.base);return _c[ck]=Math.max(ex.base,Math.round(pt*ex.penalty));}
+function exTarget(ex,k){const ck=ex.id+'|'+k;if(_c[ck]!=null)return _c[ck];if(!state.days[prevKey(k)])return _c[ck]=ex.base;const p=prevKey(k),pt=exTarget(ex,p);const pd=(state.days[p].exercises&&state.days[p].exercises[ex.id])||0;const g=ex.grow||0;if(pd>=pt)return _c[ck]=Math.min(ex.base*10,Math.round(g?pt+g:ex.base));return _c[ck]=Math.min(ex.base*10,Math.max(ex.base,Math.round(pt*ex.penalty)));}
 function addWater(n){const d=getDay(activeDay());d.water=Math.max(0,d.water+n);save();}
 function addEx(id,n){const d=getDay(activeDay());d.exercises[id]=Math.max(0,(d.exercises[id]||0)+n);save();}
 function profileName(){return (profiles.find(p=>p.id===PROFILE)||{}).name||PROFILE;}
@@ -929,7 +932,8 @@ function dayTipHTML(k){
   if(!comps)return '<div class="tt"><div class="tt-head"><b>'+ds+'</b></div><div class="tt-empty">немає даних</div>'+bg+'</div>';
   const sc=dayScore(k)??0,over=sc>100;
   let rows='';comps.forEach(c=>{const p=Math.round(c.ratio*100),col=c.pct>=1?'var(--green)':(c.kind!=='limit'&&c.pct>=.5?'var(--yellow)':'var(--red)'),bar=Math.max(4,Math.min(100,Math.round(c.pct*100)));
-    rows+='<div class="tt-row"><span class="tt-l">'+esc(c.label)+'</span><span class="tt-p" style="color:'+col+'">'+p+'%</span><span class="tt-bar"><i style="width:'+bar+'%;background:'+col+'"></i></span></div>';});
+    const val=esc(String(c.txt).replace(/ \/ /g,'/'));
+    rows+='<div class="tt-row"><span class="tt-l">'+esc(c.label)+'</span><span class="tt-p" style="color:'+col+'">'+p+'% <span class="tt-g">('+val+')</span></span><span class="tt-bar"><i style="width:'+bar+'%;background:'+col+'"></i></span></div>';});
   const nt=state.days[k]&&state.days[k].note;
   return '<div class="tt"><div class="tt-head"><b>'+ds+'</b>'+(rest?'<span class="tt-rest">🛡</span>':'')+'<span class="tt-score'+(over?' over':'')+'">'+(over?'🔥':'')+sc+'%</span></div><div class="tt-rows">'+rows+'</div>'+bg+(nt?'<div class="tt-note">📝 '+esc(nt)+'</div>':'')+'</div>';
 }
@@ -939,7 +943,7 @@ function render(){
   Object.keys(_c).forEach(k=>delete _c[k]);
   applyModules();
   applySteam(); applyScreen(); applySleepDB(); applyStepsDB();
-  const tk=todayKey(),ad=activeDay(),d=getDay(ad),S=state.settings;
+  const tk=todayKey(),ad=activeDay(),d=peekDay(ad),S=state.settings;
   $('todayLabel').textContent=new Date().toLocaleDateString(LOC(),{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   $('waterCnt').textContent=(d.water/1000).toFixed(2);
   $('waterGoal').textContent=(S.waterGoal/1000).toFixed(1);
@@ -1008,10 +1012,10 @@ function badgeStats(){
   const stepC=S.counters.find(c=>/крок|steps/i.test(c.name));
   const plankEx=S.exercises.find(e=>/планк|plank/i.test(e.name)),pushEx=S.exercises.find(e=>/віджим|push/i.test(e.name)),squatEx=S.exercises.find(e=>/присід|squat/i.test(e.name));
   const coffeeL=S.limitHabits.find(l=>/кав|coffee/i.test(l.name));
-  let perfect=0,good=0,tracked=0,waterHits=0,sleepHits=0,bestSteps=0,totalSteps=0,bestPlank=0,bestPush=0,bestSquat=0,totalPush=0,totalSquat=0,totalPlank=0,maxRecDay=0,maxPushSets=0,maxSquatSets=0,maxPlankSets=0;
+  let perfect=0,good=0,tracked=0,waterHits=0,sleepHits=0,bestSteps=0,totalSteps=0,bestPlank=0,bestPush=0,bestSquat=0,totalPush=0,totalSquat=0,totalPlank=0,maxRecDay=0,maxPushSets=0,maxSquatSets=0,maxPlankSets=0,maxDayScore=0;
   const goodArr=[],coffeeZero=[],mPush={},mSquat={},mPlank={},mWater={},mSteps={},waterDays=[],perfDays=[];
   days.forEach(k=>{const sc=dayScore(k),rest=!!(state.restDays&&state.restDays[k]),ym=k.slice(0,7);
-    if(sc!=null){tracked++;if(sc>=70||rest)good++;if(sc>=100){perfect++;perfDays.push(k);}}
+    if(sc!=null){tracked++;if(sc>=70||rest)good++;if(sc>=100){perfect++;perfDays.push(k);}if(sc>maxDayScore)maxDayScore=sc;}
     const d=state.days[k],ex=d.exercises||{},es=d.exSets||{};
     if((d.recs||0)>maxRecDay)maxRecDay=d.recs||0;
     if(pushEx){const c=(es[pushEx.id]||[]).filter(v=>v>=10).length;if(c>maxPushSets)maxPushSets=c;}
@@ -1033,7 +1037,7 @@ function badgeStats(){
   let reactBest=0;try{reactBest=+localStorage.getItem('react_best'+pkey)||0;}catch(e){}
   return {perfect,good,tracked,waterHits,sleepHits,bestSteps,totalSteps,bestPlank,bestPush,bestSquat,totalPush,totalSquat,totalPlank,
     recPushSet:pushEx?exRecord(pushEx.id):0,recSquatSet:squatEx?exRecord(squatEx.id):0,recPlankSet:plankEx?exRecord(plankEx.id):0,
-    monthPush:mx(mPush),monthSquat:mx(mSquat),monthPlank:mx(mPlank),monthWaterL:Math.round(mx(mWater)/1000),monthSteps:mx(mSteps),maxRecDay,maxPushSets,maxSquatSets,maxPlankSets,
+    monthPush:mx(mPush),monthSquat:mx(mSquat),monthPlank:mx(mPlank),monthWaterL:Math.round(mx(mWater)/1000),monthSteps:mx(mSteps),maxRecDay,maxPushSets,maxSquatSets,maxPlankSets,maxDayScore,
     claimedCount:Object.keys(state.badges||{}).length,reactBest,
     bestStreak:Math.max(bestRun(goodArr),computeStreak()),noCS2Streak:bestRun(Object.keys(steamPlay).filter(k=>steamPlay[k]===0)),coffeeStreak:bestRun(coffeeZero),waterStreak:bestRun(waterDays),perfectStreak:bestRun(perfDays),loanClosed,bestGame};
 }
@@ -1046,6 +1050,8 @@ const BADGE_DEFS=[
  {id:'perfect5',g:'score',e:'🌟',n:'П`ять зірок',ne:'Five stars',f:'Мішленівський рівень',fe:'Michelin level',need:5,u:'днів на 100%',ue:'perfect days',k:'perfect'},
  {id:'good30',g:'score',e:'💚',n:'Хороша форма',ne:'In good shape',f:'30 днів у зеленій зоні',fe:'30 days in the green',need:30,u:'хороших днів',ue:'good days',k:'good'},
  {id:'perfWeek',g:'score',e:'🗓️',n:'Ідеальний тиждень',ne:'Perfect week',f:'7 днів по 100% поспіль',fe:'7 flawless days in a row',need:7,u:'днів на 100% поспіль',ue:'perfect days in a row',k:'perfectStreak'},
+ {id:'score200',g:'score',e:'🔥',n:'Бал 200%',ne:'Score 200%',f:'День на 200% — усе вдвічі',fe:'A 200% day — everything doubled',need:200,u:'% балу за день',ue:'% day score',k:'maxDayScore'},
+ {id:'score300',g:'score',e:'💥',n:'Бал 300%',ne:'Score 300%',f:'Потрійне перевиконання',fe:'Triple over-achievement',need:300,u:'% балу за день',ue:'% day score',k:'maxDayScore'},
  {id:'pushset30',g:'push',e:'🔥',n:'Підхід 30',ne:'Set of 30',f:'30 віджимань без зупинки',fe:'30 push-ups nonstop',need:30,u:'віджимань за підхід',ue:'push-ups in one set',k:'recPushSet'},
  {id:'push_d50',g:'push',e:'💪',n:'Віджим 50',ne:'Push 50',f:'Підлога тебе боїться',fe:'The floor fears you',need:50,u:'віджимань за день',ue:'push-ups a day',k:'bestPush'},
  {id:'pushset50',g:'push',e:'⚡',n:'Підхід 50',ne:'Set of 50',f:'Груди з чавуну',fe:'Cast-iron chest',need:50,u:'віджимань за підхід',ue:'push-ups in one set',k:'recPushSet'},
@@ -1056,6 +1062,7 @@ const BADGE_DEFS=[
  {id:'squatset50',g:'squat',e:'🔥',n:'Підхід 50',ne:'Set of 50',f:'50 присідань поспіль',fe:'50 squats in a row',need:50,u:'присідань за підхід',ue:'squats in one set',k:'recSquatSet'},
  {id:'squat_d50',g:'squat',e:'🦵',n:'Присід 50',ne:'Squat 50',f:'Ноги сказали дякую',fe:'Legs said thank you',need:50,u:'присідань за день',ue:'squats a day',k:'bestSquat'},
  {id:'squatset80',g:'squat',e:'⚡',n:'Підхід 80',ne:'Set of 80',f:'Ноги не здаються',fe:'Legs never quit',need:80,u:'присідань за підхід',ue:'squats in one set',k:'recSquatSet'},
+ {id:'squatset100',g:'squat',e:'🔥',n:'Підхід 100',ne:'Set of 100',f:'100 присідань одним махом',fe:'100 squats in one go',need:100,u:'присідань за підхід',ue:'squats in one set',k:'recSquatSet'},
  {id:'squat_d100',g:'squat',e:'🏋️',n:'Присід 100',ne:'Squat 100',f:'Ноги з бетону',fe:'Concrete legs',need:100,u:'присідань за день',ue:'squats a day',k:'bestSquat'},
  {id:'squat_m1000',g:'squat',e:'📅',n:'1000 за місяць',ne:'1000 a month',f:'Місяць присідав як не в себе',fe:'Squatted all month',need:1000,u:'присідань за місяць',ue:'squats a month',k:'monthSquat'},
  {id:'squat_t5000',g:'squat',e:'🏆',n:'5000 присідань',ne:'5000 squats',f:'Легенда присіду',fe:'Squat legend',need:5000,u:'присідань усього',ue:'squats total',k:'totalSquat'},
@@ -1139,6 +1146,12 @@ function openBadges(justId){
 }
 
 /* ===== ГРАФІК ===== */
+function smoothPath(pts){if(!pts.length)return '';if(pts.length<3)return pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
+  let d='M'+pts[0][0].toFixed(1)+' '+pts[0][1].toFixed(1);
+  for(let i=0;i<pts.length-1;i++){const p0=pts[i-1]||pts[i],p1=pts[i],p2=pts[i+1],p3=pts[i+2]||p2;
+    const c1x=p1[0]+(p2[0]-p0[0])/6,c1y=p1[1]+(p2[1]-p0[1])/6,c2x=p2[0]-(p3[0]-p1[0])/6,c2y=p2[1]-(p3[1]-p1[1])/6;
+    d+=' C'+c1x.toFixed(1)+' '+c1y.toFixed(1)+' '+c2x.toFixed(1)+' '+c2y.toFixed(1)+' '+p2[0].toFixed(1)+' '+p2[1].toFixed(1);}
+  return d;}
 function svgLine({data,w=800,h=150,color='#5cc9dd',goal=null,goalLabel='',avg=false}){
   if(!data.length) return '<div class="empty">немає даних</div>';
   const pad={l:46,r:14,t:14,b:26}, n=data.length;
@@ -1148,7 +1161,7 @@ function svgLine({data,w=800,h=150,color='#5cc9dd',goal=null,goalLabel='',avg=fa
   const X=i=> n<=1? pad.l+iw/2 : pad.l+i/(n-1)*iw;
   const Y=v=> pad.t+ih-(v/maxY)*ih;
   const pts=data.map((d,i)=>[X(i),Y(d.y)]);
-  const path=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
+  const path=smoothPath(pts);
   const area=path+` L ${pts[n-1][0].toFixed(1)} ${Y(0).toFixed(1)} L ${pts[0][0].toFixed(1)} ${Y(0).toFixed(1)} Z`;
   const step=Math.max(1,Math.ceil(n/9));
   let xl='';data.forEach((d,i)=>{if(i%step===0||i===n-1)xl+=`<text x="${X(i).toFixed(1)}" y="${h-8}" fill="#7d859c" font-size="10" text-anchor="middle">${d.x}</text>`;});
@@ -1173,6 +1186,19 @@ function svgBars({data,w=800,h=175,color='#5cc9dd'}){
     bars+=`<text x="${cx.toFixed(1)}" y="${h-8}" fill="#7d859c" font-size="9" text-anchor="end" transform="rotate(-32 ${cx.toFixed(1)} ${h-8})">${lbl}</text>`;});
   const yl=`<text x="6" y="${(pad.t+ih).toFixed(1)}" fill="#7d859c" font-size="10">0</text><text x="6" y="${pad.t+9}" fill="#7d859c" font-size="10">${fmt(Math.round(maxY*.9))}</text>`;
   return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;display:block">${bars}${yl}</svg>`;
+}
+function svgMetricBars({data,w=800,h=180,color='#5cc9dd',goal=null,goalLabel=''}){
+  if(!data.length)return '<div class="empty">немає даних</div>';
+  const pad={l:46,r:14,t:14,b:26},n=data.length;
+  const maxY=Math.max(goal||0,...data.map(d=>d.y),1)*1.12;
+  const iw=w-pad.l-pad.r,ih=h-pad.t-pad.b,gap=iw/n,bw=Math.max(2,Math.min(24,gap*0.72)),Y=v=>pad.t+ih-(v/maxY)*ih;
+  let bars='';data.forEach((d,i)=>{const cx=pad.l+i*gap+gap/2,bh=(d.y/maxY)*ih,yy=pad.t+ih-bh,x=cx-bw/2;
+    const ta=d.day?`data-tip-day="${d.day}"`:`data-tip="${(d.tip||(d.x+': '+fmt(d.y))).replace(/"/g,'&quot;')}"`;
+    bars+=`<rect x="${x.toFixed(1)}" y="${yy.toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1,bh).toFixed(1)}" rx="3" fill="${color}" opacity=".9" ${ta}/>`;});
+  const step=Math.max(1,Math.ceil(n/9));let xl='';data.forEach((d,i)=>{if(i%step===0||i===n-1){const cx=pad.l+i*gap+gap/2;xl+=`<text x="${cx.toFixed(1)}" y="${h-8}" fill="#7d859c" font-size="10" text-anchor="middle">${d.x}</text>`;}});
+  const yl=`<text x="8" y="${(pad.t+ih).toFixed(1)}" fill="#7d859c" font-size="10">0</text><text x="8" y="${(Y(maxY*.9)+3).toFixed(1)}" fill="#7d859c" font-size="10">${fmt(Math.round(maxY*.9))}</text>`;
+  let gl='';if(goal!=null){const gy=Y(goal);gl=`<line x1="${pad.l}" y1="${gy.toFixed(1)}" x2="${w-pad.r}" y2="${gy.toFixed(1)}" stroke="#4fc596" stroke-dasharray="4 4" stroke-width="1" opacity=".8"/><text x="${w-pad.r}" y="${(gy-4).toFixed(1)}" fill="#4fc596" font-size="9" text-anchor="end">${goalLabel||('ціль '+fmt(goal))}</text>`;}
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;display:block">${gl}${bars}${xl}${yl}</svg>`;
 }
 function svgMultiLine({series,labels,w=800,h=190,unit='',hidden={},toggle=false,yMin=null,yMax=null,yFmt=null}){
   const n=series[0]?series[0].data.length:0;
@@ -1230,6 +1256,7 @@ function renderMonth(){
   applyMetricBar();
   $('btnCal').className='sm '+(monthView==='cal'?'acc':'');
   $('btnLine').className='sm '+(monthView==='line'?'acc':'');
+  {const b=$('btnBar');if(b)b.className='sm '+(monthView==='bar'?'acc':'');}
   $('btnRest').className='sm '+(state.restDays&&state.restDays[todayKey()]?'acc':'');
   const mt=curMetric();
   const now=new Date(),y=now.getFullYear(),mo=now.getMonth(),days=new Date(y,mo+1,0).getDate();
@@ -1247,9 +1274,9 @@ function renderMonth(){
     let cells='';for(let i=0;i<start;i++)cells+='<div></div>';
     for(let dd=1;dd<=days;dd++){const k=dayKey(new Date(y,mo,dd)),t=k===todayKey(),rest=!!(state.restDays&&state.restDays[k]);const gotB=Object.values(state.badges||{}).includes(k);const num=dd+(rest?' 🛡':'')+(gotB?' 🏅':'');const ol=t?'outline:2px solid var(--cyan);outline-offset:1px':(k===selDay?'outline:2px solid var(--yellow);outline-offset:1px':'');
       if(mt.id==='all'){const comps=dayComponents(k);const dots=comps?`<div class="mdots">${comps.map(c=>`<i style="background:${compColor(c)}"></i>`).join('')}</div>`:'';
-        cells+=`<div class="d" data-tip-day="${k}" onclick="selectDay('${k}')" style="cursor:pointer;${ol}"><b>${num}</b>${dots}</div>`;
+        cells+=`<div class="d" data-tip-day="${k}" onclick="cellTap('${k}',event)" style="cursor:pointer;${ol}"><b>${num}</b>${dots}</div>`;
       } else {const r=metricDay(mt,k),c=metricColor(mt,r);
-        cells+=`<div class="d" data-tip-day="${k}" onclick="selectDay('${k}')" style="cursor:pointer;background:${c.bg};color:${c.col};${ol}"><b>${num}</b>${r.has?`<small>${metricValTxt(mt,r.v)}</small>`:''}</div>`;}
+        cells+=`<div class="d" data-tip-day="${k}" onclick="cellTap('${k}',event)" style="cursor:pointer;background:${c.bg};color:${c.col};${ol}"><b>${num}</b>${r.has?`<small>${metricValTxt(mt,r.v)}</small>`:''}</div>`;}
     }
     $('monthBody').innerHTML=`<div class="calbig">${head}</div><div class="calbig">${cells}</div>`;
     $('monthLegend').textContent=mt.id==='all'?'':(mt.kind==='limit'?'🟩 в межах ліміту · 🟥 перебір · ▫️ немає даних':'🟩 ціль виконана · 🟨 частково · 🟥 мало · ▫️ немає даних');
@@ -1283,7 +1310,7 @@ function renderMonth(){
     } else {
       const data=[];for(let dd=1;dd<=lastDay;dd++){const k=dayKey(new Date(y,mo,dd)),r=metricDay(gm,k);if(gm.id==='score'){data.push({x:dd,y:r.has?r.v:0,day:k});}else{data.push({x:dd,y:r.has?r.v:0,tip:dd+' '+msh+': '+(r.has?metricValTxt(gm,r.v):'немає даних')});}}
       const color=gm.kind==='limit'?'#e56b7b':'#5cc9dd';
-      $('monthBody').innerHTML=svgLine({data,color,goal:metricGoal(gm),goalLabel:gm.kind==='limit'?'ліміт':'ціль',h:180,avg:true});
+      $('monthBody').innerHTML=(monthView==='bar')?svgMetricBars({data,color,goal:metricGoal(gm),goalLabel:gm.kind==='limit'?'ліміт':'ціль',h:190}):svgLine({data,color,goal:metricGoal(gm),goalLabel:gm.kind==='limit'?'ліміт':'ціль',h:180,avg:true});
       $('monthLegend').textContent=(gm.kind==='limit'?'Значення по днях; зелена пунктирна — ліміт.':'Значення по днях; зелена пунктирна — ціль.');
     }
   }
@@ -1383,14 +1410,23 @@ function renderOverview(){
   }
 }
 
-/* тултіп календаря (миттєвий) */
+/* тултіп: миша — наведення; тач — тап (1 тап тултіп, подвійний — відкрити день) */
+let _tipPinned=false;
+function placeTipAtPoint(px,py){const tip=$('tip');const r=tip.getBoundingClientRect();let x=px+14,y=py+14;if(x+r.width>innerWidth-8)x=px-r.width-14;if(y+r.height>innerHeight-8)y=py-r.height-14;x=Math.max(8,Math.min(x,innerWidth-r.width-8));y=Math.max(8,Math.min(y,innerHeight-r.height-8));tip.style.left=x+'px';tip.style.top=y+'px';}
+function placeTipNear(el){const tip=$('tip');const r=el.getBoundingClientRect(),tr=tip.getBoundingClientRect();let x=r.left+r.width/2-tr.width/2;x=Math.max(8,Math.min(x,innerWidth-tr.width-8));let y=r.bottom+8;if(y+tr.height>innerHeight-8)y=r.top-tr.height-8;y=Math.max(8,Math.min(y,innerHeight-tr.height-8));tip.style.left=x+'px';tip.style.top=y+'px';}
+function fillTip(el){const tip=$('tip');const day=el.getAttribute('data-tip-day');if(day){tip.style.whiteSpace='normal';tip.innerHTML=dayTipHTML(day);}else{tip.style.whiteSpace='pre-line';tip.textContent=(el.getAttribute('data-tip')||'').replace(/¶/g,'\n');}tip.classList.add('on');}
+function hideTip(){$('tip').classList.remove('on');_tipPinned=false;}
+function showDayTipEl(k,el){const tip=$('tip');tip.style.whiteSpace='normal';tip.innerHTML=dayTipHTML(k);tip.classList.add('on');placeTipNear(el);_tipPinned=true;}
+let _tapT=null,_tapK=null;
+function cellTap(k,ev){const cell=ev.currentTarget;
+  if(_tapT&&_tapK===k){clearTimeout(_tapT);_tapT=null;_tapK=null;hideTip();selectDay(k);return;} // подвійний — відкрити день
+  if(_tapT)clearTimeout(_tapT);
+  _tapK=k;_tapT=setTimeout(()=>{_tapT=null;_tapK=null;showDayTipEl(k,cell);},250);} // одинарний — тултіп
 function initTip(){if(document.body._tip)return;document.body._tip=1;const tip=$('tip');
-  document.body.addEventListener('pointermove',e=>{const el=e.target.closest&&e.target.closest('[data-tip],[data-tip-day]');
-    if(!el){tip.classList.remove('on');return;}
-    const day=el.getAttribute('data-tip-day');
-    if(day){tip.style.whiteSpace='normal';tip.innerHTML=dayTipHTML(day);}else{tip.style.whiteSpace='pre-line';tip.textContent=el.getAttribute('data-tip').replace(/¶/g,'\n');}
-    tip.classList.add('on');
-    const r=tip.getBoundingClientRect();let x=e.clientX+14,y=e.clientY+14;if(x+r.width>innerWidth-8)x=e.clientX-r.width-14;if(y+r.height>innerHeight-8)y=e.clientY-r.height-14;tip.style.left=x+'px';tip.style.top=y+'px';});}
+  document.body.addEventListener('pointermove',e=>{if(e.pointerType==='touch')return;const el=e.target.closest&&e.target.closest('[data-tip],[data-tip-day]');
+    if(!el){if(!_tipPinned)tip.classList.remove('on');return;}
+    fillTip(el);placeTipAtPoint(e.clientX,e.clientY);});
+  document.addEventListener('click',e=>{if(_tipPinned&&!e.target.closest('[data-tip-day],#tip,.pill'))hideTip();});}
 
 /* нагадування */
 let remTimer=null,lastRemMs=0;

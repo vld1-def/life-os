@@ -61,7 +61,8 @@
       "Bash(python -c \"import sys,json;d=json.load\\(sys.stdin\\);g=d['response']['games'];print\\('total:',sum\\(x.get\\('playtime_forever',0\\) for x in g\\)\\)\")",
       "Bash(grep -n \"r.has?metricValTxt\\(gm,r.v\\):'немає даних'\\\\|svgLine\\({data,color,goal:metricGoal\" index.html)",
       "Bash(grep -n 'const tip=dayTitle\\(k,rest\\)\\\\|data-tip=\"\\\\${tip}\"\\\\|data-tip=' index.html)",
-      "Bash(grep -n \"const tip=gm.id==='score'?dayTitle\\\\|data.push\\({x:dd,y:r.has?r.v:0,tip}\\)\" index.html)"
+      "Bash(grep -n \"const tip=gm.id==='score'?dayTitle\\\\|data.push\\({x:dd,y:r.has?r.v:0,tip}\\)\" index.html)",
+      "Bash(grep -n 'onclick=\"selectDay\\(.\\\\${k}.\\)\"' index.html)"
     ]
   }
 }
