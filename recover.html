@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LIFE OS — відновлення даних</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{color-scheme:dark}
+  body{margin:0;background:#05060d;color:#e7ecf3;font-family:-apple-system,Segoe UI,Arial,sans-serif;padding:18px;line-height:1.5}
+  h1{font-size:20px;margin:0 0 4px}
+  .sub{color:#8791a3;font-size:13px;margin-bottom:16px}
+  .card{background:#0f1320;border:1px solid #1e2438;border-radius:14px;padding:14px;margin:10px 0}
+  .k{font-weight:700}
+  .ok{color:#4fc596}.warn{color:#e3bd68}.bad{color:#e56b7b}
+  .muted{color:#8791a3;font-size:13px}
+  textarea{width:100%;height:150px;background:#05060d;color:#8fa;border:1px solid #1e2438;border-radius:10px;font-size:11px;margin-top:8px;box-sizing:border-box}
+  button{background:#5cc9dd;color:#05060d;border:0;border-radius:10px;padding:10px 14px;font-weight:700;font-size:14px;margin-top:8px}
+  #status{white-space:pre-wrap;font-size:14px}
+</style>
+</head>
+<body>
+  <h1>🆘 Відновлення даних LIFE OS</h1>
+  <div class="sub">Ця сторінка лише ЧИТАЄ локальну пам'ять і зберігає бекап. Вона НЕ запускає застосунок і нічого не стирає.</div>
+  <div class="card"><div id="status">Читаю локальну пам'ять…</div></div>
+  <div id="dumps"></div>
+
+<script>
+const SUPABASE_URL='https://xezhbqcteaihrlrykbkr.supabase.co';
+const SUPABASE_ANON_KEY='sb_publishable_qNcUyFxMlWAWAry3uSHndg_ADVMCE3a';
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+const $=id=>document.getElementById(id);
+function idFor(key){ if(key==='lifeos_cache')return 'me'; if(key.indexOf('lifeos_cache_')===0)return 'profile_'+key.slice('lifeos_cache_'.length); return null; }
+(async function(){
+  const found=[];
+  for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i); if(key && key.indexOf('lifeos_cache')===0){ found.push(key); }}
+  if(!found.length){ $('status').innerHTML='<span class="bad">На цьому пристрої немає локального кешу LIFE OS.</span>\nМожливо, він уже перезаписаний, або дані в іншому контексті (застосунок з екрана vs Safari).'; return; }
+  let log='Знайдено кешів: '+found.length+'\n\n';
+  for(const key of found){
+    const id=idFor(key); let obj=null, days=0;
+    try{obj=JSON.parse(localStorage.getItem(key));}catch(e){}
+    days=obj&&obj.days?Object.keys(obj.days).length:0;
+    log+=key+' → '+(id||'?')+': '+days+' днів\n';
+    // показуємо дамп для ручного копіювання
+    const c=document.createElement('div'); c.className='card';
+    c.innerHTML='<div class="k">'+key+' <span class="'+(days>0?'ok':'warn')+'">('+days+' днів)</span></div>'+
+      '<div class="muted">Скопіюй цей текст і надішли, якщо автозалив не спрацює:</div>'+
+      '<textarea readonly onclick="this.select()">'+(localStorage.getItem(key)||'')+'</textarea>';
+    $('dumps').appendChild(c);
+    // автозалив у бекап, якщо є дні і не «худне»
+    if(id && days>0){
+      try{
+        const bid='bak_'+id;
+        const {data}=await sb.from('solo').select('data').eq('id',bid).maybeSingle();
+        const bakDays=data&&data.data&&data.data.days?Object.keys(data.data.days).length:0;
+        if(days>=bakDays){ const {error}=await sb.from('solo').upsert({id:bid,data:obj,updated_at:new Date().toISOString()}); log+=(error?('  ⚠ помилка заливу: '+error.message):('  ✅ залито в '+bid))+'\n'; }
+        else log+='  ↷ на сервері вже кращий бекап ('+bakDays+' днів)\n';
+      }catch(e){ log+='  ⚠ '+e.message+'\n'; }
+    }
+  }
+  const totalDays=found.reduce((a,k)=>{try{const o=JSON.parse(localStorage.getItem(k));return a+(o&&o.days?Object.keys(o.days).length:0);}catch(e){return a;}},0);
+  log+='\n'+(totalDays>0?'✅ Готово. Напиши Клоду — я відновлю з бекапу.':'⚠ Кеш порожній — відновлювати з нього нічого.');
+  $('status').innerHTML=log;
+})();
+</script>
+</body>
+</html>
