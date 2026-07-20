@@ -925,7 +925,15 @@ function selectDay(k){if(k>todayKey())return;selDay=(k===todayKey())?null:k;rend
 function compRatio(c){ // частка балу пункту (без обмеження зверху); ліміти дають бонус за «під нормою»
   if(c.kind==='limit'){const mx=c.mx;if(mx<=0)return c.v<=0?1:0;return c.v<=mx?1+(1-c.v/mx)*0.5:Math.max(0,1-(c.v-mx)/mx);}
   return c.goal>0?c.v/c.goal:(c.v>0?1:0);}
-function dayComponents(k){const d=state.days[k];if(!d)return null;const S=state.settings,a=[];
+function dayEmpty(d){ // день існує, але нічого не залоговано → трактуємо як «немає даних», а не провал 0%
+  if(!d)return true;
+  if(+d.water>0)return false;
+  if(d.note&&String(d.note).trim())return false;
+  if(d.sleep&&(d.sleep.b||d.sleep.w))return false;
+  const anyPos=o=>o&&Object.values(o).some(v=>+v>0);
+  return !(anyPos(d.exercises)||anyPos(d.limits)||anyPos(d.counters));
+}
+function dayComponents(k){const d=state.days[k];if(!d||dayEmpty(d))return null;const S=state.settings,a=[];
   const add=o=>{o.ratio=compRatio(o);o.pct=o.ratio;o.ok=(o.kind==='limit')?(o.v<=o.mx):(o.v>=o.goal);a.push(o);};
   if(mod('water'))add({label:'Вода',kind:'goal',v:d.water||0,goal:S.waterGoal,txt:((d.water||0)/1000).toFixed(1)+'л / '+(S.waterGoal/1000)+'л'});
   if(mod('activity'))S.exercises.forEach(ex=>{const t=exTarget(ex,k),v=d.exercises[ex.id]||0;add({label:ex.name,kind:'goal',v,goal:t,txt:v+' / '+t});});
