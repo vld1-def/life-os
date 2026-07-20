@@ -1037,6 +1037,8 @@ function bestRun(keys){const arr=[...new Set(keys)].sort();let best=0,run=0,prev
 function badgeStats(){
   const days=Object.keys(state.days),S=state.settings;
   const stepC=S.counters.find(c=>/крок|steps/i.test(c.name));
+  const bookC=S.counters.find(c=>/книг|book/i.test(c.name)),gymC=S.counters.find(c=>/зал|gym/i.test(c.name));
+  let bookPages=0,gymTotal=0;
   const plankEx=S.exercises.find(e=>/планк|plank/i.test(e.name)),pushEx=S.exercises.find(e=>/віджим|push/i.test(e.name)),squatEx=S.exercises.find(e=>/присід|squat/i.test(e.name));
   const coffeeL=S.limitHabits.find(l=>/кав|coffee/i.test(l.name));
   let perfect=0,good=0,tracked=0,waterHits=0,sleepHits=0,bestSteps=0,totalSteps=0,bestPlank=0,bestPush=0,bestSquat=0,totalPush=0,totalSquat=0,totalPlank=0,maxRecDay=0,maxPushSets=0,maxSquatSets=0,maxPlankSets=0,maxDayScore=0;
@@ -1051,6 +1053,8 @@ function badgeStats(){
     if(d.water>=S.waterGoal){waterHits++;waterDays.push(k);}
     const sh=sleepHours(k);if(sh>0&&sh>=(S.sleepGoal||8))sleepHits++;
     if(stepC){const v=(d.counters&&d.counters[stepC.id])||0;if(v>bestSteps)bestSteps=v;totalSteps+=v;mSteps[ym]=(mSteps[ym]||0)+v;}
+    if(bookC)bookPages+=(d.counters&&d.counters[bookC.id])||0;
+    if(gymC)gymTotal+=(d.counters&&d.counters[gymC.id])||0;
     const pv=pushEx?(ex[pushEx.id]||0):0,sv=squatEx?(ex[squatEx.id]||0):0,plv=plankEx?(ex[plankEx.id]||0):0;
     totalPush+=pv;totalSquat+=sv;totalPlank+=plv;
     if(pv>bestPush)bestPush=pv;if(sv>bestSquat)bestSquat=sv;if(plv>bestPlank)bestPlank=plv;
@@ -1065,10 +1069,10 @@ function badgeStats(){
   return {perfect,good,tracked,waterHits,sleepHits,bestSteps,totalSteps,bestPlank,bestPush,bestSquat,totalPush,totalSquat,totalPlank,
     recPushSet:pushEx?exRecord(pushEx.id):0,recSquatSet:squatEx?exRecord(squatEx.id):0,recPlankSet:plankEx?exRecord(plankEx.id):0,
     monthPush:mx(mPush),monthSquat:mx(mSquat),monthPlank:mx(mPlank),monthWaterL:Math.round(mx(mWater)/1000),monthSteps:mx(mSteps),maxRecDay,maxPushSets,maxSquatSets,maxPlankSets,maxDayScore,
-    claimedCount:Object.keys(state.badges||{}).length,reactBest,
+    claimedCount:Object.keys(state.badges||{}).length,reactBest,bookPages,gymTotal,
     bestStreak:Math.max(bestRun(goodArr),computeStreak()),noCS2Streak:bestRun(Object.keys(steamPlay).filter(k=>steamPlay[k]===0)),coffeeStreak:bestRun(coffeeZero),waterStreak:bestRun(waterDays),perfectStreak:bestRun(perfDays),loanClosed,bestGame};
 }
-const BADGE_GROUPS=[['streak','🔥 Серії','🔥 Streaks'],['score','⭐ Ідеал','⭐ Perfection'],['push','💪 Віджимання','💪 Push-ups'],['squat','🦵 Присідання','🦵 Squats'],['plank','🧘 Планка','🧘 Plank'],['steps','👣 Кроки','👣 Steps'],['water','💧 Вода','💧 Water'],['sleep','😴 Сон','😴 Sleep'],['games','🎮 Ігри','🎮 Games'],['coffee','☕ Кава','☕ Coffee'],['read','📖 Читання','📖 Reading'],['tenure','📅 Стаж','📅 Tenure'],['finance','💰 Гроші','💰 Money'],['game','🎮 Міні-ігри','🎮 Mini-games'],['meta','👑 Майстерність','👑 Mastery']];
+const BADGE_GROUPS=[['streak','🔥 Серії','🔥 Streaks'],['score','⭐ Ідеал','⭐ Perfection'],['push','💪 Віджимання','💪 Push-ups'],['squat','🦵 Присідання','🦵 Squats'],['plank','🧘 Планка','🧘 Plank'],['steps','👣 Кроки','👣 Steps'],['water','💧 Вода','💧 Water'],['sleep','😴 Сон','😴 Sleep'],['games','🎮 Ігри','🎮 Games'],['coffee','☕ Кава','☕ Coffee'],['gym','🏋️ Зал','🏋️ Gym'],['read','📖 Читання','📖 Reading'],['tenure','📅 Стаж','📅 Tenure'],['finance','💰 Гроші','💰 Money'],['game','🎮 Міні-ігри','🎮 Mini-games'],['meta','👑 Майстерність','👑 Mastery']];
 const BADGE_DEFS=[
  {id:'streak7',g:'streak',e:'🔥',n:'Тижнева серія',ne:'Weekly streak',f:'Тиждень без відмазок 💥',fe:'A week, zero excuses 💥',need:7,u:'днів поспіль',ue:'days in a row',k:'bestStreak'},
  {id:'streak14',g:'streak',e:'💪',n:'Два тижні',ne:'Two weeks',f:'Воля з титану',fe:'Titanium willpower',need:14,u:'днів поспіль',ue:'days in a row',k:'bestStreak'},
@@ -1136,6 +1140,10 @@ const BADGE_DEFS=[
  {id:'collector',g:'meta',e:'📦',n:'Колекціонер',ne:'Collector',f:'Ціла полиця бейджів',fe:'A whole shelf of badges',need:20,u:'відкритих бейджів',ue:'badges unlocked',k:'claimedCount'},
  {id:'combo3',g:'meta',e:'🔥',n:'Комбо-майстер',ne:'Combo master',f:'Три рекорди за один день',fe:'Three records in one day',need:3,u:'рекорди за день',ue:'records in a day',k:'maxRecDay'},
  {id:'book1',g:'read',prof:'bodia',manual:true,e:'📚',n:'Прочитав книгу',ne:'Read a book',f:'Ціла книга — від першої до останньої сторінки',fe:'A whole book, cover to cover',need:1,u:'книга',ue:'book'},
+ {id:'read50',g:'read',prof:'bodia',e:'📖',n:'50 сторінок',ne:'50 pages',f:'Півсотні сторінок позаду',fe:'Fifty pages down',need:50,u:'сторінок',ue:'pages',k:'bookPages'},
+ {id:'read100',g:'read',prof:'bodia',e:'📚',n:'100 сторінок',ne:'100 pages',f:'Сотня сторінок — так тримати',fe:'A hundred pages, keep going',need:100,u:'сторінок',ue:'pages',k:'bookPages'},
+ {id:'gym1',g:'gym',prof:'bodia',e:'🏋️',n:'Перше заняття',ne:'First workout',f:'Найважчий крок — зайти в зал уперше',fe:'The hardest step is the first gym visit',need:1,u:'заняття',ue:'workout',k:'gymTotal'},
+ {id:'gym10',g:'gym',prof:'bodia',e:'💪',n:'10 занять',ne:'10 workouts',f:'Зал уже впізнає тебе',fe:'The gym knows you now',need:10,u:'занять',ue:'workouts',k:'gymTotal'},
 ];
 function badgeName(id){if(id.indexOf('master_')===0)return '👑 Майстер';const b=BADGE_DEFS.find(x=>x.id===id);return b?b.e+' '+TT(b.n,b.ne):id;}
 function badgeReached(b){return b.manual?true:(b.lower?(b.val>0&&b.val<=b.need):(b.val>=b.need));}
@@ -1400,16 +1408,18 @@ function monthStats(){
 }
 /* ===== ЗВІТ МІСЯЦЯ КАРТИНКОЮ ===== */
 function monthReportStats(){
-  const s=monthStats(),mk=monthKey();const stepC=state.settings.counters.find(c=>/крок|steps/i.test(c.name));
-  let totSteps=0,bestStepsDay=0,waterMl=0,activeDays=0,socialMin=0,sleepTot=0,sleepN=0;
+  const s=monthStats(),mk=monthKey();const C=state.settings.counters;const stepC=C.find(c=>/крок|steps/i.test(c.name)),bookC=C.find(c=>/книг|book/i.test(c.name)),gymC=C.find(c=>/зал|gym/i.test(c.name));
+  let totSteps=0,bestStepsDay=0,waterMl=0,activeDays=0,socialMin=0,sleepTot=0,sleepN=0,bookPages=0,gymSessions=0;
   for(let dd=1;dd<=s.elapsed;dd++){const k=mk+'-'+String(dd).padStart(2,'0'),d=state.days[k];
     if(screenApps[k])socialMin+=Object.values(screenApps[k]).reduce((a,b)=>a+b,0);
     const sh=sleepHours(k);if(sh>0){sleepTot+=sh;sleepN++;}
     if(!d)continue;activeDays++;
     if(stepC){const v=(d.counters&&d.counters[stepC.id])||0;totSteps+=v;if(v>bestStepsDay)bestStepsDay=v;}
+    if(bookC)bookPages+=(d.counters&&d.counters[bookC.id])||0;
+    if(gymC)gymSessions+=(d.counters&&d.counters[gymC.id])||0;
     waterMl+=d.water||0;}
   const bs=badgeStats();
-  return {...s,totSteps,avgSteps:activeDays?Math.round(totSteps/activeDays):0,bestStepsDay,waterL:Math.round(waterMl/100)/10,activeDays,
+  return {...s,totSteps,avgSteps:activeDays?Math.round(totSteps/activeDays):0,bestStepsDay,waterL:Math.round(waterMl/100)/10,activeDays,hasSteps:!!stepC,bookPages,gymSessions,
     socialH:Math.round(socialMin/60*10)/10,sleepTot:Math.round(sleepTot),sleepAvg:sleepN?Math.round(sleepTot/sleepN*10)/10:0,avgSpent:s.elapsed?Math.round(s.spent/s.elapsed):0,
     recPush:bs.recPushSet,recSquat:bs.recSquatSet,recPlank:bs.recPlankSet,streak:computeStreak()};
 }
@@ -1417,17 +1427,25 @@ function buildMonthReportSVG(){
   const r=monthReportStats(),mn=new Date().toLocaleDateString('uk-UA',{month:'long',year:'numeric'}),cur=state.settings.currency||'₴';
   const W=800,H=1000,pad=60;  // 4:5
   const C={green:'#4fc596',cyan:'#5cc9dd',purple:'#9d8ad6',blue:'#7cc5ff',yellow:'#e3bd68',red:'#e56b7b',white:'#e7ecf3'};
-  const stats=[
-    [C.white,fmt(r.totSteps),'кроків за місяць'],[C.cyan,fmt(r.avgSteps),'середньо/день'],
-    [C.blue,r.waterL+' л','води випито'],[C.green,r.good+'/'+r.daysIn,'хороші дні'],
-    [C.purple,r.sleepTot+' год','сну всього'],[C.purple,r.sleepAvg+' год','сон/ніч'],
-    [C.yellow,r.gamesH+' год','CS2'],[C.yellow,r.socialH+' год','соцмережі'],
-    [C.red,fmt(Math.round(r.spent))+' '+cur,'витрати'],[C.red,fmt(r.avgSpent)+' '+cur,'витрати/день']
-  ];
-  const colX=[W*0.28,W*0.72],rowY=[300,400,500,600,700];
-  let sg='';stats.forEach((st,i)=>{const cx=colX[i%2],y=rowY[(i-i%2)/2];
-    sg+=`<text x="${cx}" y="${y}" font-size="40" font-weight="800" text-anchor="middle" fill="${st[0]}" font-family="Arial,sans-serif">${st[1]}</text><text x="${cx}" y="${y+27}" font-size="16.5" text-anchor="middle" fill="#8791a3" font-family="Arial,sans-serif">${st[2]}</text>`;});
+  // плитки лише з наявних даних цього профілю
+  const tiles=[];
+  if(r.hasSteps&&r.totSteps>0){tiles.push([C.white,fmt(r.totSteps),'кроків за місяць']);tiles.push([C.cyan,fmt(r.avgSteps),'середньо/день']);}
+  if(mod('water')&&r.waterL>0)tiles.push([C.blue,r.waterL+' л','води випито']);
+  tiles.push([C.green,r.good+'/'+r.daysIn,'хороші дні']);
+  if(mod('sleep')&&r.sleepTot>0){tiles.push([C.purple,r.sleepTot+' год','сну всього']);tiles.push([C.purple,r.sleepAvg+' год','сон/ніч']);}
+  if(PROFILE==='me'&&r.gamesH>0)tiles.push([C.yellow,r.gamesH+' год','CS2']);
+  if(r.socialH>0)tiles.push([C.yellow,r.socialH+' год','соцмережі']);
+  if(r.gymSessions>0)tiles.push([C.green,fmt(r.gymSessions),'занять у залі']);
+  if(r.bookPages>0)tiles.push([C.cyan,fmt(r.bookPages),'сторінок прочитано']);
+  if(mod('finance')&&r.spent>0){tiles.push([C.red,fmt(Math.round(r.spent))+' '+cur,'витрати']);tiles.push([C.red,fmt(r.avgSpent)+' '+cur,'витрати/день']);}
   const dv=y=>`<line x1="${pad}" y1="${y}" x2="${W-pad}" y2="${y}" stroke="rgba(255,255,255,0.09)" stroke-width="1"/>`;
+  const recs=[];if(r.recPush>0)recs.push('💪 '+r.recPush);if(r.recSquat>0)recs.push('🦵 '+r.recSquat);if(r.recPlank>0)recs.push('🧘 '+r.recPlank+'с');
+  const botA=recs.length?740:900,topA=250,rows=Math.max(1,Math.ceil(tiles.length/2));
+  const gap=rows>1?Math.min(104,(botA-topA)/(rows-1)):0,startY=Math.round((topA+botA)/2-(rows-1)*gap/2);
+  const colX=[W*0.28,W*0.72];
+  let sg='';tiles.forEach((st,i)=>{const row=Math.floor(i/2),lastSingle=(i===tiles.length-1&&tiles.length%2===1),cx=lastSingle?W/2:colX[i%2],y=startY+row*gap;
+    sg+=`<text x="${cx}" y="${y}" font-size="40" font-weight="800" text-anchor="middle" fill="${st[0]}" font-family="Arial,sans-serif">${st[1]}</text><text x="${cx}" y="${y+27}" font-size="16.5" text-anchor="middle" fill="#8791a3" font-family="Arial,sans-serif">${st[2]}</text>`;});
+  const recBlock=recs.length?`${dv(756)}<text x="${W/2}" y="805" font-size="17" text-anchor="middle" fill="#8791a3" letter-spacing="2" font-family="Arial,sans-serif">РЕКОРДИ ЗА ПІДХІД</text><text x="${W/2}" y="853" font-size="36" font-weight="800" text-anchor="middle" fill="#e7ecf3" font-family="Arial,sans-serif">${recs.join('   ·   ')}</text>`:'';
   return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;border-radius:16px">
     <defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5cc9dd"/><stop offset="1" stop-color="#9d8ad6"/></linearGradient></defs>
     <rect width="${W}" height="${H}" fill="#0a0c14"/>
@@ -1436,9 +1454,7 @@ function buildMonthReportSVG(){
     <text x="${pad}" y="185" font-size="20" fill="#8791a3" font-family="Arial,sans-serif">${profileName()} · ${r.activeDays} днів активності · 🔥 серія ${r.streak}</text>
     ${dv(218)}
     ${sg}
-    ${dv(756)}
-    <text x="${W/2}" y="805" font-size="17" text-anchor="middle" fill="#8791a3" letter-spacing="2" font-family="Arial,sans-serif">РЕКОРДИ ЗА ПІДХІД</text>
-    <text x="${W/2}" y="853" font-size="36" font-weight="800" text-anchor="middle" fill="#e7ecf3" font-family="Arial,sans-serif">💪 ${r.recPush}   ·   🦵 ${r.recSquat}   ·   🧘 ${r.recPlank}с</text>
+    ${recBlock}
     <text x="${W/2}" y="954" font-size="17" text-anchor="middle" fill="#5a6273" font-family="Arial,sans-serif">life-os · ${todayKey()}</text>
   </svg>`;
 }
