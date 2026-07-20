@@ -873,11 +873,13 @@ const _c={};
 // «чиста» прогресія цілі — росте на grow щодня, БЕЗ штрафу (щоб штраф не накопичувався)
 function exProg(ex,k){const ck='P'+ex.id+'|'+k;if(_c[ck]!=null)return _c[ck];const p=prevKey(k);if(!state.days[p])return _c[ck]=ex.base;
   return _c[ck]=Math.min(2000,Math.round(exProg(ex,p)+(ex.grow||0)));}
-// ціль дня = прогресія + разова надбавка за ВЧОРАШНІЙ недобір (недобір×множник; штраф не переноситься далі)
+// ціль дня = чиста прогресія + штраф за недобір проти РЕАЛЬНОЇ вчорашньої цілі (тягнеться, поки не наздоженеш);
+// сам штраф обмежений (base×5), щоб не вибухав до 2000, а звичайне зростання цілі лишалось
 function exTarget(ex,k){const ck=ex.id+'|'+k;if(_c[ck]!=null)return _c[ck];const p=prevKey(k);if(!state.days[p])return _c[ck]=ex.base;
-  const progPrev=exProg(ex,p),prog=Math.min(2000,Math.round(progPrev+(ex.grow||0)));
+  const prog=Math.min(2000,Math.round(exProg(ex,p)+(ex.grow||0)));
   const pd=(state.days[p].exercises&&state.days[p].exercises[ex.id])||0;
-  const penalty=Math.max(0,progPrev-pd)*(ex.penalty||0);
+  const cap=(ex.base||1)*5; // ліміт штрафної надбавки
+  const penalty=Math.min(cap,Math.max(0,exTarget(ex,p)-pd)*(ex.penalty||0)); // недобір проти вчорашньої ЦІЛІ (зі штрафом)
   return _c[ck]=Math.min(2000,Math.round(prog+penalty));}
 function addWater(n){const d=getDay(activeDay());d.water=Math.max(0,d.water+n);save();}
 function addEx(id,n){const d=getDay(activeDay());d.exercises[id]=Math.max(0,(d.exercises[id]||0)+n);save();}
