@@ -677,6 +677,19 @@ const BODIA_AV='<svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg"><cir
 let profiles=[{id:'me',name:'Влад',emoji:'🧑'},{id:'bodia',name:'Бодя',avatar:BODIA_AV}];
 let selDay=null; const activeDay=()=>selDay||todayKey();
 
+/* ===== АВТОБЕКАП: зберігає локальний кеш у окремий рядок bak_<id> ще до будь-якого перезапису ===== */
+async function snapshotBackup(){
+  try{
+    if(!sb)return;
+    const raw=localStorage.getItem(cacheKey); if(!raw)return;
+    let obj; try{obj=JSON.parse(raw);}catch(e){return;}
+    const days=obj&&obj.days?Object.keys(obj.days).length:0; if(days<1)return; // нема що бекапити
+    const bid='bak_'+SOLO_ID;
+    const {data}=await sb.from('solo').select('data').eq('id',bid).maybeSingle();
+    const bakDays=data&&data.data&&data.data.days?Object.keys(data.data.days).length:0;
+    if(days>=bakDays) await sb.from('solo').upsert({id:bid,data:obj,updated_at:new Date().toISOString()}); // не даємо бекапу «схуднути»
+  }catch(e){}
+}
 /* ===== АВТЕНТИФІКАЦІЯ ===== */
 async function boot(){
   if(!configured) return;
@@ -687,6 +700,7 @@ async function boot(){
   }
   let started=false;
   const start=()=>{if(started)return;started=true;enterApp();};
+  snapshotBackup(); // синхронно фіксує локальний кеш у bak_<id> ще до перезапису при завантаженні
   const cache=localStorage.getItem(cacheKey);
   if(cache){ try{ state=migrate(JSON.parse(cache)); start(); }catch(e){} }
   setSync('busy');
@@ -695,7 +709,8 @@ async function boot(){
     if(error) throw error;
     if(data&&data.data){
       if(!dirty && JSON.stringify(data.data)!==localStorage.getItem(cacheKey)){ state=migrate(data.data); localStorage.setItem(cacheKey,JSON.stringify(state)); if(started) render(); }
-    } else { await sb.from('solo').upsert({id:SOLO_ID,data:state}); localStorage.setItem(cacheKey,JSON.stringify(state)); }
+    } else if(state.days && Object.keys(state.days).length>0){ // створюємо рядок ЛИШЕ якщо є що зберігати — щоб збій мережі не затер наявний рядок дефолтами
+      await sb.from('solo').upsert({id:SOLO_ID,data:state}); localStorage.setItem(cacheKey,JSON.stringify(state)); }
     start(); render(); setSync('ok');
   }catch(e){ start(); setSync('off'); }
 }
@@ -754,6 +769,13 @@ function renderOverviewToggles(){$('setOverview').innerHTML=OVSTATS.filter(([k])
 let saveTimer=null, dirty=false;
 function scheduleSync(){ dirty=true; localStorage.setItem(cacheKey,JSON.stringify(state)); setSync('busy'); clearTimeout(saveTimer); saveTimer=setTimeout(pushState,700); }
 async function pushState(){
+  try{ // 🛡 не даємо порожньому стану затерти непорожні дані на сервері (захист від втрати даних)
+    if(!state.days || Object.keys(state.days).length===0){
+      const {data}=await sb.from('solo').select('data').eq('id',SOLO_ID).maybeSingle();
+      const srv=data&&data.data&&data.data.days?Object.keys(data.data.days).length:0;
+      if(srv>0){ dirty=false; setSync('off'); toast('🛡 Захист даних: не зберігаю порожній стан поверх твоїх даних'); return; }
+    }
+  }catch(e){}
   const {error}=await sb.from('solo').upsert({id:SOLO_ID,data:state,updated_at:new Date().toISOString()});
   if(!error)dirty=false; setSync(error?'off':'ok'); if(error)toast('Немає зв\'язку — збережу локально');
 }
