@@ -843,7 +843,7 @@ function debtMonthlySeries(n){const arr=[],now=new Date();for(let i=n-1;i>=0;i--
 function getDay(k){if(!state.days[k])state.days[k]={water:0,exercises:{},limits:{},counters:{},note:''};const d=state.days[k];d.counters=d.counters||{};d.limits=d.limits||{};d.exercises=d.exercises||{};d.note=d.note??'';return d;}
 function peekDay(k){return state.days[k]||{water:0,exercises:{},limits:{},counters:{},note:'',sleep:{}};} // читання без створення дня
 const _c={};
-function exTarget(ex,k){const ck=ex.id+'|'+k;if(_c[ck]!=null)return _c[ck];if(!state.days[prevKey(k)])return _c[ck]=ex.base;const p=prevKey(k),pt=exTarget(ex,p);const pd=(state.days[p].exercises&&state.days[p].exercises[ex.id])||0;const g=ex.grow||0;if(pd>=pt)return _c[ck]=Math.min(ex.base*10,Math.round(g?pt+g:ex.base));return _c[ck]=Math.min(ex.base*10,Math.max(ex.base,Math.round(pt*ex.penalty)));}
+function exTarget(ex,k){const ck=ex.id+'|'+k;if(_c[ck]!=null)return _c[ck];if(!state.days[prevKey(k)])return _c[ck]=ex.base;const p=prevKey(k),pt=exTarget(ex,p);const pd=(state.days[p].exercises&&state.days[p].exercises[ex.id])||0;const g=ex.grow||0;if(pd>=pt)return _c[ck]=Math.min(ex.base*10,Math.round(g?pt+g:ex.base));return _c[ck]=ex.base;}
 function addWater(n){const d=getDay(activeDay());d.water=Math.max(0,d.water+n);save();}
 function addEx(id,n){const d=getDay(activeDay());d.exercises[id]=Math.max(0,(d.exercises[id]||0)+n);save();}
 function profileName(){return (profiles.find(p=>p.id===PROFILE)||{}).name||PROFILE;}
@@ -1233,7 +1233,7 @@ function setMetric(id){metricSel=id;renderMonth();}
 function setMonthView(v){monthView=v;renderMonth();}
 function metricList(){const S=state.settings;const a=[{id:'all',label:'Усі',kind:'all'},{id:'score',label:'Бал дня',unit:'%',kind:'score'}];if(mod('water'))a.push({id:'water',label:'Вода',unit:'мл',kind:'goal'});if(mod('sleep'))a.push({id:'sleep',label:'Сон',unit:'год',kind:'sleep'});if(mod('weight'))a.push({id:'weight',label:'Вага',unit:'кг',kind:'weight'});if(mod('counters'))S.counters.forEach(c=>a.push({id:'cnt:'+c.id,label:c.name,unit:c.unit,kind:'goal',ref:c}));if(mod('limits'))S.limitHabits.forEach(l=>{if(l.mode==='week')return;a.push({id:'lim:'+l.id,label:l.name,unit:l.unit,kind:'limit',ref:l});});if(mod('activity')&&S.exercises.length)a.push({id:'exmaxAll',label:'🏆 Макс/підхід',unit:'реп',kind:'exmaxAll'});return a;}
 function curMetric(){return metricList().find(m=>m.id===metricSel)||metricList()[0];}
-function metricGoal(mt){if(mt.id==='water')return state.settings.waterGoal;if(mt.id==='sleep')return state.settings.sleepGoal||8;if(mt.id==='weight')return null;if(mt.id==='score')return 70;if(mt.kind==='goal')return mt.ref.goal;if(mt.kind==='limit')return mt.ref.max;return null;}
+function metricGoal(mt){if(mt.id==='water')return state.settings.waterGoal;if(mt.id==='sleep')return state.settings.sleepGoal||8;if(mt.id==='weight')return null;if(mt.id==='score')return 80;if(mt.kind==='goal')return mt.ref.goal;if(mt.kind==='limit')return mt.ref.max;return null;}
 function metricDay(mt,k){const d=state.days[k];if(!d)return{has:false};
   if(mt.id==='score'){const sc=dayScore(k);return{v:sc,goal:100,ok:sc>=70,has:sc!=null};}
   if(mt.id==='water'){return{v:d.water||0,goal:state.settings.waterGoal,ok:(d.water||0)>=state.settings.waterGoal,has:true};}
@@ -1264,7 +1264,7 @@ function renderMonth(){
     const exs=state.settings.exercises,cols=['#5cc9dd','#4fc596','#e3bd68','#9d8ad6','#e56b7b'];
     const series=exs.map((ex,i)=>({name:ex.name,color:cols[i%cols.length],data:[]})),labels=[],msh=now.toLocaleDateString(LOC(),{month:'short'}),last=new Date().getDate();
     for(let dd=1;dd<=last;dd++){const k=dayKey(new Date(y,mo,dd));labels.push(dd+' '+msh);exs.forEach((ex,i)=>series[i].data.push({x:dd,y:exMaxSet(ex.id,k)}));}
-    $('monthBody').innerHTML=exs.length?svgMultiLine({series,labels,unit:'реп',h:200,hidden:hiddenLines,toggle:true}):'<div class="empty">немає вправ</div>';
+    $('monthBody').innerHTML=exs.length?svgMultiLine({series,labels,unit:'реп',h:236,hidden:hiddenLines,toggle:true}):'<div class="empty">немає вправ</div>';
     $('monthLegend').textContent='Макс за підхід по днях — окрема лінія на кожну вправу.';
     return;
   }
@@ -1298,19 +1298,19 @@ function renderMonth(){
       else{
         const lo=Math.max(0,Math.floor(Math.min(...all))-1),hi=Math.min(24,Math.ceil(Math.max(...all))+1);
         const yFmt=v=>{const hh=Math.round((v+18)%24);return String(((hh%24)+24)%24).padStart(2,'0')+':00';};
-        $('monthBody').innerHTML=svgMultiLine({series:[bed,wake],labels,h:200,hidden:hiddenLines,toggle:true,yMin:lo,yMax:hi,yFmt});
+        $('monthBody').innerHTML=svgMultiLine({series:[bed,wake],labels,h:236,hidden:hiddenLines,toggle:true,yMin:lo,yMax:hi,yFmt});
         $('monthLegend').textContent='Час засинання і підйому по днях (відстань між лініями = тривалість сну). Розриви — дні без даних.';
       }
     } else if(gm.kind==='limit'&&gm.ref&&socId&&gm.ref.id===socId&&Object.keys(screenApps).length){
       const apps=['Instagram','TikTok','Threads'],colors={Instagram:'#e56b7b',TikTok:'#5cc9dd',Threads:'#9d8ad6'};
       const series=apps.map(a=>({name:a,color:colors[a],data:[]})),total={name:'Всього',color:'#e3bd68',data:[]},labels=[];
       for(let dd=1;dd<=lastDay;dd++){const k=dayKey(new Date(y,mo,dd));labels.push(dd+' '+msh);let t=0;apps.forEach((a,ai)=>{const v=Math.round((screenApps[k]&&screenApps[k][a])||0);series[ai].data.push({x:dd,y:v});t+=v;});total.data.push({x:dd,y:t});}
-      $('monthBody').innerHTML=svgMultiLine({series:[total].concat(series),labels,unit:'хв',h:200,hidden:hiddenLines,toggle:true});
+      $('monthBody').innerHTML=svgMultiLine({series:[total].concat(series),labels,unit:'хв',h:236,hidden:hiddenLines,toggle:true});
       $('monthLegend').textContent='Жовта «Всього» — сума хв/день. Тисни лінію в легенді, щоб приховати.';
     } else {
       const data=[];for(let dd=1;dd<=lastDay;dd++){const k=dayKey(new Date(y,mo,dd)),r=metricDay(gm,k);if(gm.id==='score'){data.push({x:dd,y:r.has?r.v:0,day:k});}else{data.push({x:dd,y:r.has?r.v:0,tip:dd+' '+msh+': '+(r.has?metricValTxt(gm,r.v):'немає даних')});}}
       const color=gm.kind==='limit'?'#e56b7b':'#5cc9dd';
-      $('monthBody').innerHTML=(monthView==='bar')?svgMetricBars({data,color,goal:metricGoal(gm),goalLabel:gm.kind==='limit'?'ліміт':'ціль',h:190}):svgLine({data,color,goal:metricGoal(gm),goalLabel:gm.kind==='limit'?'ліміт':'ціль',h:180,avg:true});
+      $('monthBody').innerHTML=(monthView==='bar')?svgMetricBars({data,color,goal:metricGoal(gm),goalLabel:gm.kind==='limit'?'ліміт':'ціль',h:236}):svgLine({data,color,goal:metricGoal(gm),goalLabel:gm.kind==='limit'?'ліміт':'ціль',h:236,avg:true});
       $('monthLegend').textContent=(gm.kind==='limit'?'Значення по днях; зелена пунктирна — ліміт.':'Значення по днях; зелена пунктирна — ціль.');
     }
   }

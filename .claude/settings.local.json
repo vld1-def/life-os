@@ -62,7 +62,10 @@
       "Bash(grep -n \"r.has?metricValTxt\\(gm,r.v\\):'немає даних'\\\\|svgLine\\({data,color,goal:metricGoal\" index.html)",
       "Bash(grep -n 'const tip=dayTitle\\(k,rest\\)\\\\|data-tip=\"\\\\${tip}\"\\\\|data-tip=' index.html)",
       "Bash(grep -n \"const tip=gm.id==='score'?dayTitle\\\\|data.push\\({x:dd,y:r.has?r.v:0,tip}\\)\" index.html)",
-      "Bash(grep -n 'onclick=\"selectDay\\(.\\\\${k}.\\)\"' index.html)"
+      "Bash(grep -n 'onclick=\"selectDay\\(.\\\\${k}.\\)\"' index.html)",
+      "Bash(grep -n \"svgLine\\({data,color\\\\|svgMetricBars\\({data,color\\\\|svgMultiLine\\({series\" index.html)",
+      "Bash(sed -i 's/h:200,hidden:hiddenLines/h:236,hidden:hiddenLines/g' index.html)",
+      "Bash(sed -i 's/goalLabel:gm.kind===.limit.?.ліміт.:.ціль.,h:190/GOALBAR/; ' index.html)"
     ]
   }
 }
