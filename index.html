@@ -843,7 +843,10 @@ function debtMonthlySeries(n){const arr=[],now=new Date();for(let i=n-1;i>=0;i--
 function getDay(k){if(!state.days[k])state.days[k]={water:0,exercises:{},limits:{},counters:{},note:''};const d=state.days[k];d.counters=d.counters||{};d.limits=d.limits||{};d.exercises=d.exercises||{};d.note=d.note??'';return d;}
 function peekDay(k){return state.days[k]||{water:0,exercises:{},limits:{},counters:{},note:'',sleep:{}};} // читання без створення дня
 const _c={};
-function exTarget(ex,k){const ck=ex.id+'|'+k;if(_c[ck]!=null)return _c[ck];if(!state.days[prevKey(k)])return _c[ck]=ex.base;const p=prevKey(k),pt=exTarget(ex,p);const pd=(state.days[p].exercises&&state.days[p].exercises[ex.id])||0;const g=ex.grow||0;if(pd>=pt)return _c[ck]=Math.min(ex.base*10,Math.round(g?pt+g:ex.base));return _c[ck]=ex.base;}
+function exTarget(ex,k){const ck=ex.id+'|'+k;if(_c[ck]!=null)return _c[ck];const p=prevKey(k);if(!state.days[p])return _c[ck]=ex.base;
+  const pt=exTarget(ex,p),pd=(state.days[p].exercises&&state.days[p].exercises[ex.id])||0;
+  const grow=ex.grow||0,deficit=Math.max(0,pt-pd),penalty=deficit*(ex.penalty||0);
+  return _c[ck]=Math.min(2000,Math.round(pt+grow+penalty));}
 function addWater(n){const d=getDay(activeDay());d.water=Math.max(0,d.water+n);save();}
 function addEx(id,n){const d=getDay(activeDay());d.exercises[id]=Math.max(0,(d.exercises[id]||0)+n);save();}
 function profileName(){return (profiles.find(p=>p.id===PROFILE)||{}).name||PROFILE;}
@@ -1200,6 +1203,22 @@ function svgMetricBars({data,w=800,h=180,color='#5cc9dd',goal=null,goalLabel=''}
   let gl='';if(goal!=null){const gy=Y(goal);gl=`<line x1="${pad.l}" y1="${gy.toFixed(1)}" x2="${w-pad.r}" y2="${gy.toFixed(1)}" stroke="#4fc596" stroke-dasharray="4 4" stroke-width="1" opacity=".8"/><text x="${w-pad.r}" y="${(gy-4).toFixed(1)}" fill="#4fc596" font-size="9" text-anchor="end">${goalLabel||('ціль '+fmt(goal))}</text>`;}
   return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;display:block">${gl}${bars}${xl}${yl}</svg>`;
 }
+function svgMultiBars({series,labels,w=800,h=190,unit='',hidden={},toggle=false}){
+  const n=series[0]?series[0].data.length:0;
+  const leg=series.map(s=>{const off=!!hidden[s.name];return `<span ${toggle?`onclick="toggleLine('${String(s.name).replace(/'/g,'')}')"`:''} style="display:inline-flex;align-items:center;gap:5px;margin-right:14px;${toggle?'cursor:pointer;':''}opacity:${off?.35:1}"><span style="width:11px;height:11px;background:${s.color};display:inline-block;border-radius:3px"></span><span style="${off?'text-decoration:line-through':''}">${s.name}</span></span>`;}).join('');
+  const legHtml=`<div class="muted" style="margin-bottom:6px">${leg}${toggle?' <span style="opacity:.5">· тисни, щоб приховати</span>':''}</div>`;
+  const vis=series.filter(s=>!hidden[s.name]);
+  if(!n||!vis.some(s=>s.data.some(d=>d.y>0)))return legHtml+'<div class="empty">немає даних для показу</div>';
+  const pad={l:44,r:14,t:14,b:26},maxY=Math.max(1,...vis.flatMap(s=>s.data.map(d=>d.y||0)))*1.1;
+  const iw=w-pad.l-pad.r,ih=h-pad.t-pad.b,gap=iw/n,grpW=Math.min(gap*0.8,26),bw=Math.max(1.4,grpW/vis.length-1),Y=v=>pad.t+ih-(v/maxY)*ih;
+  let bars='';for(let i=0;i<n;i++){const cx=pad.l+i*gap+gap/2,x0=cx-grpW/2;
+    vis.forEach((s,si)=>{const v=s.data[i]&&s.data[i].y||0,bh=(v/maxY)*ih,x=x0+si*(bw+1);
+      const tip=(labels?labels[i]:i+1)+'¶'+vis.map(ss=>ss.name+': '+fmt(ss.data[i]&&ss.data[i].y||0)+' '+unit).join('¶');
+      bars+=`<rect x="${x.toFixed(1)}" y="${Y(v).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(0,ih-(Y(v)-pad.t)).toFixed(1)}" rx="1.5" fill="${s.color}" opacity=".92" data-tip="${tip.replace(/"/g,'&quot;')}"/>`;});}
+  const step=Math.max(1,Math.ceil(n/9));let xl='';for(let i=0;i<n;i++){if(i%step===0||i===n-1){const cx=pad.l+i*gap+gap/2;xl+=`<text x="${cx.toFixed(1)}" y="${h-8}" fill="#7d859c" font-size="10" text-anchor="middle">${series[0].data[i]?series[0].data[i].x:i+1}</text>`;}}
+  const yl=`<text x="8" y="${(pad.t+ih).toFixed(1)}" fill="#7d859c" font-size="10">0</text><text x="8" y="${(Y(maxY*.9)+3).toFixed(1)}" fill="#7d859c" font-size="10">${fmt(Math.round(maxY*.9))}${unit}</text>`;
+  return legHtml+`<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;display:block">${bars}${xl}${yl}</svg>`;
+}
 function svgMultiLine({series,labels,w=800,h=190,unit='',hidden={},toggle=false,yMin=null,yMax=null,yFmt=null}){
   const n=series[0]?series[0].data.length:0;
   const leg=series.map(s=>{const off=!!hidden[s.name];return `<span ${toggle?`onclick="toggleLine('${String(s.name).replace(/'/g,'')}')"`:''} style="display:inline-flex;align-items:center;gap:5px;margin-right:14px;${toggle?'cursor:pointer;':''}opacity:${off?.35:1}"><span style="width:12px;height:3px;background:${s.color};display:inline-block;border-radius:2px"></span><span style="${off?'text-decoration:line-through':''}">${s.name}</span></span>`;}).join('');
@@ -1264,8 +1283,8 @@ function renderMonth(){
     const exs=state.settings.exercises,cols=['#5cc9dd','#4fc596','#e3bd68','#9d8ad6','#e56b7b'];
     const series=exs.map((ex,i)=>({name:ex.name,color:cols[i%cols.length],data:[]})),labels=[],msh=now.toLocaleDateString(LOC(),{month:'short'}),last=new Date().getDate();
     for(let dd=1;dd<=last;dd++){const k=dayKey(new Date(y,mo,dd));labels.push(dd+' '+msh);exs.forEach((ex,i)=>series[i].data.push({x:dd,y:exMaxSet(ex.id,k)}));}
-    $('monthBody').innerHTML=exs.length?svgMultiLine({series,labels,unit:'реп',h:236,hidden:hiddenLines,toggle:true}):'<div class="empty">немає вправ</div>';
-    $('monthLegend').textContent='Макс за підхід по днях — окрема лінія на кожну вправу.';
+    $('monthBody').innerHTML=exs.length?(monthView==='bar'?svgMultiBars({series,labels,unit:'реп',h:236,hidden:hiddenLines,toggle:true}):svgMultiLine({series,labels,unit:'реп',h:236,hidden:hiddenLines,toggle:true})):'<div class="empty">немає вправ</div>';
+    $('monthLegend').textContent='Макс за підхід по днях — окрема '+(monthView==='bar'?'група стовпчиків':'лінія')+' на кожну вправу.';
     return;
   }
   if(monthView==='cal'){
@@ -1305,8 +1324,8 @@ function renderMonth(){
       const apps=['Instagram','TikTok','Threads'],colors={Instagram:'#e56b7b',TikTok:'#5cc9dd',Threads:'#9d8ad6'};
       const series=apps.map(a=>({name:a,color:colors[a],data:[]})),total={name:'Всього',color:'#e3bd68',data:[]},labels=[];
       for(let dd=1;dd<=lastDay;dd++){const k=dayKey(new Date(y,mo,dd));labels.push(dd+' '+msh);let t=0;apps.forEach((a,ai)=>{const v=Math.round((screenApps[k]&&screenApps[k][a])||0);series[ai].data.push({x:dd,y:v});t+=v;});total.data.push({x:dd,y:t});}
-      $('monthBody').innerHTML=svgMultiLine({series:[total].concat(series),labels,unit:'хв',h:236,hidden:hiddenLines,toggle:true});
-      $('monthLegend').textContent='Жовта «Всього» — сума хв/день. Тисни лінію в легенді, щоб приховати.';
+      $('monthBody').innerHTML=(monthView==='bar')?svgMultiBars({series,labels,unit:'хв',h:236,hidden:hiddenLines,toggle:true}):svgMultiLine({series:[total].concat(series),labels,unit:'хв',h:236,hidden:hiddenLines,toggle:true});
+      $('monthLegend').textContent=(monthView==='bar')?'Хвилини по кожному застосунку/день (стовпчики). Тисни назву в легенді, щоб приховати.':'Жовта «Всього» — сума хв/день. Тисни лінію в легенді, щоб приховати.';
     } else {
       const data=[];for(let dd=1;dd<=lastDay;dd++){const k=dayKey(new Date(y,mo,dd)),r=metricDay(gm,k);if(gm.id==='score'){data.push({x:dd,y:r.has?r.v:0,day:k});}else{data.push({x:dd,y:r.has?r.v:0,tip:dd+' '+msh+': '+(r.has?metricValTxt(gm,r.v):'немає даних')});}}
       const color=gm.kind==='limit'?'#e56b7b':'#5cc9dd';
