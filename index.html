@@ -881,6 +881,8 @@ function exTarget(ex,k){const ck=ex.id+'|'+k;if(_c[ck]!=null)return _c[ck];const
   const cap=(ex.base||1)*5; // ліміт штрафної надбавки
   const penalty=Math.min(cap,Math.max(0,exTarget(ex,p)-pd)*(ex.penalty||0)); // недобір проти вчорашньої ЦІЛІ (зі штрафом)
   return _c[ck]=Math.min(2000,Math.round(prog+penalty));}
+// розмір штрафної надбавки у ціль конкретного дня (0 = штрафу немає)
+function exPenaltyOn(ex,k){const p=prevKey(k);if(!state.days[p])return 0;const clean=Math.min(2000,Math.round(exProg(ex,p)+(ex.grow||0)));return Math.max(0,exTarget(ex,k)-clean);}
 function addWater(n){const d=getDay(activeDay());d.water=Math.max(0,d.water+n);save();}
 function addEx(id,n){const d=getDay(activeDay());d.exercises[id]=Math.max(0,(d.exercises[id]||0)+n);save();}
 function profileName(){return (profiles.find(p=>p.id===PROFILE)||{}).name||PROFILE;}
@@ -1067,7 +1069,7 @@ function badgeStats(){
   const days=Object.keys(state.days),S=state.settings;
   const stepC=S.counters.find(c=>/крок|steps/i.test(c.name));
   const bookC=S.counters.find(c=>/книг|book/i.test(c.name)),gymC=S.counters.find(c=>/зал|gym/i.test(c.name));
-  let bookPages=0,gymTotal=0;
+  let bookPages=0,gymTotal=0,penaltyDays=0,penaltyBeaten=0;
   const plankEx=S.exercises.find(e=>/планк|plank/i.test(e.name)),pushEx=S.exercises.find(e=>/віджим|push/i.test(e.name)),squatEx=S.exercises.find(e=>/присід|squat/i.test(e.name));
   const coffeeL=S.limitHabits.find(l=>/кав|coffee/i.test(l.name));
   let perfect=0,good=0,tracked=0,waterHits=0,sleepHits=0,bestSteps=0,totalSteps=0,bestPlank=0,bestPush=0,bestSquat=0,totalPush=0,totalSquat=0,totalPlank=0,maxRecDay=0,maxPushSets=0,maxSquatSets=0,maxPlankSets=0,maxDayScore=0;
@@ -1089,6 +1091,7 @@ function badgeStats(){
     if(pv>bestPush)bestPush=pv;if(sv>bestSquat)bestSquat=sv;if(plv>bestPlank)bestPlank=plv;
     mPush[ym]=(mPush[ym]||0)+pv;mSquat[ym]=(mSquat[ym]||0)+sv;mPlank[ym]=(mPlank[ym]||0)+plv;mWater[ym]=(mWater[ym]||0)+(d.water||0);
     if((sc!=null&&sc>=streakMin())||rest)goodArr.push(k);
+    let dayPen=false;(S.exercises||[]).forEach(e=>{if(exPenaltyOn(e,k)>0){dayPen=true;if((ex[e.id]||0)>=exTarget(e,k))penaltyBeaten++;}});if(dayPen)penaltyDays++;
     if(coffeeL&&sc!=null&&(((d.limits&&d.limits[coffeeL.id])||0)===0))coffeeZero.push(k);});
   const mx=o=>Object.values(o).reduce((a,b)=>Math.max(a,b),0);
   let loanClosed=0;Object.keys(state.loanLog||{}).forEach(id=>{if(Object.values(state.loanLog[id]).some(v=>v===0))loanClosed=1;});
@@ -1100,9 +1103,10 @@ function badgeStats(){
     monthPush:mx(mPush),monthSquat:mx(mSquat),monthPlank:mx(mPlank),monthWaterL:Math.round(mx(mWater)/1000),monthSteps:mx(mSteps),maxRecDay,maxPushSets,maxSquatSets,maxPlankSets,maxDayScore,
     claimedCount:Object.keys(state.badges||{}).length,reactBest,bookPages,gymTotal,
     booksRead:(state.tasks||[]).filter(t=>t.done&&/книг|книж|book/i.test(t.text||'')).length,
+    penaltyDays,penaltyBeaten,
     bestStreak:Math.max(bestRun(goodArr),computeStreak()),noCS2Streak:bestRun(Object.keys(steamPlay).filter(k=>steamPlay[k]===0)),coffeeStreak:bestRun(coffeeZero),waterStreak:bestRun(waterDays),perfectStreak:bestRun(perfDays),loanClosed,bestGame};
 }
-const BADGE_GROUPS=[['streak','🔥 Серії','🔥 Streaks'],['score','⭐ Ідеал','⭐ Perfection'],['push','💪 Віджимання','💪 Push-ups'],['squat','🦵 Присідання','🦵 Squats'],['plank','🧘 Планка','🧘 Plank'],['steps','👣 Кроки','👣 Steps'],['water','💧 Вода','💧 Water'],['sleep','😴 Сон','😴 Sleep'],['games','🎮 Ігри','🎮 Games'],['coffee','☕ Кава','☕ Coffee'],['gym','🏋️ Зал','🏋️ Gym'],['read','📖 Читання','📖 Reading'],['tenure','📅 Стаж','📅 Tenure'],['finance','💰 Гроші','💰 Money'],['game','🎮 Міні-ігри','🎮 Mini-games'],['meta','👑 Майстерність','👑 Mastery']];
+const BADGE_GROUPS=[['streak','🔥 Серії','🔥 Streaks'],['score','⭐ Ідеал','⭐ Perfection'],['push','💪 Віджимання','💪 Push-ups'],['squat','🦵 Присідання','🦵 Squats'],['plank','🧘 Планка','🧘 Plank'],['steps','👣 Кроки','👣 Steps'],['water','💧 Вода','💧 Water'],['sleep','😴 Сон','😴 Sleep'],['games','🎮 Ігри','🎮 Games'],['coffee','☕ Кава','☕ Coffee'],['gym','🏋️ Зал','🏋️ Gym'],['read','📖 Читання','📖 Reading'],['pen','🔨 Штрафи','🔨 Penalties'],['tenure','📅 Стаж','📅 Tenure'],['finance','💰 Гроші','💰 Money'],['game','🎮 Міні-ігри','🎮 Mini-games'],['meta','👑 Майстерність','👑 Mastery']];
 const BADGE_DEFS=[
  {id:'streak7',g:'streak',e:'🔥',n:'Тижнева серія',ne:'Weekly streak',f:'Тиждень без відмазок 💥',fe:'A week, zero excuses 💥',need:7,u:'днів поспіль',ue:'days in a row',k:'bestStreak'},
  {id:'streak14',g:'streak',e:'💪',n:'Два тижні',ne:'Two weeks',f:'Воля з титану',fe:'Titanium willpower',need:14,u:'днів поспіль',ue:'days in a row',k:'bestStreak'},
@@ -1174,6 +1178,10 @@ const BADGE_DEFS=[
  {id:'read100',g:'read',prof:'bodia',e:'📚',n:'100 сторінок',ne:'100 pages',f:'Сотня сторінок — так тримати',fe:'A hundred pages, keep going',need:100,u:'сторінок',ue:'pages',k:'bookPages'},
  {id:'gym1',g:'gym',prof:'bodia',e:'🏋️',n:'Перше заняття',ne:'First workout',f:'Найважчий крок — зайти в зал уперше',fe:'The hardest step is the first gym visit',need:1,u:'заняття',ue:'workout',k:'gymTotal'},
  {id:'gym10',g:'gym',prof:'bodia',e:'💪',n:'10 занять',ne:'10 workouts',f:'Зал уже впізнає тебе',fe:'The gym knows you now',need:10,u:'занять',ue:'workouts',k:'gymTotal'},
+ {id:'pen1',g:'pen',e:'⚠️',n:'Перший штраф',ne:'First penalty',f:'Недобрав — і ціль підросла. Буває, головне наздогнати',fe:'Missed a goal and it grew. Happens — now catch up',need:1,u:'день зі штрафом',ue:'day with a penalty',k:'penaltyDays'},
+ {id:'penBeat1',g:'pen',e:'💪',n:'Реванш',ne:'Comeback',f:'Виконав ціль ПОПРИ штраф — красень',fe:'Hit the goal despite the penalty',need:1,u:'закритий штраф',ue:'penalty cleared',k:'penaltyBeaten'},
+ {id:'penBeat5',g:'pen',e:'🔥',n:'Відпрацьовано ×5',ne:'Cleared ×5',f:'П’ять разів наздогнав штрафну ціль',fe:'Beat a penalized goal five times',need:5,u:'закритих штрафів',ue:'penalties cleared',k:'penaltyBeaten'},
+ {id:'penBeat15',g:'pen',e:'🏆',n:'Незламний',ne:'Unbreakable',f:'15 закритих штрафів — тебе не зупинити',fe:'15 penalties cleared — unstoppable',need:15,u:'закритих штрафів',ue:'penalties cleared',k:'penaltyBeaten'},
 ];
 function badgeName(id){if(id.indexOf('master_')===0)return '👑 Майстер';const b=BADGE_DEFS.find(x=>x.id===id);return b?b.e+' '+TT(b.n,b.ne):id;}
 function badgeReached(b){return b.manual?true:(b.lower?(b.val>0&&b.val<=b.need):(b.val>=b.need));}
@@ -1183,6 +1191,7 @@ function badgeVisible(b){
   if(b.g==='games')return PROFILE==='me';          // CS2/Steam — лише Влад
   if(b.g==='coffee')return PROFILE==='me';         // кава-ліміт — лише Влад
   if(b.g==='finance')return mod('finance');        // фінанси — лише Влад
+  if(b.g==='pen')return mod('activity');            // штрафи — де є активність (Влад і Бодя)
   if(b.g==='water')return PROFILE==='me'?mod('water'):false; // воду ховаємо для інших профілів
   return true;}
 function badgeList(){const s=badgeStats();
