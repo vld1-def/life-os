@@ -917,7 +917,8 @@ function weekMondayKey(d){return dayKey(weekMonday(d));}
 function limitWeekQuota(l){const startK=l.startDate||weekMondayKey(new Date());const weeks=Math.max(0,Math.floor((weekMonday(new Date())-new Date(startK))/(7*86400000)));return Math.max(l.minPerWeek||1,(l.startPerWeek||7)-(l.stepPerWeek||1)*weeks);}
 function weekConsumed(id){const mon=weekMonday(new Date());let s=0;for(let i=0;i<7;i++){const dd=new Date(mon);dd.setDate(dd.getDate()+i);const day=state.days[dayKey(dd)];if(day&&day.limits)s+=day.limits[id]||0;}return s;}
 function addLimitToday(id,n){const d=getDay(activeDay());d.limits[id]=Math.max(0,(d.limits[id]||0)+n);save();}
-function computeStreak(){let s=0,d=new Date();for(let i=0;i<400;i++){const k=dayKey(d);if(state.restDays&&state.restDays[k]){s++;d.setDate(d.getDate()-1);continue;}const sc=dayScore(k);if(sc!=null&&sc>=80)s++;else if(k!==todayKey())break;d.setDate(d.getDate()-1);}return s;}
+function streakMin(){return PROFILE==='bodia'?100:80;} // мінімальний % дня для стріку: Бодя суворіший — 100%
+function computeStreak(){const MIN=streakMin();let s=0,d=new Date();for(let i=0;i<400;i++){const k=dayKey(d);if(state.restDays&&state.restDays[k]){s++;d.setDate(d.getDate()-1);continue;}const sc=dayScore(k);if(sc!=null&&sc>=MIN)s++;else if(k!==todayKey())break;d.setDate(d.getDate()-1);}return s;}
 function toggleRest(){if(!state.restDays)state.restDays={};const k=activeDay();if(state.restDays[k])delete state.restDays[k];else state.restDays[k]=true;save();toast((state.restDays[k]?'🛡 Вихідний — ':'Знято вихідний — ')+(k===todayKey()?'сьогодні':k));}
 function selectDay(k){if(k>todayKey())return;selDay=(k===todayKey())?null:k;render();const dt=new Date(k+'T00:00:00');toast(k===todayKey()?'Сьогодні':('✏️ Редагуєш '+dt.toLocaleDateString(LOC(),{day:'numeric',month:'long'})+' — тапни сьогоднішній день, щоб повернутись'));}
 
@@ -1036,7 +1037,7 @@ function badgeStats(){
     totalPush+=pv;totalSquat+=sv;totalPlank+=plv;
     if(pv>bestPush)bestPush=pv;if(sv>bestSquat)bestSquat=sv;if(plv>bestPlank)bestPlank=plv;
     mPush[ym]=(mPush[ym]||0)+pv;mSquat[ym]=(mSquat[ym]||0)+sv;mPlank[ym]=(mPlank[ym]||0)+plv;mWater[ym]=(mWater[ym]||0)+(d.water||0);
-    if((sc!=null&&sc>=80)||rest)goodArr.push(k);
+    if((sc!=null&&sc>=streakMin())||rest)goodArr.push(k);
     if(coffeeL&&sc!=null&&(((d.limits&&d.limits[coffeeL.id])||0)===0))coffeeZero.push(k);});
   const mx=o=>Object.values(o).reduce((a,b)=>Math.max(a,b),0);
   let loanClosed=0;Object.keys(state.loanLog||{}).forEach(id=>{if(Object.values(state.loanLog[id]).some(v=>v===0))loanClosed=1;});
