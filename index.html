@@ -688,6 +688,11 @@ async function snapshotBackup(){
     const {data}=await sb.from('solo').select('data').eq('id',bid).maybeSingle();
     const bakDays=data&&data.data&&data.data.days?Object.keys(data.data.days).length:0;
     if(days>=bakDays) await sb.from('solo').upsert({id:bid,data:obj,updated_at:new Date().toISOString()}); // не даємо бекапу «схуднути»
+    // 3-денний тотал-бекап: окрема копія, що перезаписується не частіше ніж раз на 3 дні (запасний, «старіший» зріз)
+    const b3='bak3_'+SOLO_ID;
+    const {data:d3}=await sb.from('solo').select('updated_at').eq('id',b3).maybeSingle();
+    const last=d3&&d3.updated_at?new Date(d3.updated_at).getTime():0;
+    if(Date.now()-last>=3*86400000) await sb.from('solo').upsert({id:b3,data:obj,updated_at:new Date().toISOString()});
   }catch(e){}
 }
 /* ===== АВТЕНТИФІКАЦІЯ ===== */
@@ -1092,6 +1097,7 @@ function badgeStats(){
     recPushSet:pushEx?exRecord(pushEx.id):0,recSquatSet:squatEx?exRecord(squatEx.id):0,recPlankSet:plankEx?exRecord(plankEx.id):0,
     monthPush:mx(mPush),monthSquat:mx(mSquat),monthPlank:mx(mPlank),monthWaterL:Math.round(mx(mWater)/1000),monthSteps:mx(mSteps),maxRecDay,maxPushSets,maxSquatSets,maxPlankSets,maxDayScore,
     claimedCount:Object.keys(state.badges||{}).length,reactBest,bookPages,gymTotal,
+    booksRead:(state.tasks||[]).filter(t=>t.done&&/книг|книж|book/i.test(t.text||'')).length,
     bestStreak:Math.max(bestRun(goodArr),computeStreak()),noCS2Streak:bestRun(Object.keys(steamPlay).filter(k=>steamPlay[k]===0)),coffeeStreak:bestRun(coffeeZero),waterStreak:bestRun(waterDays),perfectStreak:bestRun(perfDays),loanClosed,bestGame};
 }
 const BADGE_GROUPS=[['streak','🔥 Серії','🔥 Streaks'],['score','⭐ Ідеал','⭐ Perfection'],['push','💪 Віджимання','💪 Push-ups'],['squat','🦵 Присідання','🦵 Squats'],['plank','🧘 Планка','🧘 Plank'],['steps','👣 Кроки','👣 Steps'],['water','💧 Вода','💧 Water'],['sleep','😴 Сон','😴 Sleep'],['games','🎮 Ігри','🎮 Games'],['coffee','☕ Кава','☕ Coffee'],['gym','🏋️ Зал','🏋️ Gym'],['read','📖 Читання','📖 Reading'],['tenure','📅 Стаж','📅 Tenure'],['finance','💰 Гроші','💰 Money'],['game','🎮 Міні-ігри','🎮 Mini-games'],['meta','👑 Майстерність','👑 Mastery']];
@@ -1161,7 +1167,7 @@ const BADGE_DEFS=[
  {id:'react100',g:'game',e:'🤖',n:'Реакція <100мс',ne:'Reaction <100ms',f:'Ти точно людина?',fe:'Are you even human?',need:100,lower:true,u:'мс реакції',ue:'ms reaction',k:'reactBest'},
  {id:'collector',g:'meta',e:'📦',n:'Колекціонер',ne:'Collector',f:'Ціла полиця бейджів',fe:'A whole shelf of badges',need:20,u:'відкритих бейджів',ue:'badges unlocked',k:'claimedCount'},
  {id:'combo3',g:'meta',e:'🔥',n:'Комбо-майстер',ne:'Combo master',f:'Три рекорди за один день',fe:'Three records in one day',need:3,u:'рекорди за день',ue:'records in a day',k:'maxRecDay'},
- {id:'book1',g:'read',prof:'bodia',manual:true,e:'📚',n:'Прочитав книгу',ne:'Read a book',f:'Ціла книга — від першої до останньої сторінки',fe:'A whole book, cover to cover',need:1,u:'книга',ue:'book'},
+ {id:'book1',g:'read',prof:'bodia',e:'📚',n:'Прочитав книгу',ne:'Read a book',f:'Ціла книга — від першої до останньої сторінки (постав галочку на таску про книгу)',fe:'A whole book, cover to cover (check off the book task)',need:1,u:'виконана таска про книгу',ue:'completed book task',k:'booksRead'},
  {id:'read50',g:'read',prof:'bodia',e:'📖',n:'50 сторінок',ne:'50 pages',f:'Півсотні сторінок позаду',fe:'Fifty pages down',need:50,u:'сторінок',ue:'pages',k:'bookPages'},
  {id:'read100',g:'read',prof:'bodia',e:'📚',n:'100 сторінок',ne:'100 pages',f:'Сотня сторінок — так тримати',fe:'A hundred pages, keep going',need:100,u:'сторінок',ue:'pages',k:'bookPages'},
  {id:'gym1',g:'gym',prof:'bodia',e:'🏋️',n:'Перше заняття',ne:'First workout',f:'Найважчий крок — зайти в зал уперше',fe:'The hardest step is the first gym visit',need:1,u:'заняття',ue:'workout',k:'gymTotal'},
