@@ -910,7 +910,7 @@ function limitWeekQuota(l){const startK=l.startDate||weekMondayKey(new Date());c
 function weekConsumed(id){const mon=weekMonday(new Date());let s=0;for(let i=0;i<7;i++){const dd=new Date(mon);dd.setDate(dd.getDate()+i);const day=state.days[dayKey(dd)];if(day&&day.limits)s+=day.limits[id]||0;}return s;}
 function addLimitToday(id,n){const d=getDay(activeDay());d.limits[id]=Math.max(0,(d.limits[id]||0)+n);save();}
 function computeStreak(){let s=0,d=new Date();for(let i=0;i<400;i++){const k=dayKey(d);if(state.restDays&&state.restDays[k]){s++;d.setDate(d.getDate()-1);continue;}const sc=dayScore(k);if(sc!=null&&sc>=80)s++;else if(k!==todayKey())break;d.setDate(d.getDate()-1);}return s;}
-function toggleRest(){if(!state.restDays)state.restDays={};const k=todayKey();if(state.restDays[k])delete state.restDays[k];else state.restDays[k]=true;save();}
+function toggleRest(){if(!state.restDays)state.restDays={};const k=activeDay();if(state.restDays[k])delete state.restDays[k];else state.restDays[k]=true;save();toast((state.restDays[k]?'🛡 Вихідний — ':'Знято вихідний — ')+(k===todayKey()?'сьогодні':k));}
 function selectDay(k){if(k>todayKey())return;selDay=(k===todayKey())?null:k;render();const dt=new Date(k+'T00:00:00');toast(k===todayKey()?'Сьогодні':('✏️ Редагуєш '+dt.toLocaleDateString(LOC(),{day:'numeric',month:'long'})+' — тапни сьогоднішній день, щоб повернутись'));}
 
 function compRatio(c){ // частка балу пункту (без обмеження зверху); ліміти дають бонус за «під нормою»
@@ -1257,7 +1257,7 @@ function renderMonth(){
   $('btnCal').className='sm '+(monthView==='cal'?'acc':'');
   $('btnLine').className='sm '+(monthView==='line'?'acc':'');
   {const b=$('btnBar');if(b)b.className='sm '+(monthView==='bar'?'acc':'');}
-  $('btnRest').className='sm '+(state.restDays&&state.restDays[todayKey()]?'acc':'');
+  {const rb=$('btnRest');rb.className='sm '+(state.restDays&&state.restDays[activeDay()]?'acc':'');const tt=(activeDay()===todayKey()?'Зробити сьогодні':'Зробити '+activeDay())+' вихідним — серія 🔥 не перерветься';rb.title=tt;rb._o=rb._o||{};rb._o.title=tt;}
   const mt=curMetric();
   const now=new Date(),y=now.getFullYear(),mo=now.getMonth(),days=new Date(y,mo+1,0).getDate();
   if(mt.kind==='exmaxAll'){
