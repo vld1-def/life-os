@@ -78,8 +78,8 @@
   .g-green{background:linear-gradient(90deg,#2f8b66,var(--green))}
   .g-purple{background:linear-gradient(90deg,#6a5aa8,var(--purple))}
 
-  button{background:var(--glass2); color:var(--text); border:1px solid var(--stroke); border-radius:12px; padding:9px 14px; font-size:13px; cursor:pointer; font-weight:600; font-family:var(--font); transition:.15s; backdrop-filter:blur(8px)}
-  button:hover{background:rgba(255,255,255,.13)}
+  button{background:var(--glass2); color:var(--text); border:1px solid var(--stroke); border-radius:12px; padding:9px 14px; font-size:13px; cursor:pointer; font-weight:600; font-family:var(--font); transition:.15s; backdrop-filter:blur(8px); touch-action:manipulation}
+  @media(hover:hover){button:hover{background:rgba(255,255,255,.13)}}
   button:active{transform:scale(.96)}
   button.acc{background:linear-gradient(90deg,rgba(92,201,221,.24),rgba(157,138,214,.24)); border-color:rgba(92,201,221,.42)}
   button.sm{padding:6px 12px; font-size:12px; border-radius:10px}
@@ -110,7 +110,7 @@
   .calbig+.calbig{margin-top:7px}
   .calbig .hd{color:var(--muted); font-size:10px; text-align:center; text-transform:uppercase; letter-spacing:.5px}
   .calbig .d{height:clamp(40px,5vw,50px); border-radius:11px; background:rgba(255,255,255,.05); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; font-size:12px; color:var(--muted); overflow:hidden; cursor:default; transition:.12s}
-  .calbig .d:hover{outline:2px solid rgba(255,255,255,.35); outline-offset:1px}
+  @media(hover:hover){.calbig .d:hover{outline:2px solid rgba(255,255,255,.35); outline-offset:1px}}
   .calbig .d b{font-size:13px; font-weight:700}
   .calbig .d small{font-size:10px; opacity:.85}
   .mdots{display:flex; flex-wrap:wrap; gap:3px; justify-content:center; max-width:96%}
@@ -198,13 +198,13 @@
   .gate-sub{color:var(--muted); margin:8px 0 26px; font-size:15px}
   .gate-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px}
   .gate-card{position:relative; border:1px solid var(--stroke); border-radius:18px; padding:24px 14px; cursor:pointer; background:rgba(255,255,255,.03); transition:.15s}
-  .gate-card:hover{border-color:var(--cyan); transform:translateY(-2px); background:rgba(92,201,221,.08)}
+  @media(hover:hover){.gate-card:hover{border-color:var(--cyan); transform:translateY(-2px); background:rgba(92,201,221,.08)}}
   .gate-card .ge{font-size:48px; line-height:1}
   .gate-card .ge svg{width:56px; height:56px; border-radius:50%; vertical-align:middle}
   .gate-card .gn{font-weight:800; margin-top:10px; font-size:18px}
   .gate-card .gtag{font-size:11px; color:var(--cyan); margin-top:4px}
   .gate-card .gdel{position:absolute; top:8px; right:8px; background:none; border:none; cursor:pointer; font-size:14px; opacity:.55}
-  .gate-card .gdel:hover{opacity:1}
+  @media(hover:hover){.gate-card .gdel:hover{opacity:1}}
   .gate-add{display:flex; gap:8px; margin-top:24px}
   .gate-add input{flex:1}
   .row-ex{padding:12px 0; border-bottom:1px solid var(--stroke)}
@@ -212,7 +212,7 @@
   .ex-sets{display:flex; align-items:center; flex-wrap:wrap; gap:6px}
   .setchip{background:rgba(79,197,150,.16); border:1px solid rgba(79,197,150,.4); color:var(--text); border-radius:8px; padding:3px 8px; font-size:13px; font-weight:700; cursor:pointer}
   .setchip b{color:var(--muted); font-weight:700; margin-left:3px}
-  .setchip:hover{border-color:var(--red); background:rgba(229,107,123,.15)}
+  @media(hover:hover){.setchip:hover{border-color:var(--red); background:rgba(229,107,123,.15)}}
   .setin{width:74px}
   .setrec{margin-left:auto; font-size:12px; white-space:nowrap}
   .lb-row{display:flex; align-items:center; gap:12px; padding:12px 14px; border:1px solid var(--stroke); border-radius:14px; margin-bottom:9px; background:rgba(0,0,0,.18)}
@@ -227,7 +227,7 @@
   .lb-score small{display:block; font-size:11px; font-weight:600; color:var(--muted)}
   .game-menu{display:flex; flex-direction:column; gap:10px; margin-top:14px}
   .game-opt{display:flex; align-items:center; gap:14px; padding:16px; border:1px solid var(--stroke); border-radius:16px; text-decoration:none; color:var(--text); background:rgba(255,255,255,.03); transition:.15s}
-  .game-opt:hover{border-color:var(--cyan); transform:translateY(-2px); background:rgba(92,201,221,.08)}
+  @media(hover:hover){.game-opt:hover{border-color:var(--cyan); transform:translateY(-2px); background:rgba(92,201,221,.08)}}
   .game-opt .ge{font-size:36px; line-height:1}
   .game-opt .gt{font-weight:800; font-size:16px}
   .game-opt .gd{font-size:12px; color:var(--muted); margin-top:2px}
@@ -1181,7 +1181,6 @@ const BADGE_DEFS=[
  {id:'pen1',g:'pen',e:'⚠️',n:'Перший штраф',ne:'First penalty',f:'Недобрав — і ціль підросла. Буває, головне наздогнати',fe:'Missed a goal and it grew. Happens — now catch up',need:1,u:'день зі штрафом',ue:'day with a penalty',k:'penaltyDays'},
  {id:'penBeat1',g:'pen',e:'💪',n:'Реванш',ne:'Comeback',f:'Виконав ціль ПОПРИ штраф — красень',fe:'Hit the goal despite the penalty',need:1,u:'закритий штраф',ue:'penalty cleared',k:'penaltyBeaten'},
  {id:'penBeat5',g:'pen',e:'🔥',n:'Відпрацьовано ×5',ne:'Cleared ×5',f:'П’ять разів наздогнав штрафну ціль',fe:'Beat a penalized goal five times',need:5,u:'закритих штрафів',ue:'penalties cleared',k:'penaltyBeaten'},
- {id:'penBeat15',g:'pen',e:'🏆',n:'Незламний',ne:'Unbreakable',f:'15 закритих штрафів — тебе не зупинити',fe:'15 penalties cleared — unstoppable',need:15,u:'закритих штрафів',ue:'penalties cleared',k:'penaltyBeaten'},
 ];
 function badgeName(id){if(id.indexOf('master_')===0)return '👑 Майстер';const b=BADGE_DEFS.find(x=>x.id===id);return b?b.e+' '+TT(b.n,b.ne):id;}
 function badgeReached(b){return b.manual?true:(b.lower?(b.val>0&&b.val<=b.need):(b.val>=b.need));}
