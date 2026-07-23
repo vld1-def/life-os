@@ -1455,17 +1455,20 @@ function monthStats(){
 /* ===== ЗВІТ МІСЯЦЯ КАРТИНКОЮ ===== */
 function monthReportStats(){
   const s=monthStats(),mk=monthKey();const C=state.settings.counters;const stepC=C.find(c=>/крок|steps/i.test(c.name)),bookC=C.find(c=>/книг|book/i.test(c.name)),gymC=C.find(c=>/зал|gym/i.test(c.name));
+  const exL=state.settings.exercises||[],exTot={};
   let totSteps=0,bestStepsDay=0,waterMl=0,activeDays=0,socialMin=0,sleepTot=0,sleepN=0,bookPages=0,gymSessions=0;
   for(let dd=1;dd<=s.elapsed;dd++){const k=mk+'-'+String(dd).padStart(2,'0'),d=state.days[k];
     if(screenApps[k])socialMin+=Object.values(screenApps[k]).reduce((a,b)=>a+b,0);
     const sh=sleepHours(k);if(sh>0){sleepTot+=sh;sleepN++;}
     if(!d)continue;activeDays++;
+    exL.forEach(ex=>{exTot[ex.id]=(exTot[ex.id]||0)+((d.exercises&&d.exercises[ex.id])||0);});
     if(stepC){const v=(d.counters&&d.counters[stepC.id])||0;totSteps+=v;if(v>bestStepsDay)bestStepsDay=v;}
     if(bookC)bookPages+=(d.counters&&d.counters[bookC.id])||0;
     if(gymC)gymSessions+=(d.counters&&d.counters[gymC.id])||0;
     waterMl+=d.water||0;}
   const bs=badgeStats();
   return {...s,totSteps,avgSteps:activeDays?Math.round(totSteps/activeDays):0,bestStepsDay,waterL:Math.round(waterMl/100)/10,activeDays,hasSteps:!!stepC,bookPages,gymSessions,
+    exTotals:exL.map(ex=>({name:ex.name,total:exTot[ex.id]||0})).filter(e=>e.total>0),
     socialH:Math.round(socialMin/60*10)/10,sleepTot:Math.round(sleepTot),sleepAvg:sleepN?Math.round(sleepTot/sleepN*10)/10:0,avgSpent:s.elapsed?Math.round(s.spent/s.elapsed):0,
     recPush:bs.recPushSet,recSquat:bs.recSquatSet,recPlank:bs.recPlankSet,streak:computeStreak()};
 }
@@ -1491,7 +1494,9 @@ function buildMonthReportSVG(){
   const colX=[W*0.28,W*0.72];
   let sg='';tiles.forEach((st,i)=>{const row=Math.floor(i/2),lastSingle=(i===tiles.length-1&&tiles.length%2===1),cx=lastSingle?W/2:colX[i%2],y=startY+row*gap;
     sg+=`<text x="${cx}" y="${y}" font-size="40" font-weight="800" text-anchor="middle" fill="${st[0]}" font-family="Arial,sans-serif">${st[1]}</text><text x="${cx}" y="${y+27}" font-size="16.5" text-anchor="middle" fill="#8791a3" font-family="Arial,sans-serif">${st[2]}</text>`;});
-  const recBlock=recs.length?`${dv(756)}<text x="${W/2}" y="805" font-size="17" text-anchor="middle" fill="#8791a3" letter-spacing="2" font-family="Arial,sans-serif">РЕКОРДИ ЗА ПІДХІД</text><text x="${W/2}" y="853" font-size="36" font-weight="800" text-anchor="middle" fill="#e7ecf3" font-family="Arial,sans-serif">${recs.join('   ·   ')}</text>`:'';
+  const exTotStr=(r.exTotals||[]).map(e=>`${esc(e.name)} ${fmt(e.total)}`).join('    ·    ');
+  const totLine=exTotStr?`<text x="${W/2}" y="892" font-size="15.5" text-anchor="middle" fill="#8791a3" font-family="Arial,sans-serif">${exTotStr}</text>`:'';
+  const recBlock=recs.length?`${dv(756)}<text x="${W/2}" y="805" font-size="17" text-anchor="middle" fill="#8791a3" letter-spacing="2" font-family="Arial,sans-serif">РЕКОРДИ ЗА ПІДХІД</text><text x="${W/2}" y="853" font-size="36" font-weight="800" text-anchor="middle" fill="#e7ecf3" font-family="Arial,sans-serif">${recs.join('   ·   ')}</text>${totLine}`:'';
   return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;border-radius:16px">
     <defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5cc9dd"/><stop offset="1" stop-color="#9d8ad6"/></linearGradient></defs>
     <rect width="${W}" height="${H}" fill="#0a0c14"/>
