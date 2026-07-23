@@ -927,6 +927,14 @@ function exRecord(id){let m=0;for(const k in state.days){const s=state.days[k].e
 function setLimit(id,v){getDay(activeDay()).limits[id]=Math.max(0,+v||0);save();}
 function setCounter(id,v){getDay(activeDay()).counters[id]=Math.max(0,+v||0);save();}
 function addCounterToday(id,n){const d=getDay(activeDay());d.counters[id]=Math.max(0,(d.counters[id]||0)+n);save();}
+// ефективна денна ціль лічильника. Богдан: у день, коли відмічено зал, мінімалка кроків нижча на 5000
+function counterGoalOn(c,k){let g=c.goal;
+  if(PROFILE==='bodia'&&/крок|steps/i.test(c.name)){
+    const gymC=state.settings.counters.find(x=>/зал|gym/i.test(x.name)),day=state.days[k];
+    const gymV=(gymC&&day&&day.counters&&day.counters[gymC.id])||0;
+    if(gymV>0)g=Math.max(0,g-5000);
+  }
+  return g;}
 function saveNote(v){getDay(activeDay()).note=v;save();}
 function setSleep(f,v){const d=getDay(activeDay());d.sleep=d.sleep||{};d.sleep[f]=v;save();}
 function nowHM(){const n=new Date();return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');}
@@ -971,7 +979,7 @@ function dayComponents(k){const d=state.days[k];if(!d||dayEmpty(d))return null;c
   if(mod('water'))add({label:'Вода',kind:'goal',v:d.water||0,goal:S.waterGoal,txt:((d.water||0)/1000).toFixed(1)+'л / '+(S.waterGoal/1000)+'л'});
   if(mod('activity'))S.exercises.forEach(ex=>{const t=exTarget(ex,k),v=d.exercises[ex.id]||0;add({label:ex.name,kind:'goal',v,goal:t,txt:v+' / '+t});});
   if(mod('limits'))S.limitHabits.forEach(l=>{if(l.mode==='week')return;const v=d.limits[l.id]||0,mx=limitMaxOn(l,k);add({label:l.name,kind:'limit',v,mx,txt:v+' / ≤'+mx+(l.unit?(' '+l.unit):'')});});
-  if(mod('counters'))S.counters.forEach(c=>{if(c.mode==='week')return;const v=d.counters[c.id]||0;add({label:c.name,kind:'goal',v,goal:c.goal,txt:fmt(v)+' / '+fmt(c.goal)});});
+  if(mod('counters'))S.counters.forEach(c=>{if(c.mode==='week')return;const v=d.counters[c.id]||0,g=counterGoalOn(c,k);add({label:c.name,kind:'goal',v,goal:g,txt:fmt(v)+' / '+fmt(g)});});
   return a;}
 function compColor(c){if(c.pct>=1)return 'var(--green)';if(c.kind!=='limit'&&c.pct>=.5)return 'var(--yellow)';return 'var(--red)';}
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
@@ -1028,8 +1036,8 @@ function render(){
       :`<input type="number" style="width:80px" value="${v}" onchange="setCounter('${c.id}',this.value)">`;
     if(c.mode==='week'){const q=c.goalPerWeek||1,cons=weekConsumedC(c.id),ok=cons>=q;
       return `<div class="row"><div style="flex:1"><div>${c.name} <span class="tag ${ok?'ok':'warn'}">${cons}/${q} на тиждень</span></div><div class="muted">сьогодні: ${fmt(v)} ${c.unit||''} · ціль тижня ${q}</div><div class="bar"><i style="width:${Math.min(100,cons/q*100)}%;background:${ok?'linear-gradient(90deg,#2f8b66,#4fc596)':'linear-gradient(90deg,#7c6bb0,#9d8ad6)'}"></i></div></div><div class="flex" style="margin-left:10px">${ctrl}</div></div>`;}
-    const ok=v>=c.goal;
-    return `<div class="row"><div style="flex:1"><div class="between"><span>${c.name} ${ok?'✅':''}</span><span class="muted cnt">${fmt(v)} / ${fmt(c.goal)} ${c.unit}</span></div><div class="bar"><i class="g-purple" style="width:${Math.min(100,v/c.goal*100)}%"></i></div></div><div class="flex" style="margin-left:10px">${ctrl}</div></div>`;}).join('')||'<div class="empty">Додай лічильники</div>';
+    const g=counterGoalOn(c,ad),ok=v>=g,cut=g<c.goal;
+    return `<div class="row"><div style="flex:1"><div class="between"><span>${c.name} ${ok?'✅':''}${cut?' <span class="tag ok" title="У день із залом мінус 5000">🏋️ −5000</span>':''}</span><span class="muted cnt">${fmt(v)} / ${fmt(g)} ${c.unit}</span></div><div class="bar"><i class="g-purple" style="width:${Math.min(100,g?v/g*100:0)}%"></i></div></div><div class="flex" style="margin-left:10px">${ctrl}</div></div>`;}).join('')||'<div class="empty">Додай лічильники</div>';
 
   $('noteInput').value=d.note||'';
   const slp=d.sleep||{}; $('sleepBed').value=slp.b||''; $('sleepWake').value=slp.w||'';
@@ -1052,7 +1060,7 @@ function render(){
 function buildNotifs(){const tk=todayKey(),d=getDay(tk),S=state.settings;const todo=[],over=[],pen=[];
   if(d.water<S.waterGoal)todo.push(`💧 Вода — лишилось ${S.waterGoal-d.water} мл`);
   S.exercises.forEach(ex=>{const t=exTarget(ex,tk),v=d.exercises[ex.id]||0;if(v<t)todo.push(`💪 ${ex.name}: ${v}/${t}`);if((ex.grow||0)===0&&t>ex.base)pen.push(`${ex.name}: ціль ${t} замість ${ex.base} (штраф ×${ex.penalty} — вчора не закрив)`);});
-  S.counters.forEach(c=>{if(c.mode==='week'){const q=c.goalPerWeek||1,cons=weekConsumedC(c.id);if(cons<q)todo.push(`🔢 ${c.name}: ${fmt(cons)}/${fmt(q)} на тиждень`);return;}const v=d.counters[c.id]||0;if(v<c.goal)todo.push(`🔢 ${c.name}: ${fmt(v)}/${fmt(c.goal)} ${c.unit}`);});
+  S.counters.forEach(c=>{if(c.mode==='week'){const q=c.goalPerWeek||1,cons=weekConsumedC(c.id);if(cons<q)todo.push(`🔢 ${c.name}: ${fmt(cons)}/${fmt(q)} на тиждень`);return;}const v=d.counters[c.id]||0,g=counterGoalOn(c,ad);if(v<g)todo.push(`🔢 ${c.name}: ${fmt(v)}/${fmt(g)} ${c.unit}`);});
   S.limitHabits.forEach(l=>{if(l.mode==='week'){const q=limitWeekQuota(l),cons=weekConsumed(l.id);if(cons>q)over.push(`☕ ${l.name}: ${cons} > ${q} на тиждень — перебір`);return;}const v=d.limits[l.id]||0;if(v>l.max)over.push(`🎮 ${l.name}: ${v} > ${l.max} ${l.unit||''} — перебір`);});
   return{todo,over,pen};}
 function notifCount(){const n=buildNotifs();return n.todo.length+n.over.length+n.pen.length;}
