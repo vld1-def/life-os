@@ -1060,7 +1060,7 @@ function render(){
 function buildNotifs(){const tk=todayKey(),d=getDay(tk),S=state.settings;const todo=[],over=[],pen=[];
   if(d.water<S.waterGoal)todo.push(`💧 Вода — лишилось ${S.waterGoal-d.water} мл`);
   S.exercises.forEach(ex=>{const t=exTarget(ex,tk),v=d.exercises[ex.id]||0;if(v<t)todo.push(`💪 ${ex.name}: ${v}/${t}`);if((ex.grow||0)===0&&t>ex.base)pen.push(`${ex.name}: ціль ${t} замість ${ex.base} (штраф ×${ex.penalty} — вчора не закрив)`);});
-  S.counters.forEach(c=>{if(c.mode==='week'){const q=c.goalPerWeek||1,cons=weekConsumedC(c.id);if(cons<q)todo.push(`🔢 ${c.name}: ${fmt(cons)}/${fmt(q)} на тиждень`);return;}const v=d.counters[c.id]||0,g=counterGoalOn(c,ad);if(v<g)todo.push(`🔢 ${c.name}: ${fmt(v)}/${fmt(g)} ${c.unit}`);});
+  S.counters.forEach(c=>{if(c.mode==='week'){const q=c.goalPerWeek||1,cons=weekConsumedC(c.id);if(cons<q)todo.push(`🔢 ${c.name}: ${fmt(cons)}/${fmt(q)} на тиждень`);return;}const v=d.counters[c.id]||0,g=counterGoalOn(c,tk);if(v<g)todo.push(`🔢 ${c.name}: ${fmt(v)}/${fmt(g)} ${c.unit}`);});
   S.limitHabits.forEach(l=>{if(l.mode==='week'){const q=limitWeekQuota(l),cons=weekConsumed(l.id);if(cons>q)over.push(`☕ ${l.name}: ${cons} > ${q} на тиждень — перебір`);return;}const v=d.limits[l.id]||0;if(v>l.max)over.push(`🎮 ${l.name}: ${v} > ${l.max} ${l.unit||''} — перебір`);});
   return{todo,over,pen};}
 function notifCount(){const n=buildNotifs();return n.todo.length+n.over.length+n.pen.length;}
@@ -1536,10 +1536,12 @@ function fillTip(el){const tip=$('tip');const day=el.getAttribute('data-tip-day'
 function hideTip(){$('tip').classList.remove('on');_tipPinned=false;}
 function showDayTipEl(k,el){const tip=$('tip');tip.style.whiteSpace='normal';tip.innerHTML=dayTipHTML(k);tip.classList.add('on');placeTipNear(el);_tipPinned=true;}
 let _tapT=null,_tapK=null;
-function cellTap(k,ev){const cell=ev.currentTarget;
-  if(_tapT&&_tapK===k){clearTimeout(_tapT);_tapT=null;_tapK=null;hideTip();selectDay(k);return;} // подвійний — відкрити день
+function cellTap(k,ev){
+  if(window.matchMedia('(hover:hover)').matches){hideTip();selectDay(k);return;} // десктоп: тултіп по наведенню, клік одразу відкриває день
+  const cell=ev.currentTarget; // мобільний: одинарний тап — тултіп, подвійний — відкрити день
+  if(_tapT&&_tapK===k){clearTimeout(_tapT);_tapT=null;_tapK=null;hideTip();selectDay(k);return;}
   if(_tapT)clearTimeout(_tapT);
-  _tapK=k;_tapT=setTimeout(()=>{_tapT=null;_tapK=null;showDayTipEl(k,cell);},250);} // одинарний — тултіп
+  _tapK=k;_tapT=setTimeout(()=>{_tapT=null;_tapK=null;showDayTipEl(k,cell);},250);}
 function initTip(){if(document.body._tip)return;document.body._tip=1;const tip=$('tip');
   document.body.addEventListener('pointermove',e=>{if(e.pointerType==='touch')return;const el=e.target.closest&&e.target.closest('[data-tip],[data-tip-day]');
     if(!el){if(!_tipPinned)tip.classList.remove('on');return;}
