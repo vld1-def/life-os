@@ -174,6 +174,13 @@
   .badge-card.on{opacity:1; background:linear-gradient(160deg,rgba(92,201,221,.14),rgba(157,138,214,.14)); border-color:rgba(92,201,221,.4)}
   .badge-card.ready{opacity:1; cursor:pointer; border-color:var(--yellow); animation:readyPulse 1.6s ease-in-out infinite}
   .badge-card.ready:active{transform:scale(.95)}
+  .ph-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; max-height:70vh; overflow:auto}
+  .ph-card{border:1px solid var(--stroke); border-radius:12px; padding:8px; cursor:pointer; background:rgba(255,255,255,.03); transition:.15s}
+  .ph-card:active{transform:scale(.97)}
+  @media(hover:hover){.ph-card:hover{border-color:var(--cyan); transform:translateY(-2px)}}
+  .ph-thumb{border-radius:8px; overflow:hidden; line-height:0}
+  .ph-thumb svg{width:100%; height:auto; display:block}
+  .ph-name{text-align:center; font-size:12.5px; font-weight:700; margin-top:6px; text-transform:capitalize}
   @keyframes readyPulse{0%,100%{box-shadow:0 0 8px rgba(227,189,104,.25)} 50%{box-shadow:0 0 20px rgba(227,189,104,.6)}}
   .badge-card .be{font-size:32px; line-height:1; filter:grayscale(1) opacity(.5)}
   .badge-card.on .be,.badge-card.ready .be{filter:none}
@@ -351,7 +358,7 @@
   <div class="glass card" style="--o:2" data-tab="progress">
     <div class="between" style="gap:8px">
       <h2 style="margin:0"><span class="dot" style="background:var(--yellow)"></span>Огляд</h2>
-      <div class="flex" style="flex-shrink:0"><button class="sm" onclick="openMonthReport()" title="Звіт місяця картинкою">📸</button><button class="sm" id="ovWeekBtn" onclick="setOverview('week')">Тиждень</button><button class="sm" id="ovMonthBtn" onclick="setOverview('month')">Місяць</button></div>
+      <div class="flex" style="flex-shrink:0"><button class="sm" onclick="openMonthReport()" title="Звіт місяця картинкою">📸</button><button class="sm" onclick="openPhotoLib()" title="Фототека — звіти по місяцях">🖼</button><button class="sm" id="ovWeekBtn" onclick="setOverview('week')">Тиждень</button><button class="sm" id="ovMonthBtn" onclick="setOverview('month')">Місяць</button></div>
     </div>
     <div class="muted" id="ovRange" style="text-transform:none;letter-spacing:0;font-size:12px;margin-top:6px;min-height:15px"></div>
     <div id="ovBody" style="margin-top:8px"></div>
@@ -562,6 +569,12 @@
 <dialog id="monthReport">
   <div class="between"><h2 style="margin:0">📸 Звіт місяця</h2><button class="sm" onclick="monthReport.close()">✕</button></div>
   <div id="monthReportBody" style="margin-top:12px"></div>
+</dialog>
+
+<dialog id="photoLib">
+  <div class="between"><h2 style="margin:0">🖼 Фототека звітів</h2><button class="sm" onclick="photoLib.close()">✕</button></div>
+  <div class="muted" style="margin:4px 0 12px">Звіти по місяцях. Тисни, щоб відкрити й зберегти.</div>
+  <div id="photoLibBody" class="ph-grid"></div>
 </dialog>
 
 <dialog id="gamePick">
@@ -1448,8 +1461,8 @@ function ovCards(s,denom){const cur=state.settings.currency;const b=(lbl,val,cls
   return out||'<div class="empty" style="grid-column:1/-1">Обери показники в налаштуваннях ⚙️</div>';}
 let overviewMode='week';
 function setOverview(m){overviewMode=m;renderOverview();}
-function monthStats(){
-  const mk=monthKey(),[y,m]=mk.split('-').map(Number),daysIn=new Date(y,m,0).getDate();
+function monthStats(mkArg){
+  const mk=mkArg||monthKey(),[y,m]=mk.split('-').map(Number),daysIn=new Date(y,m,0).getDate();
   const elapsed=(y===new Date().getFullYear()&&m===new Date().getMonth()+1)?new Date().getDate():daysIn;
   let good=0,scSum=0,scN=0,waterOk=0,slpSum=0,slpN=0,gamesMin=0;
   for(let dd=1;dd<=elapsed;dd++){const k=mk+'-'+String(dd).padStart(2,'0');const sc=dayScore(k);
@@ -1460,8 +1473,8 @@ function monthStats(){
   return{daysIn,elapsed,good,avg:scN?Math.round(scSum/scN):0,waterOk,avgSleep:slpN?Math.round(slpSum/slpN*10)/10:0,spent:monthTotal(mk),gamesH:Math.round(gamesMin/60*10)/10};
 }
 /* ===== ЗВІТ МІСЯЦЯ КАРТИНКОЮ ===== */
-function monthReportStats(){
-  const s=monthStats(),mk=monthKey();const C=state.settings.counters;const stepC=C.find(c=>/крок|steps/i.test(c.name)),bookC=C.find(c=>/книг|book/i.test(c.name)),gymC=C.find(c=>/зал|gym/i.test(c.name));
+function monthReportStats(mkArg){
+  const mk=mkArg||monthKey();const s=monthStats(mk);const C=state.settings.counters;const stepC=C.find(c=>/крок|steps/i.test(c.name)),bookC=C.find(c=>/книг|book/i.test(c.name)),gymC=C.find(c=>/зал|gym/i.test(c.name));
   const exL=state.settings.exercises||[],exTot={};
   let totSteps=0,bestStepsDay=0,waterMl=0,activeDays=0,socialMin=0,sleepTot=0,sleepN=0,bookPages=0,gymSessions=0;
   for(let dd=1;dd<=s.elapsed;dd++){const k=mk+'-'+String(dd).padStart(2,'0'),d=state.days[k];
@@ -1479,8 +1492,9 @@ function monthReportStats(){
     socialH:Math.round(socialMin/60*10)/10,sleepTot:Math.round(sleepTot),sleepAvg:sleepN?Math.round(sleepTot/sleepN*10)/10:0,avgSpent:s.elapsed?Math.round(s.spent/s.elapsed):0,
     recPush:bs.recPushSet,recSquat:bs.recSquatSet,recPlank:bs.recPlankSet,streak:computeStreak()};
 }
-function buildMonthReportSVG(){
-  const r=monthReportStats(),mn=new Date().toLocaleDateString('uk-UA',{month:'long',year:'numeric'}),cur=state.settings.currency||'₴';
+function buildMonthReportSVG(mkArg){
+  const mk=mkArg||monthKey(),[yy,mm]=mk.split('-').map(Number);
+  const r=monthReportStats(mk),mn=new Date(yy,mm-1,1).toLocaleDateString('uk-UA',{month:'long',year:'numeric'}),cur=state.settings.currency||'₴';
   const W=800,H=1000,pad=60;  // 4:5
   const C={green:'#4fc596',cyan:'#5cc9dd',purple:'#9d8ad6',blue:'#7cc5ff',yellow:'#e3bd68',red:'#e56b7b',white:'#e7ecf3'};
   // плитки лише з наявних даних цього профілю
@@ -1516,8 +1530,14 @@ function buildMonthReportSVG(){
     <text x="${W/2}" y="954" font-size="17" text-anchor="middle" fill="#5a6273" font-family="Arial,sans-serif">life-os · ${todayKey()}</text>
   </svg>`;
 }
-function openMonthReport(){$('monthReportBody').innerHTML=buildMonthReportSVG()+'<div style="text-align:center;margin-top:14px"><button class="acc" onclick="downloadReport()">⬇ Зберегти картинкою</button></div>';monthReport.showModal();}
-function downloadReport(){const svgEl=$('monthReportBody').querySelector('svg');const xml=new XMLSerializer().serializeToString(svgEl);const url='data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(xml)));const vb=svgEl.viewBox.baseVal,sc=2,W=vb.width*sc,H=vb.height*sc;const img=new Image();img.width=vb.width;img.height=vb.height;img.onload=function(){const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');x.fillStyle='#0a0c14';x.fillRect(0,0,W,H);x.drawImage(img,0,0,W,H);try{const a=document.createElement('a');a.download='life-os-'+monthKey()+'.png';a.href=c.toDataURL('image/png');a.click();toast('Звіт збережено 📸');}catch(e){toast('Не вдалось зберегти');}};img.onerror=function(){toast('Помилка рендеру');};img.src=url;}
+let _reportMk=null;
+function openMonthReport(mkArg){_reportMk=mkArg||monthKey();$('monthReportBody').innerHTML=buildMonthReportSVG(_reportMk)+'<div style="text-align:center;margin-top:14px"><button class="acc" onclick="downloadReport()">⬇ Зберегти картинкою</button></div>';if(typeof photoLib!=='undefined'&&photoLib.open)photoLib.close();monthReport.showModal();}
+function downloadReport(){const svgEl=$('monthReportBody').querySelector('svg');const xml=new XMLSerializer().serializeToString(svgEl);const url='data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(xml)));const vb=svgEl.viewBox.baseVal,sc=2,W=vb.width*sc,H=vb.height*sc;const img=new Image();img.width=vb.width;img.height=vb.height;img.onload=function(){const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');x.fillStyle='#0a0c14';x.fillRect(0,0,W,H);x.drawImage(img,0,0,W,H);try{const a=document.createElement('a');a.download='life-os-'+(_reportMk||monthKey())+'.png';a.href=c.toDataURL('image/png');a.click();toast('Звіт збережено 📸');}catch(e){toast('Не вдалось зберегти');}};img.onerror=function(){toast('Помилка рендеру');};img.src=url;}
+// ===== ФОТОТЕКА: звіти по місяцях =====
+function monthsWithData(){const set={};Object.keys(state.days||{}).forEach(k=>{if(!dayEmpty(state.days[k]))set[k.slice(0,7)]=1;});Object.keys(state.months||{}).forEach(mk=>set[mk]=1);return Object.keys(set).sort().reverse();}
+function openPhotoLib(){const months=monthsWithData();
+  $('photoLibBody').innerHTML=months.length?months.map(mk=>{const [yy,mm]=mk.split('-').map(Number);const name=new Date(yy,mm-1,1).toLocaleDateString(LOC(),{month:'long',year:'numeric'});return `<div class="ph-card" onclick="openMonthReport('${mk}')"><div class="ph-thumb">${buildMonthReportSVG(mk)}</div><div class="ph-name">${name}</div></div>`;}).join(''):'<div class="empty">Ще немає даних для звітів</div>';
+  photoLib.showModal();}
 function renderOverview(){
   const cur=state.settings.currency;
   $('ovWeekBtn').className='sm '+(overviewMode==='week'?'acc':'');
