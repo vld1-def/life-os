@@ -706,6 +706,9 @@ async function snapshotBackup(){
     const {data:d3}=await sb.from('solo').select('updated_at').eq('id',b3).maybeSingle();
     const last=d3&&d3.updated_at?new Date(d3.updated_at).getTime():0;
     if(Date.now()-last>=3*86400000) await sb.from('solo').upsert({id:b3,data:obj,updated_at:new Date().toISOString()});
+    // місячний бекап: окремий рядок на кожен календарний місяць (архів по місяцях). Поточний місяць оновлюється, минулі — «заморожені»
+    const bm='bakM_'+SOLO_ID+'_'+todayKey().slice(0,7);
+    await sb.from('solo').upsert({id:bm,data:obj,updated_at:new Date().toISOString()});
   }catch(e){}
 }
 /* ===== АВТЕНТИФІКАЦІЯ ===== */
@@ -883,12 +886,12 @@ function debtMonthlySeries(n){const arr=[],now=new Date();for(let i=n-1;i>=0;i--
 function getDay(k){if(!state.days[k])state.days[k]={water:0,exercises:{},limits:{},counters:{},note:''};const d=state.days[k];d.counters=d.counters||{};d.limits=d.limits||{};d.exercises=d.exercises||{};d.note=d.note??'';return d;}
 function peekDay(k){return state.days[k]||{water:0,exercises:{},limits:{},counters:{},note:'',sleep:{}};} // читання без створення дня
 const _c={};
-// «чиста» прогресія цілі — росте на grow щодня, БЕЗ штрафу (щоб штраф не накопичувався)
-function exProg(ex,k){const ck='P'+ex.id+'|'+k;if(_c[ck]!=null)return _c[ck];const p=prevKey(k);if(!state.days[p])return _c[ck]=ex.base;
+// «чиста» прогресія цілі — росте на grow щодня, БЕЗ штрафу; скидається до бази 1-го числа кожного місяця
+function exProg(ex,k){const ck='P'+ex.id+'|'+k;if(_c[ck]!=null)return _c[ck];const p=prevKey(k);if(!state.days[p]||p.slice(0,7)!==k.slice(0,7))return _c[ck]=ex.base;
   return _c[ck]=Math.min(2000,Math.round(exProg(ex,p)+(ex.grow||0)));}
 // ціль дня = чиста прогресія + штраф за недобір проти РЕАЛЬНОЇ вчорашньої цілі (тягнеться, поки не наздоженеш);
-// сам штраф обмежений (base×5), щоб не вибухав до 2000, а звичайне зростання цілі лишалось
-function exTarget(ex,k){const ck=ex.id+'|'+k;if(_c[ck]!=null)return _c[ck];const p=prevKey(k);if(!state.days[p])return _c[ck]=ex.base;
+// сам штраф обмежений (base×5), щоб не вибухав до 2000; на 1-ше число місяця все скидається до бази
+function exTarget(ex,k){const ck=ex.id+'|'+k;if(_c[ck]!=null)return _c[ck];const p=prevKey(k);if(!state.days[p]||p.slice(0,7)!==k.slice(0,7))return _c[ck]=ex.base;
   const prog=Math.min(2000,Math.round(exProg(ex,p)+(ex.grow||0)));
   const pd=(state.days[p].exercises&&state.days[p].exercises[ex.id])||0;
   const cap=(ex.base||1)*5; // ліміт штрафної надбавки
