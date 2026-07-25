@@ -52,6 +52,8 @@
   .pill .big{font-size:20px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1}
   .pill .lbl{font-size:9.5px; color:var(--muted); letter-spacing:.4px; text-transform:uppercase}
   .neon-cyan{color:var(--cyan)} .neon-purple{color:var(--purple)} .neon-green{color:var(--green)} .neon-red{color:var(--red)}
+  .xp-bar{height:4px;background:rgba(255,255,255,.12);border-radius:3px;margin-top:6px;overflow:hidden}
+  .xp-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#4fc596,#5cc9dd);border-radius:3px;transition:width .3s}
 
   #app{max-width:1180px; margin:0 auto}
   .card{padding:20px}
@@ -313,6 +315,7 @@
   <div class="top-stats">
     <div class="glass pill"><div class="big neon-purple" id="streakVal">0</div><div class="lbl">🔥 серія</div></div>
     <div class="glass pill" onclick="showDayTipEl(todayKey(),this)" style="cursor:pointer" title="Розклад балу за сьогодні"><div class="big neon-cyan" id="scoreVal">0%</div><div class="lbl">⭐ бал дня</div></div>
+    <div class="glass pill" id="lvlPill" onclick="openXP()" style="cursor:pointer"><div class="big neon-green" id="lvlVal">1</div><div class="lbl">📈 рівень</div><div class="xp-bar"><i id="xpFill"></i></div></div>
     <div class="glass pill"><div class="big neon-red" id="debtVal">0</div><div class="lbl">💳 борг</div></div>
     <div class="flex">
       <div class="glass pill" style="min-width:auto;padding:11px" title="Синхронізація: зелений — збережено, жовтий — зберігаю, червоний — немає зв'язку"><span class="sync-dot" id="syncDot"></span></div>
@@ -569,6 +572,11 @@
 <dialog id="monthReport">
   <div class="between"><h2 style="margin:0">📸 Звіт місяця</h2><button class="sm" onclick="monthReport.close()">✕</button></div>
   <div id="monthReportBody" style="margin-top:12px"></div>
+</dialog>
+
+<dialog id="xpInfo">
+  <div class="between"><h2 style="margin:0">📈 Рівень і XP</h2><button class="sm" onclick="xpInfo.close()">✕</button></div>
+  <div id="xpBody" style="margin-top:12px"></div>
 </dialog>
 
 <dialog id="photoLib">
@@ -968,6 +976,36 @@ function delTask(id){state.tasks=state.tasks.filter(x=>x.id!==id);save();}
 
 function limitMaxOn(l,k){const h=l&&l.maxHist;if(!h||!h.length)return l?l.max:0;let m=h[0].max;for(const e of h){if(e.d<=k)m=e.max;else break;}return m;}
 function dayScore(k){const comps=dayComponents(k);if(!comps)return null;if(!comps.length)return 0;let s=0;comps.forEach(c=>s+=c.ratio);return Math.round(s/comps.length*100);}
+/* ===== XP / РІВНІ ===== */
+// ціль-компонент (вода, кроки): 0–100 за % + до +20 бонус за перевищення
+function goalXP(r){const base=Math.min(100,Math.max(0,r*100));const bonus=r>1?Math.min(20,(r-1)*40):0;return base+bonus;}
+// вправа: 0–100 за норму + до +30 бонус (падаюча віддача) − штраф (0 зробив = −10, половина = −5)
+function exXP(done,target){if(target<=0)return 0;const r=done/target;const base=Math.min(100,r*100);const bonus=r>1?Math.min(30,Math.sqrt(r-1)*30):0;const pen=r<1?10*(1-r):0;return base+bonus-pen;}
+// ліміт: бали за НЕперевищення (100 при 0 → 60 на межі), штраф за перебір (до −40)
+function limitXP(v,mx){if(mx<=0)return 0;if(v<=mx)return 100-(v/mx)*40;return -Math.min(40,(v-mx)/mx*40);}
+function xpComponents(k){const d=state.days[k];if(!d||dayEmpty(d))return [];const S=state.settings,out=[];
+  if(mod('water'))out.push(goalXP((d.water||0)/(S.waterGoal||1)));
+  if(mod('activity'))S.exercises.forEach(ex=>{out.push(exXP((d.exercises&&d.exercises[ex.id])||0,exTarget(ex,k)));});
+  if(mod('counters'))S.counters.forEach(c=>{if(c.mode==='week')return;const g=counterGoalOn(c,k)||c.goal||0;out.push(goalXP(g?((d.counters&&d.counters[c.id])||0)/g:0));});
+  if(mod('limits'))S.limitHabits.forEach(l=>{if(l.mode==='week')return;out.push(limitXP((d.limits&&d.limits[l.id])||0,limitMaxOn(l,k)));});
+  return out;}
+function dayXPraw(k){const c=xpComponents(k);if(!c.length)return 0;return Math.max(0,c.reduce((a,b)=>a+b,0)/c.length);}
+function streakMult(len){return len>=14?1.5:len>=7?1.25:len>=3?1.1:1;} // множник серії
+function streakLenAt(k){let n=0,d=new Date(k+'T00:00:00');for(let i=0;i<420;i++){const kk=dayKey(d);const rest=!!(state.restDays&&state.restDays[kk]);const sc=dayScore(kk);if(rest||(sc!=null&&sc>=streakMin())){n++;d.setDate(d.getDate()-1);}else break;}return n;}
+function dayXP(k){return Math.round(dayXPraw(k)*streakMult(streakLenAt(k)));}
+function xpTotal(){const set={};Object.keys(state.days).forEach(k=>{if(!dayEmpty(state.days[k]))set[k]=1;});if(state.restDays)Object.keys(state.restDays).forEach(k=>set[k]=1);
+  const days=Object.keys(set).sort();let total=0,streak=0,prev=null;
+  days.forEach(k=>{const rest=!!(state.restDays&&state.restDays[k]);const sc=dayScore(k);const good=rest||(sc!=null&&sc>=streakMin());
+    if(prev){const gap=Math.round((new Date(k+'T00:00:00')-new Date(prev+'T00:00:00'))/86400000);if(gap!==1)streak=0;}
+    if(good)streak++;else streak=0;
+    total+=Math.round(dayXPraw(k)*streakMult(streak));prev=k;});
+  return total;}
+function cumXP(L){return (L-1)*(15*L+70);} // XP щоб досягти рівня L
+function levelInfo(xp){let L=1;while(L<999&&cumXP(L+1)<=xp)L++;const cur=cumXP(L),next=cumXP(L+1);return {level:L,into:xp-cur,span:next-cur,pct:Math.min(100,Math.floor((xp-cur)/(next-cur)*100)),total:xp};}
+function openXP(){const xi=levelInfo(xpTotal()),today=dayXP(todayKey()),mult=streakMult(computeStreak());
+  $('xpBody').innerHTML=`<div style="text-align:center;margin:6px 0 16px"><div style="font-size:42px;font-weight:800" class="neon-green">Рівень ${xi.level}</div><div class="muted">${fmt(xi.into)} / ${fmt(xi.span)} XP до рівня ${xi.level+1}</div><div class="xp-bar" style="height:9px;margin:12px auto;max-width:280px"><i style="width:${xi.pct}%"></i></div><div class="muted">Всього <b>${fmt(xi.total)} XP</b> · сьогодні <b>+${fmt(today)} XP</b> · серія ×${mult}</div></div>`+
+    `<div class="muted" style="font-size:12.5px;line-height:1.75"><b>Як нараховується XP за день:</b><br>💧 Вода / 🔢 лічильники — 0–100 за % цілі, +до 20 за перевищення<br>💪 Вправи — 0–100 за норму, +до 30 бонус (падаюча віддача), штраф −10 якщо не робив (−5 за половину)<br>🚫 Ліміти — до 100 за «в межах», штраф до −40 за перебір<br>Далі: <b>середнє по активних модулях × множник серії</b> (3 дні ×1.1, 7 ×1.25, 14+ ×1.5).</div>`;
+  xpInfo.showModal();}
 function weekMonday(d){const x=new Date(d);const dow=(x.getDay()+6)%7;x.setDate(x.getDate()-dow);x.setHours(0,0,0,0);return x;}
 function weekMondayKey(d){return dayKey(weekMonday(d));}
 function limitWeekQuota(l){const startK=l.startDate||weekMondayKey(new Date());const weeks=Math.max(0,Math.floor((weekMonday(new Date())-new Date(startK))/(7*86400000)));return Math.max(l.minPerWeek||1,(l.startPerWeek||7)-(l.stepPerWeek||1)*weeks);}
@@ -1068,6 +1106,7 @@ function render(){
   renderOverview();
   {const scv=dayScore(tk)??0,sel=$('scoreVal');sel.textContent=(scv>100?'🔥':'')+scv+'%';sel.style.color=scv>100?'#e3bd68':'';sel.style.textShadow=scv>100?'0 0 14px rgba(227,189,104,.55)':'';}
   $('streakVal').textContent=computeStreak();
+  {const xi=levelInfo(xpTotal()),lv=$('lvlVal');if(lv){lv.textContent=xi.level;const xf=$('xpFill');if(xf)xf.style.width=xi.pct+'%';const lp=$('lvlPill');if(lp)lp.title='Рівень '+xi.level+' · '+fmt(xi.into)+'/'+fmt(xi.span)+' XP до наст. · всього '+fmt(xi.total)+' XP';}}
   $('debtVal').textContent=fmt(Math.round(totalDebtNow()));
   renderNotifBadge(); updateBadgeReady();
   applyLang();
@@ -1122,16 +1161,25 @@ function badgeStats(){
   const pkey=PROFILE==='me'?'':'_'+PROFILE;
   let bestGame=0;try{bestGame=(JSON.parse(localStorage.getItem('run_best3'+pkey))||{}).p||0;}catch(e){}
   let reactBest=0;try{reactBest=+localStorage.getItem('react_best'+pkey)||0;}catch(e){}
+  const _xpT=xpTotal();
   return {perfect,good,tracked,waterHits,sleepHits,bestSteps,totalSteps,bestPlank,bestPush,bestSquat,totalPush,totalSquat,totalPlank,
     recPushSet:pushEx?exRecord(pushEx.id):0,recSquatSet:squatEx?exRecord(squatEx.id):0,recPlankSet:plankEx?exRecord(plankEx.id):0,
     monthPush:mx(mPush),monthSquat:mx(mSquat),monthPlank:mx(mPlank),monthWaterL:Math.round(mx(mWater)/1000),monthSteps:mx(mSteps),maxRecDay,maxPushSets,maxSquatSets,maxPlankSets,maxSquat100Sets,steps10kStreak:bestRun(steps10kDays),maxDayScore,
-    claimedCount:Object.keys(state.badges||{}).length,reactBest,bookPages,gymTotal,
+    claimedCount:Object.keys(state.badges||{}).length,reactBest,bookPages,gymTotal,xpTotal:_xpT,level:levelInfo(_xpT).level,
     booksRead:(state.tasks||[]).filter(t=>t.done&&/книг|книж|book/i.test(t.text||'')).length,
     penaltyDays,penaltyBeaten,
     bestStreak:Math.max(bestRun(goodArr),computeStreak()),noCS2Streak:bestRun(Object.keys(steamPlay).filter(k=>steamPlay[k]===0)),coffeeStreak:bestRun(coffeeZero),waterStreak:bestRun(waterDays),perfectStreak:bestRun(perfDays),loanClosed,bestGame};
 }
-const BADGE_GROUPS=[['streak','🔥 Серії','🔥 Streaks'],['score','⭐ Ідеал','⭐ Perfection'],['push','💪 Віджимання','💪 Push-ups'],['squat','🦵 Присідання','🦵 Squats'],['plank','🧘 Планка','🧘 Plank'],['steps','👣 Кроки','👣 Steps'],['water','💧 Вода','💧 Water'],['sleep','😴 Сон','😴 Sleep'],['games','🎮 Ігри','🎮 Games'],['coffee','☕ Кава','☕ Coffee'],['gym','🏋️ Зал','🏋️ Gym'],['read','📖 Читання','📖 Reading'],['pen','🔨 Штрафи','🔨 Penalties'],['tenure','📅 Стаж','📅 Tenure'],['finance','💰 Гроші','💰 Money'],['game','🎮 Міні-ігри','🎮 Mini-games'],['meta','👑 Майстерність','👑 Mastery']];
+const BADGE_GROUPS=[['level','📈 Рівень','📈 Level'],['streak','🔥 Серії','🔥 Streaks'],['score','⭐ Ідеал','⭐ Perfection'],['push','💪 Віджимання','💪 Push-ups'],['squat','🦵 Присідання','🦵 Squats'],['plank','🧘 Планка','🧘 Plank'],['steps','👣 Кроки','👣 Steps'],['water','💧 Вода','💧 Water'],['sleep','😴 Сон','😴 Sleep'],['games','🎮 Ігри','🎮 Games'],['coffee','☕ Кава','☕ Coffee'],['gym','🏋️ Зал','🏋️ Gym'],['read','📖 Читання','📖 Reading'],['pen','🔨 Штрафи','🔨 Penalties'],['tenure','📅 Стаж','📅 Tenure'],['finance','💰 Гроші','💰 Money'],['game','🎮 Міні-ігри','🎮 Mini-games'],['meta','👑 Майстерність','👑 Mastery']];
 const BADGE_DEFS=[
+ {id:'lvl1',g:'level',e:'🌱',n:'Рівень 1',ne:'Level 1',f:'Початок шляху — усе попереду',fe:'The journey begins',need:1,u:'рівень',ue:'level',k:'level'},
+ {id:'lvl10',g:'level',e:'⭐',n:'Рівень 10',ne:'Level 10',f:'Десятий рівень — ти в темі',fe:'Level ten — you are rolling',need:10,u:'рівень',ue:'level',k:'level'},
+ {id:'lvl50',g:'level',e:'🌟',n:'Рівень 50',ne:'Level 50',f:'Півсотні рівнів дисципліни',fe:'Fifty levels of discipline',need:50,u:'рівень',ue:'level',k:'level'},
+ {id:'lvl100',g:'level',e:'👑',n:'Рівень 100',ne:'Level 100',f:'Сотий рівень — легенда',fe:'Level one hundred — a legend',need:100,u:'рівень',ue:'level',k:'level'},
+ {id:'xp10',g:'level',e:'✨',n:'10 XP',ne:'10 XP',f:'Перші бали досвіду',fe:'First experience points',need:10,u:'XP',ue:'XP',k:'xpTotal'},
+ {id:'xp100',g:'level',e:'💫',n:'100 XP',ne:'100 XP',f:'Сотня XP у скарбничці',fe:'A hundred XP banked',need:100,u:'XP',ue:'XP',k:'xpTotal'},
+ {id:'xp500',g:'level',e:'🔆',n:'500 XP',ne:'500 XP',f:'П’ятсот балів досвіду',fe:'Five hundred experience',need:500,u:'XP',ue:'XP',k:'xpTotal'},
+ {id:'xp1000',g:'level',e:'🏆',n:'1000 XP',ne:'1000 XP',f:'Тисяча XP — машина звичок',fe:'A thousand XP — a habit machine',need:1000,u:'XP',ue:'XP',k:'xpTotal'},
  {id:'streak7',g:'streak',e:'🔥',n:'Тижнева серія',ne:'Weekly streak',f:'Тиждень без відмазок 💥',fe:'A week, zero excuses 💥',need:7,u:'днів поспіль',ue:'days in a row',k:'bestStreak'},
  {id:'streak14',g:'streak',e:'💪',n:'Два тижні',ne:'Two weeks',f:'Воля з титану',fe:'Titanium willpower',need:14,u:'днів поспіль',ue:'days in a row',k:'bestStreak'},
  {id:'streak30',g:'streak',e:'👑',n:'Місяць вогню',ne:'Month of fire',f:'Ти вже інша людина',fe:'You are a new person now',need:30,u:'днів поспіль',ue:'days in a row',k:'bestStreak'},
