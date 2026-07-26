@@ -977,12 +977,11 @@ function delTask(id){state.tasks=state.tasks.filter(x=>x.id!==id);save();}
 function limitMaxOn(l,k){const h=l&&l.maxHist;if(!h||!h.length)return l?l.max:0;let m=h[0].max;for(const e of h){if(e.d<=k)m=e.max;else break;}return m;}
 function dayScore(k){const comps=dayComponents(k);if(!comps)return null;if(!comps.length)return 0;let s=0;comps.forEach(c=>s+=c.ratio);return Math.round(s/comps.length*100);}
 /* ===== XP / РІВНІ ===== */
-// ціль-компонент (вода, кроки): 0–100 за % + до +20 бонус за перевищення
-function goalXP(r){const base=Math.min(100,Math.max(0,r*100));const bonus=r>1?Math.min(20,(r-1)*40):0;return base+bonus;}
-// вправа: 0–100 за норму + до +30 бонус (падаюча віддача) − штраф (0 зробив = −10, половина = −5)
-function exXP(done,target){if(target<=0)return 0;const r=done/target;const base=Math.min(100,r*100);const bonus=r>1?Math.min(30,Math.sqrt(r-1)*30):0;const pen=r<1?10*(1-r):0;return base+bonus-pen;}
-// ліміт: бали за НЕперевищення (100 при 0 → 60 на межі), штраф за перебір (до −40)
-function limitXP(v,mx){if(mx<=0)return 0;if(v<=mx)return 100-(v/mx)*40;return -Math.min(40,(v-mx)/mx*40);}
+// завдання-ціль (вода, вправи, лічильники): −50 якщо зовсім не робив → 100 за норму → +до 20 за перевищення (лінійно від −50 до 100)
+function goalXP(r){if(r>=1)return 100+Math.min(20,(r-1)*40);return 150*r-50;}
+function exXP(done,target){if(target<=0)return 0;return goalXP(done/target);}
+// ліміт: 100 якщо в межах, −50 за перебір (без бонусу)
+function limitXP(v,mx){if(mx<=0)return 0;return v<=mx?100:-50;}
 function xpComponents(k){const d=state.days[k];if(!d||dayEmpty(d))return [];const S=state.settings,out=[];
   if(mod('water'))out.push(goalXP((d.water||0)/(S.waterGoal||1)));
   if(mod('activity'))S.exercises.forEach(ex=>{out.push(exXP((d.exercises&&d.exercises[ex.id])||0,exTarget(ex,k)));});
@@ -1004,7 +1003,7 @@ function cumXP(L){return (L-1)*(15*L+70);} // XP щоб досягти рівн�
 function levelInfo(xp){let L=1;while(L<999&&cumXP(L+1)<=xp)L++;const cur=cumXP(L),next=cumXP(L+1);return {level:L,into:xp-cur,span:next-cur,pct:Math.min(100,Math.floor((xp-cur)/(next-cur)*100)),total:xp};}
 function openXP(){const xi=levelInfo(xpTotal()),today=dayXP(todayKey()),mult=streakMult(computeStreak());
   $('xpBody').innerHTML=`<div style="text-align:center;margin:6px 0 16px"><div style="font-size:42px;font-weight:800" class="neon-green">Рівень ${xi.level}</div><div class="muted">${fmt(xi.into)} / ${fmt(xi.span)} XP до рівня ${xi.level+1}</div><div class="xp-bar" style="height:9px;margin:12px auto;max-width:280px"><i style="width:${xi.pct}%"></i></div><div class="muted">Всього <b>${fmt(xi.total)} XP</b> · сьогодні <b>+${fmt(today)} XP</b> · серія ×${mult}</div></div>`+
-    `<div class="muted" style="font-size:12.5px;line-height:1.75"><b>Як нараховується XP за день:</b><br>💧 Вода / 🔢 лічильники — 0–100 за % цілі, +до 20 за перевищення<br>💪 Вправи — 0–100 за норму, +до 30 бонус (падаюча віддача), штраф −10 якщо не робив (−5 за половину)<br>🚫 Ліміти — до 100 за «в межах», штраф до −40 за перебір<br>Далі: <b>середнє по активних модулях × множник серії</b> (3 дні ×1.1, 7 ×1.25, 14+ ×1.5).</div>`;
+    `<div class="muted" style="font-size:12.5px;line-height:1.75"><b>Як нараховується XP за день:</b><br>💧 Вода · 💪 вправи · 🔢 лічильники — <b>−50</b> якщо не робив, до <b>100</b> за норму, <b>+до 20</b> за перевищення<br>🚫 Ліміти — <b>100</b> якщо в межах, <b>−50</b> за перебір (без бонусу)<br>Далі: <b>середнє по активних модулях × множник серії</b> (3 дні ×1.1, 7 ×1.25, 14+ ×1.5). День не може дати менше 0 XP.</div>`;
   xpInfo.showModal();}
 function weekMonday(d){const x=new Date(d);const dow=(x.getDay()+6)%7;x.setDate(x.getDate()-dow);x.setHours(0,0,0,0);return x;}
 function weekMondayKey(d){return dayKey(weekMonday(d));}
