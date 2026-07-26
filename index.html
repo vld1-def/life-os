@@ -52,6 +52,7 @@
   .pill .big{font-size:20px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1}
   .pill .lbl{font-size:9.5px; color:var(--muted); letter-spacing:.4px; text-transform:uppercase}
   .neon-cyan{color:var(--cyan)} .neon-purple{color:var(--purple)} .neon-green{color:var(--green)} .neon-red{color:var(--red)}
+  .mobile-only{display:none}
   .xp-bar{height:4px;background:rgba(255,255,255,.12);border-radius:3px;margin-top:6px;overflow:hidden}
   .xp-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#4fc596,#5cc9dd);border-radius:3px;transition:width .3s}
 
@@ -257,6 +258,9 @@
     #bottomNav .navbtn.on{color:var(--cyan); background:rgba(92,201,221,.12)}
     #bottomNav .navbtn:active{transform:scale(.94)}
     .card.tab-off{display:none!important}
+    .menu-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px}
+    .menu-btn{display:flex; align-items:center; justify-content:center; gap:6px; padding:15px 10px; border-radius:12px; font-weight:700; font-size:14px; position:relative}
+    .mobile-only{display:block}
     .toast{bottom:calc(84px + env(safe-area-inset-bottom))}
   }
   @media(max-width:640px){
@@ -459,6 +463,17 @@
       <button class="acc sm" onclick="addTask()">+</button>
     </div>
     <div id="taskList"></div>
+  </div>
+
+  <!-- МЕНЮ (моб.) -->
+  <div class="glass card mobile-only" data-tab="more">
+    <h2><span class="dot" style="background:var(--purple)"></span>Меню</h2>
+    <div class="menu-grid">
+      <button class="menu-btn acc" onclick="openBadges()">🏅 Бейджі<span class="cnt" id="mBadge"></span></button>
+      <button class="menu-btn acc" onclick="openNotifs()">🔔 Сповіщення<span class="cnt" id="mNotif"></span></button>
+      <button class="menu-btn acc" onclick="openSettings()">⚙️ Налаштування</button>
+      <button class="menu-btn acc" onclick="toggleLang()"><span id="mLang">🌐 English</span></button>
+    </div>
   </div>
 
   <!-- ГРА -->
@@ -789,6 +804,9 @@ function updateHdrMenu(){
   const hn=$('hdrNotif');if(hn)hn.textContent=nc||'';
   const hb=$('hdrBadge');if(hb)hb.textContent=bc||'';
   const dot=$('hdrDot');if(dot)dot.style.display=(nc||bc)?'block':'none';
+  const ml=$('mLang');if(ml)ml.textContent=lang==='en'?'🌐 Українською':'🌐 English';
+  const mn=$('mNotif');if(mn)mn.textContent=nc||'';
+  const mb=$('mBadge');if(mb)mb.textContent=bc||'';
 }
 document.addEventListener('click',e=>{const m=$('hdrMenu');if(m&&m.classList.contains('on')&&!e.target.closest('.hdr-menu-wrap'))m.classList.remove('on');});
 window.addEventListener('resize',applyTab);
@@ -989,6 +1007,13 @@ function xpComponents(k){const d=state.days[k];if(!d||dayEmpty(d))return [];cons
   if(mod('limits'))S.limitHabits.forEach(l=>{if(l.mode==='week')return;out.push(limitXP((d.limits&&d.limits[l.id])||0,limitMaxOn(l,k)));});
   return out;}
 function dayXPraw(k){const c=xpComponents(k);if(!c.length)return 0;return Math.max(0,c.reduce((a,b)=>a+b,0)/c.length);}
+// розклад балів дня по модулях (для вікна рівня)
+function xpBreakdown(k){const d=state.days[k];if(!d||dayEmpty(d))return [];const S=state.settings,out=[];
+  if(mod('water'))out.push({label:'💧 Вода',pts:goalXP((d.water||0)/(S.waterGoal||1))});
+  if(mod('activity'))S.exercises.forEach(ex=>{out.push({label:'💪 '+ex.name,pts:exXP((d.exercises&&d.exercises[ex.id])||0,exTarget(ex,k))});});
+  if(mod('counters'))S.counters.forEach(c=>{if(c.mode==='week')return;const g=counterGoalOn(c,k)||c.goal||0;out.push({label:'🔢 '+c.name,pts:goalXP(g?((d.counters&&d.counters[c.id])||0)/g:0)});});
+  if(mod('limits'))S.limitHabits.forEach(l=>{if(l.mode==='week')return;out.push({label:'🚫 '+l.name,pts:limitXP((d.limits&&d.limits[l.id])||0,limitMaxOn(l,k))});});
+  return out;}
 function streakMult(len){return len>=14?1.5:len>=7?1.25:len>=3?1.1:1;} // множник серії
 function streakLenAt(k){let n=0,d=new Date(k+'T00:00:00');for(let i=0;i<420;i++){const kk=dayKey(d);const rest=!!(state.restDays&&state.restDays[kk]);const sc=dayScore(kk);if(rest||(sc!=null&&sc>=streakMin())){n++;d.setDate(d.getDate()-1);}else break;}return n;}
 function dayXP(k){return Math.round(dayXPraw(k)*streakMult(streakLenAt(k)));}
@@ -1001,9 +1026,12 @@ function xpTotal(){const set={};Object.keys(state.days).forEach(k=>{if(!dayEmpty
   return total;}
 function cumXP(L){return (L-1)*(15*L+70);} // XP щоб досягти рівня L
 function levelInfo(xp){let L=1;while(L<999&&cumXP(L+1)<=xp)L++;const cur=cumXP(L),next=cumXP(L+1);return {level:L,into:xp-cur,span:next-cur,pct:Math.min(100,Math.floor((xp-cur)/(next-cur)*100)),total:xp};}
-function openXP(){const xi=levelInfo(xpTotal()),today=dayXP(todayKey()),mult=streakMult(computeStreak());
-  $('xpBody').innerHTML=`<div style="text-align:center;margin:6px 0 16px"><div style="font-size:42px;font-weight:800" class="neon-green">Рівень ${xi.level}</div><div class="muted">${fmt(xi.into)} / ${fmt(xi.span)} XP до рівня ${xi.level+1}</div><div class="xp-bar" style="height:9px;margin:12px auto;max-width:280px"><i style="width:${xi.pct}%"></i></div><div class="muted">Всього <b>${fmt(xi.total)} XP</b> · сьогодні <b>+${fmt(today)} XP</b> · серія ×${mult}</div></div>`+
-    `<div class="muted" style="font-size:12.5px;line-height:1.75"><b>Як нараховується XP за день:</b><br>💧 Вода · 💪 вправи · 🔢 лічильники — <b>−50</b> якщо не робив, до <b>100</b> за норму, <b>+до 20</b> за перевищення<br>🚫 Ліміти — <b>100</b> якщо в межах, <b>−50</b> за перебір (без бонусу)<br>Далі: <b>середнє по активних модулях × множник серії</b> (3 дні ×1.1, 7 ×1.25, 14+ ×1.5). День не може дати менше 0 XP.</div>`;
+function openXP(){const xi=levelInfo(xpTotal()),tk=todayKey(),today=dayXP(tk),mult=streakMult(computeStreak());
+  const bd=xpBreakdown(tk);
+  const rows=bd.length?bd.map(c=>`<div class="between" style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.06)"><span>${esc(c.label)}</span><b style="color:${c.pts>=0?'var(--green)':'var(--red)'}">${c.pts>=0?'+':''}${Math.round(c.pts)}</b></div>`).join(''):'<div class="muted" style="text-align:center;padding:12px">Сьогодні ще немає даних — почни виконувати цілі 💪</div>';
+  $('xpBody').innerHTML=`<div style="text-align:center;margin:6px 0 14px"><div style="font-size:42px;font-weight:800" class="neon-green">Рівень ${xi.level}</div><div class="muted">${fmt(xi.into)} / ${fmt(xi.span)} XP до рівня ${xi.level+1}</div><div class="xp-bar" style="height:9px;margin:12px auto;max-width:280px"><i style="width:${xi.pct}%"></i></div><div class="muted">Всього <b>${fmt(xi.total)} XP</b></div></div>`+
+    `<div style="font-size:13px;font-weight:700;margin:6px 0 2px">📊 Сьогодні по модулях:</div>${rows}`+
+    (bd.length?`<div class="between" style="padding:9px 0 2px;font-weight:800"><span>Разом (середнє ×серія ×${mult})</span><b style="color:var(--green)">+${fmt(today)} XP</b></div>`:'');
   xpInfo.showModal();}
 function weekMonday(d){const x=new Date(d);const dow=(x.getDay()+6)%7;x.setDate(x.getDate()-dow);x.setHours(0,0,0,0);return x;}
 function weekMondayKey(d){return dayKey(weekMonday(d));}
@@ -1175,13 +1203,14 @@ const BADGE_DEFS=[
  {id:'lvl10',g:'level',e:'⭐',n:'Рівень 10',ne:'Level 10',f:'Десятий рівень — ти в темі',fe:'Level ten — you are rolling',need:10,u:'рівень',ue:'level',k:'level'},
  {id:'lvl50',g:'level',e:'🌟',n:'Рівень 50',ne:'Level 50',f:'Півсотні рівнів дисципліни',fe:'Fifty levels of discipline',need:50,u:'рівень',ue:'level',k:'level'},
  {id:'lvl100',g:'level',e:'👑',n:'Рівень 100',ne:'Level 100',f:'Сотий рівень — легенда',fe:'Level one hundred — a legend',need:100,u:'рівень',ue:'level',k:'level'},
- {id:'xp10',g:'level',e:'✨',n:'10 XP',ne:'10 XP',f:'Перші бали досвіду',fe:'First experience points',need:10,u:'XP',ue:'XP',k:'xpTotal'},
- {id:'xp100',g:'level',e:'💫',n:'100 XP',ne:'100 XP',f:'Сотня XP у скарбничці',fe:'A hundred XP banked',need:100,u:'XP',ue:'XP',k:'xpTotal'},
- {id:'xp500',g:'level',e:'🔆',n:'500 XP',ne:'500 XP',f:'П’ятсот балів досвіду',fe:'Five hundred experience',need:500,u:'XP',ue:'XP',k:'xpTotal'},
- {id:'xp1000',g:'level',e:'🏆',n:'1000 XP',ne:'1000 XP',f:'Тисяча XP — машина звичок',fe:'A thousand XP — a habit machine',need:1000,u:'XP',ue:'XP',k:'xpTotal'},
+ {id:'xp1000',g:'level',e:'🔆',n:'1000 XP',ne:'1000 XP',f:'Тисяча XP — машина звичок',fe:'A thousand XP — a habit machine',need:1000,u:'XP',ue:'XP',k:'xpTotal'},
+ {id:'xp10000',g:'level',e:'💫',n:'10 000 XP',ne:'10,000 XP',f:'Десять тисяч досвіду',fe:'Ten thousand experience',need:10000,u:'XP',ue:'XP',k:'xpTotal'},
+ {id:'xp50000',g:'level',e:'🌟',n:'50 000 XP',ne:'50,000 XP',f:'П’ятдесят тисяч — рідкісна порода',fe:'Fifty thousand — a rare breed',need:50000,u:'XP',ue:'XP',k:'xpTotal'},
+ {id:'xp100000',g:'level',e:'🏆',n:'100 000 XP',ne:'100,000 XP',f:'Сто тисяч XP — це вже стиль життя',fe:'A hundred thousand XP — a lifestyle',need:100000,u:'XP',ue:'XP',k:'xpTotal'},
  {id:'streak7',g:'streak',e:'🔥',n:'Тижнева серія',ne:'Weekly streak',f:'Тиждень без відмазок 💥',fe:'A week, zero excuses 💥',need:7,u:'днів поспіль',ue:'days in a row',k:'bestStreak'},
  {id:'streak14',g:'streak',e:'💪',n:'Два тижні',ne:'Two weeks',f:'Воля з титану',fe:'Titanium willpower',need:14,u:'днів поспіль',ue:'days in a row',k:'bestStreak'},
  {id:'streak30',g:'streak',e:'👑',n:'Місяць вогню',ne:'Month of fire',f:'Ти вже інша людина',fe:'You are a new person now',need:30,u:'днів поспіль',ue:'days in a row',k:'bestStreak'},
+ {id:'streak90',g:'streak',e:'🔱',n:'3 місяці вогню',ne:'3 months of fire',f:'Квартал без жодного зриву — залізна воля',fe:'A quarter with zero misses — iron will',need:90,u:'днів поспіль',ue:'days in a row',k:'bestStreak'},
  {id:'perfect1',g:'score',e:'⭐',n:'Ідеальний день',ne:'Perfect day',f:'100% — навіть кома на місці',fe:'100% — flawless',need:1,u:'день на 100%',ue:'perfect day',k:'perfect'},
  {id:'perfect5',g:'score',e:'🌟',n:'П`ять зірок',ne:'Five stars',f:'Мішленівський рівень',fe:'Michelin level',need:5,u:'днів на 100%',ue:'perfect days',k:'perfect'},
  {id:'good30',g:'score',e:'💚',n:'Хороша форма',ne:'In good shape',f:'30 днів у зеленій зоні',fe:'30 days in the green',need:30,u:'хороших днів',ue:'good days',k:'good'},
@@ -1204,8 +1233,8 @@ const BADGE_DEFS=[
  {id:'squat_m1000',g:'squat',e:'📅',n:'1000 за місяць',ne:'1000 a month',f:'Місяць присідав як не в себе',fe:'Squatted all month',need:1000,u:'присідань за місяць',ue:'squats a month',k:'monthSquat'},
  {id:'squat_t5000',g:'squat',e:'🏆',n:'5000 присідань',ne:'5000 squats',f:'Легенда присіду',fe:'Squat legend',need:5000,u:'присідань усього',ue:'squats total',k:'totalSquat'},
  {id:'squatsets5',g:'squat',e:'🔁',n:'5 підходів',ne:'5 sets',f:'5 підходів по 20+ присідань за день',fe:'5 sets of 20+ squats in a day',need:5,u:'підходів по 20+ за день',ue:'sets of 20+ a day',k:'maxSquatSets'},
- {id:'squatset150',g:'squat',e:'💥',n:'Підхід 150',ne:'Set of 150',f:'150 присідань одним підходом — звір',fe:'150 squats in a single set',need:150,u:'присідань за підхід',ue:'squats in one set',k:'recSquatSet'},
- {id:'squat2x100',g:'squat',e:'⚔️',n:'2 по 100',ne:'2×100',f:'Два підходи по 100 присідань за один день',fe:'Two sets of 100 squats in one day',need:2,u:'підходів по 100 за день',ue:'sets of 100 a day',k:'maxSquat100Sets'},
+ {id:'squatset200',g:'squat',e:'💥',n:'Підхід 200',ne:'Set of 200',f:'200 присідань одним підходом — машина',fe:'200 squats in a single set',need:200,u:'присідань за підхід',ue:'squats in one set',k:'recSquatSet'},
+ {id:'squat3x100',g:'squat',e:'⚔️',n:'3 по 100',ne:'3×100',f:'Три підходи по 100 присідань за один день',fe:'Three sets of 100 squats in one day',need:3,u:'підходів по 100 за день',ue:'sets of 100 a day',k:'maxSquat100Sets'},
  {id:'squat_m2000',g:'squat',e:'📅',n:'2000 за місяць',ne:'2000 a month',f:'Дві тисячі присідань за місяць',fe:'Two thousand squats in a month',need:2000,u:'присідань за місяць',ue:'squats a month',k:'monthSquat'},
  {id:'squat_t10000',g:'squat',e:'👑',n:'10000 присідань',ne:'10000 squats',f:'П’ять цифр присіду за весь час',fe:'Five-figure squat total',need:10000,u:'присідань усього',ue:'squats total',k:'totalSquat'},
  {id:'plankset60',g:'plank',e:'🧘',n:'Планка 60с',ne:'Plank 60s',f:'Хвилина, що триває вічність',fe:'The eternal minute',need:60,u:'сек планки за підхід',ue:'sec plank in one hold',k:'recPlankSet'},
@@ -1398,11 +1427,12 @@ function toggleMetricBar(){metricOpen=!metricOpen;applyMetricBar();}
 function applyMetricBar(){const bar=$('metricBar'),tog=$('metricToggle'),cur=$('metricCur');if(bar)bar.classList.toggle('collapsed',!metricOpen);if(tog)tog.classList.toggle('open',metricOpen);if(cur)cur.textContent=curMetric().label;}
 function setMetric(id){metricSel=id;renderMonth();}
 function setMonthView(v){monthView=v;renderMonth();}
-function metricList(){const S=state.settings;const a=[{id:'all',label:'Усі',kind:'all'},{id:'score',label:'Бал дня',unit:'%',kind:'score'}];if(mod('water'))a.push({id:'water',label:'Вода',unit:'мл',kind:'goal'});if(mod('sleep'))a.push({id:'sleep',label:'Сон',unit:'год',kind:'sleep'});if(mod('weight'))a.push({id:'weight',label:'Вага',unit:'кг',kind:'weight'});if(mod('counters'))S.counters.forEach(c=>{if(c.mode==='week')return;a.push({id:'cnt:'+c.id,label:c.name,unit:c.unit,kind:'goal',ref:c});});if(mod('limits'))S.limitHabits.forEach(l=>{if(l.mode==='week')return;a.push({id:'lim:'+l.id,label:l.name,unit:l.unit,kind:'limit',ref:l});});if(mod('activity')&&S.exercises.length)a.push({id:'exmaxAll',label:'🏆 Макс/підхід',unit:'реп',kind:'exmaxAll'});return a;}
+function metricList(){const S=state.settings;const a=[{id:'all',label:'Усі',kind:'all'},{id:'score',label:'Бал дня',unit:'%',kind:'score'},{id:'xp',label:'XP/день',unit:'XP',kind:'xp'}];if(mod('water'))a.push({id:'water',label:'Вода',unit:'мл',kind:'goal'});if(mod('sleep'))a.push({id:'sleep',label:'Сон',unit:'год',kind:'sleep'});if(mod('weight'))a.push({id:'weight',label:'Вага',unit:'кг',kind:'weight'});if(mod('counters'))S.counters.forEach(c=>{if(c.mode==='week')return;a.push({id:'cnt:'+c.id,label:c.name,unit:c.unit,kind:'goal',ref:c});});if(mod('limits'))S.limitHabits.forEach(l=>{if(l.mode==='week')return;a.push({id:'lim:'+l.id,label:l.name,unit:l.unit,kind:'limit',ref:l});});if(mod('activity')&&S.exercises.length)a.push({id:'exmaxAll',label:'🏆 Макс/підхід',unit:'реп',kind:'exmaxAll'});return a;}
 function curMetric(){return metricList().find(m=>m.id===metricSel)||metricList()[0];}
 function metricGoal(mt){if(mt.id==='water')return state.settings.waterGoal;if(mt.id==='sleep')return state.settings.sleepGoal||8;if(mt.id==='weight')return null;if(mt.id==='score')return 80;if(mt.kind==='goal')return mt.ref.goal;if(mt.kind==='limit')return mt.ref.max;return null;}
 function metricDay(mt,k){const d=state.days[k];if(!d)return{has:false};
   if(mt.id==='score'){const sc=dayScore(k);return{v:sc,goal:100,ok:sc>=70,has:sc!=null};}
+  if(mt.kind==='xp'){const has=!dayEmpty(d);return{v:has?dayXP(k):0,goal:null,ok:true,has};}
   if(mt.id==='water'){return{v:d.water||0,goal:state.settings.waterGoal,ok:(d.water||0)>=state.settings.waterGoal,has:true};}
   if(mt.id==='sleep'){const h=sleepHours(k),g=state.settings.sleepGoal||8;return{v:h,goal:g,ok:h>=g,has:h>0};}
   if(mt.id==='weight'){const v=d.weight||0;return{v,goal:null,ok:true,has:v>0};}
@@ -1410,6 +1440,7 @@ function metricDay(mt,k){const d=state.days[k];if(!d)return{has:false};
   if(mt.kind==='exmax'){const v=exMaxSet(mt.ref.id,k);return{v,goal:null,ok:true,has:v>0};}
   const v=(d.limits&&d.limits[mt.ref.id])||0,mx=limitMaxOn(mt.ref,k);return{v,goal:mx,ok:v<=mx,has:true};}
 function metricColor(mt,r){if(!r.has)return{bg:'rgba(255,255,255,.05)',col:'var(--muted)'};
+  if(mt.kind==='xp')return{bg:'rgba(79,197,150,.72)',col:'#04140d'};
   if(mt.kind==='weight')return{bg:'rgba(111,151,221,.6)',col:'#06121a'};
   if(mt.kind==='exmax')return{bg:'rgba(79,197,150,.72)',col:'#04140d'};
   if(mt.kind==='limit')return r.ok?{bg:'rgba(79,197,150,.8)',col:'#04140d'}:{bg:'rgba(229,107,123,.72)',col:'#2a0708'};
@@ -1475,7 +1506,7 @@ function renderMonth(){
       $('monthBody').innerHTML=(monthView==='bar')?svgMultiBars({series,labels,unit:'хв',h:236,hidden:hiddenLines,toggle:true}):svgMultiLine({series:[total].concat(series),labels,unit:'хв',h:236,hidden:hiddenLines,toggle:true});
       $('monthLegend').textContent=(monthView==='bar')?'Хвилини по кожному застосунку/день (стовпчики). Тисни назву в легенді, щоб приховати.':'Жовта «Всього» — сума хв/день. Тисни лінію в легенді, щоб приховати.';
     } else {
-      const data=[];for(let dd=1;dd<=lastDay;dd++){const k=dayKey(new Date(y,mo,dd)),r=metricDay(gm,k);if(gm.id==='score'){data.push({x:dd,y:r.has?r.v:0,day:k});}else{data.push({x:dd,y:r.has?r.v:0,tip:dd+' '+msh+': '+(r.has?metricValTxt(gm,r.v):'немає даних')});}}
+      const data=[];for(let dd=1;dd<=lastDay;dd++){const k=dayKey(new Date(y,mo,dd)),r=metricDay(gm,k);if(gm.id==='score'||gm.kind==='xp'){data.push({x:dd,y:r.has?r.v:0,day:k});}else{data.push({x:dd,y:r.has?r.v:0,tip:dd+' '+msh+': '+(r.has?metricValTxt(gm,r.v):'немає даних')});}}
       const color=gm.kind==='limit'?'#e56b7b':'#5cc9dd';
       $('monthBody').innerHTML=(monthView==='bar')?svgMetricBars({data,color,goal:metricGoal(gm),goalLabel:gm.kind==='limit'?'ліміт':'ціль',h:236}):svgLine({data,color,goal:metricGoal(gm),goalLabel:gm.kind==='limit'?'ліміт':'ціль',h:236,avg:true});
       $('monthLegend').textContent=(gm.kind==='limit'?'Значення по днях; зелена пунктирна — ліміт.':'Значення по днях; зелена пунктирна — ціль.');
