@@ -53,6 +53,12 @@
   .pill .lbl{font-size:9.5px; color:var(--muted); letter-spacing:.4px; text-transform:uppercase}
   .neon-cyan{color:var(--cyan)} .neon-purple{color:var(--purple)} .neon-green{color:var(--green)} .neon-red{color:var(--red)}
   .mobile-only{display:none}
+  .xp-chips{display:grid; grid-template-columns:repeat(auto-fill,minmax(88px,1fr)); gap:8px; margin-top:10px}
+  .xp-chip{border-radius:13px; padding:11px 8px; text-align:center; background:rgba(255,255,255,.04); border:1px solid var(--stroke)}
+  .xp-chip .lab{font-size:11px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .xp-chip .pts{font-size:21px; font-weight:800; margin-top:3px; line-height:1}
+  .xp-chip.pos{background:rgba(79,197,150,.1); border-color:rgba(79,197,150,.28)} .xp-chip.pos .pts{color:var(--green)}
+  .xp-chip.neg{background:rgba(229,107,123,.1); border-color:rgba(229,107,123,.28)} .xp-chip.neg .pts{color:var(--red)}
   .xp-bar{height:4px;background:rgba(255,255,255,.12);border-radius:3px;margin-top:6px;overflow:hidden}
   .xp-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#4fc596,#5cc9dd);border-radius:3px;transition:width .3s}
 
@@ -1028,10 +1034,10 @@ function cumXP(L){return (L-1)*(15*L+70);} // XP щоб досягти рівн�
 function levelInfo(xp){let L=1;while(L<999&&cumXP(L+1)<=xp)L++;const cur=cumXP(L),next=cumXP(L+1);return {level:L,into:xp-cur,span:next-cur,pct:Math.min(100,Math.floor((xp-cur)/(next-cur)*100)),total:xp};}
 function openXP(){const xi=levelInfo(xpTotal()),tk=todayKey(),today=dayXP(tk),mult=streakMult(computeStreak());
   const bd=xpBreakdown(tk);
-  const rows=bd.length?bd.map(c=>`<div class="between" style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.06)"><span>${esc(c.label)}</span><b style="color:${c.pts>=0?'var(--green)':'var(--red)'}">${c.pts>=0?'+':''}${Math.round(c.pts)}</b></div>`).join(''):'<div class="muted" style="text-align:center;padding:12px">Сьогодні ще немає даних — почни виконувати цілі 💪</div>';
-  $('xpBody').innerHTML=`<div style="text-align:center;margin:6px 0 14px"><div style="font-size:42px;font-weight:800" class="neon-green">Рівень ${xi.level}</div><div class="muted">${fmt(xi.into)} / ${fmt(xi.span)} XP до рівня ${xi.level+1}</div><div class="xp-bar" style="height:9px;margin:12px auto;max-width:280px"><i style="width:${xi.pct}%"></i></div><div class="muted">Всього <b>${fmt(xi.total)} XP</b></div></div>`+
-    `<div style="font-size:13px;font-weight:700;margin:6px 0 2px">📊 Сьогодні по модулях:</div>${rows}`+
-    (bd.length?`<div class="between" style="padding:9px 0 2px;font-weight:800"><span>Разом (середнє ×серія ×${mult})</span><b style="color:var(--green)">+${fmt(today)} XP</b></div>`:'');
+  const chips=bd.length?`<div class="xp-chips">`+bd.map(c=>{const p=Math.round(c.pts);return `<div class="xp-chip ${p>=0?'pos':'neg'}" title="${esc(c.label)}"><div class="lab">${esc(c.label)}</div><div class="pts">${p>=0?'+':''}${p}</div></div>`;}).join('')+`</div>`:'<div class="muted" style="text-align:center;padding:14px">Сьогодні ще немає даних — почни виконувати цілі 💪</div>';
+  $('xpBody').innerHTML=`<div style="text-align:center;margin:4px 0 16px"><div style="font-size:46px;font-weight:800;line-height:1" class="neon-green">${xi.level}</div><div class="muted" style="font-size:11.5px;letter-spacing:1px;margin-top:3px">РІВЕНЬ · ${fmt(xi.total)} XP</div><div class="xp-bar" style="height:9px;margin:13px auto 6px;max-width:280px"><i style="width:${xi.pct}%"></i></div><div class="muted" style="font-size:12px">${fmt(xi.into)} / ${fmt(xi.span)} XP до рівня ${xi.level+1}</div></div>`+
+    `<div class="between" style="margin:2px 0"><span style="font-size:13px;font-weight:700">Сьогодні по модулях</span>${bd.length?`<span style="font-weight:800;color:var(--green)">+${fmt(today)} XP</span>`:''}</div>${chips}`+
+    (bd.length?`<div class="muted" style="font-size:11px;text-align:center;margin-top:10px">середнє по модулях × серія ×${mult}</div>`:'');
   xpInfo.showModal();}
 function weekMonday(d){const x=new Date(d);const dow=(x.getDay()+6)%7;x.setDate(x.getDate()-dow);x.setHours(0,0,0,0);return x;}
 function weekMondayKey(d){return dayKey(weekMonday(d));}
