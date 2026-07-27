@@ -919,11 +919,11 @@ function getDay(k){if(!state.days[k])state.days[k]={water:0,exercises:{},limits:
 function peekDay(k){return state.days[k]||{water:0,exercises:{},limits:{},counters:{},note:'',sleep:{}};} // читання без створення дня
 const _c={};
 // «чиста» прогресія цілі — росте на grow щодня, БЕЗ штрафу; скидається до бази 1-го числа кожного місяця
-function exProg(ex,k){const ck='P'+ex.id+'|'+k;if(_c[ck]!=null)return _c[ck];const p=prevKey(k);if(!state.days[p]||p.slice(0,7)!==k.slice(0,7))return _c[ck]=ex.base;
+function exProg(ex,k){const ck='P'+ex.id+'|'+k;if(_c[ck]!=null)return _c[ck];const p=prevKey(k);if(!state.days[p]||p.slice(0,7)!==k.slice(0,7)||(ex.since&&p<ex.since))return _c[ck]=ex.base;
   return _c[ck]=Math.min(2000,Math.round(exProg(ex,p)+(ex.grow||0)));}
 // ціль дня = чиста прогресія + штраф за недобір проти РЕАЛЬНОЇ вчорашньої цілі (тягнеться, поки не наздоженеш);
 // сам штраф обмежений (base×5), щоб не вибухав до 2000; на 1-ше число місяця все скидається до бази
-function exTarget(ex,k){const ck=ex.id+'|'+k;if(_c[ck]!=null)return _c[ck];const p=prevKey(k);if(!state.days[p]||p.slice(0,7)!==k.slice(0,7))return _c[ck]=ex.base;
+function exTarget(ex,k){const ck=ex.id+'|'+k;if(_c[ck]!=null)return _c[ck];const p=prevKey(k);if(!state.days[p]||p.slice(0,7)!==k.slice(0,7)||(ex.since&&p<ex.since))return _c[ck]=ex.base;
   const prog=Math.min(2000,Math.round(exProg(ex,p)+(ex.grow||0)));
   const pd=(state.days[p].exercises&&state.days[p].exercises[ex.id])||0;
   const cap=(ex.base||1)*5; // ліміт штрафної надбавки
@@ -1008,17 +1008,17 @@ function exXP(done,target){if(target<=0)return 0;return goalXP(done/target);}
 function limitXP(v,mx){if(mx<=0)return 0;return v<=mx?100:-50;}
 function xpComponents(k){const d=state.days[k];if(!d||dayEmpty(d))return [];const S=state.settings,out=[];
   if(mod('water'))out.push(goalXP((d.water||0)/(S.waterGoal||1)));
-  if(mod('activity'))S.exercises.forEach(ex=>{out.push(exXP((d.exercises&&d.exercises[ex.id])||0,exTarget(ex,k)));});
-  if(mod('counters'))S.counters.forEach(c=>{if(c.mode==='week')return;const g=counterGoalOn(c,k)||c.goal||0;out.push(goalXP(g?((d.counters&&d.counters[c.id])||0)/g:0));});
-  if(mod('limits'))S.limitHabits.forEach(l=>{if(l.mode==='week')return;out.push(limitXP((d.limits&&d.limits[l.id])||0,limitMaxOn(l,k)));});
+  if(mod('activity'))S.exercises.forEach(ex=>{if(ex.since&&k<ex.since)return;out.push(exXP((d.exercises&&d.exercises[ex.id])||0,exTarget(ex,k)));});
+  if(mod('counters'))S.counters.forEach(c=>{if(c.mode==='week'||(c.since&&k<c.since))return;const g=counterGoalOn(c,k)||c.goal||0;out.push(goalXP(g?((d.counters&&d.counters[c.id])||0)/g:0));});
+  if(mod('limits'))S.limitHabits.forEach(l=>{if(l.mode==='week'||(l.since&&k<l.since))return;out.push(limitXP((d.limits&&d.limits[l.id])||0,limitMaxOn(l,k)));});
   return out;}
-function dayXPraw(k){const c=xpComponents(k);if(!c.length)return 0;return Math.max(0,c.reduce((a,b)=>a+b,0)/c.length);}
+function dayXPraw(k){const c=xpComponents(k);if(!c.length)return 0;return c.reduce((a,b)=>a+b,0)/c.length;} // знакове середнє (може бути <0)
 // розклад балів дня по модулях (для вікна рівня)
 function xpBreakdown(k){const d=state.days[k];if(!d||dayEmpty(d))return [];const S=state.settings,out=[];
   if(mod('water'))out.push({label:'💧 Вода',pts:goalXP((d.water||0)/(S.waterGoal||1))});
-  if(mod('activity'))S.exercises.forEach(ex=>{out.push({label:'💪 '+ex.name,pts:exXP((d.exercises&&d.exercises[ex.id])||0,exTarget(ex,k))});});
-  if(mod('counters'))S.counters.forEach(c=>{if(c.mode==='week')return;const g=counterGoalOn(c,k)||c.goal||0;out.push({label:'🔢 '+c.name,pts:goalXP(g?((d.counters&&d.counters[c.id])||0)/g:0)});});
-  if(mod('limits'))S.limitHabits.forEach(l=>{if(l.mode==='week')return;out.push({label:'🚫 '+l.name,pts:limitXP((d.limits&&d.limits[l.id])||0,limitMaxOn(l,k))});});
+  if(mod('activity'))S.exercises.forEach(ex=>{if(ex.since&&k<ex.since)return;out.push({label:'💪 '+ex.name,pts:exXP((d.exercises&&d.exercises[ex.id])||0,exTarget(ex,k))});});
+  if(mod('counters'))S.counters.forEach(c=>{if(c.mode==='week'||(c.since&&k<c.since))return;const g=counterGoalOn(c,k)||c.goal||0;out.push({label:'🔢 '+c.name,pts:goalXP(g?((d.counters&&d.counters[c.id])||0)/g:0)});});
+  if(mod('limits'))S.limitHabits.forEach(l=>{if(l.mode==='week'||(l.since&&k<l.since))return;out.push({label:'🚫 '+l.name,pts:limitXP((d.limits&&d.limits[l.id])||0,limitMaxOn(l,k))});});
   return out;}
 function streakMult(len){return len>=14?1.5:len>=7?1.25:len>=3?1.1:1;} // множник серії
 function streakLenAt(k){let n=0,d=new Date(k+'T00:00:00');for(let i=0;i<420;i++){const kk=dayKey(d);const rest=!!(state.restDays&&state.restDays[kk]);const sc=dayScore(kk);if(rest||(sc!=null&&sc>=streakMin())){n++;d.setDate(d.getDate()-1);}else break;}return n;}
@@ -1028,7 +1028,7 @@ function xpTotal(){const set={};Object.keys(state.days).forEach(k=>{if(!dayEmpty
   days.forEach(k=>{const rest=!!(state.restDays&&state.restDays[k]);const sc=dayScore(k);const good=rest||(sc!=null&&sc>=streakMin());
     if(prev){const gap=Math.round((new Date(k+'T00:00:00')-new Date(prev+'T00:00:00'))/86400000);if(gap!==1)streak=0;}
     if(good)streak++;else streak=0;
-    total+=Math.round(dayXPraw(k)*streakMult(streak));prev=k;});
+    total=Math.max(0,total+Math.round(dayXPraw(k)*streakMult(streak)));prev=k;});
   return total;}
 function cumXP(L){return (L-1)*(15*L+70);} // XP щоб досягти рівня L
 function levelInfo(xp){let L=1;while(L<999&&cumXP(L+1)<=xp)L++;const cur=cumXP(L),next=cumXP(L+1);return {level:L,into:xp-cur,span:next-cur,pct:Math.min(100,Math.floor((xp-cur)/(next-cur)*100)),total:xp};}
@@ -1036,7 +1036,7 @@ function openXP(){const xi=levelInfo(xpTotal()),tk=todayKey(),today=dayXP(tk),mu
   const bd=xpBreakdown(tk);
   const chips=bd.length?`<div class="xp-chips">`+bd.map(c=>{const p=Math.round(c.pts);return `<div class="xp-chip ${p>=0?'pos':'neg'}" title="${esc(c.label)}"><div class="lab">${esc(c.label)}</div><div class="pts">${p>=0?'+':''}${p}</div></div>`;}).join('')+`</div>`:'<div class="muted" style="text-align:center;padding:14px">Сьогодні ще немає даних — почни виконувати цілі 💪</div>';
   $('xpBody').innerHTML=`<div style="text-align:center;margin:4px 0 16px"><div style="font-size:46px;font-weight:800;line-height:1" class="neon-green">${xi.level}</div><div class="muted" style="font-size:11.5px;letter-spacing:1px;margin-top:3px">РІВЕНЬ · ${fmt(xi.total)} XP</div><div class="xp-bar" style="height:9px;margin:13px auto 6px;max-width:280px"><i style="width:${xi.pct}%"></i></div><div class="muted" style="font-size:12px">${fmt(xi.into)} / ${fmt(xi.span)} XP до рівня ${xi.level+1}</div></div>`+
-    `<div class="between" style="margin:2px 0"><span style="font-size:13px;font-weight:700">Сьогодні по модулях</span>${bd.length?`<span style="font-weight:800;color:var(--green)">+${fmt(today)} XP</span>`:''}</div>${chips}`+
+    `<div class="between" style="margin:2px 0"><span style="font-size:13px;font-weight:700">Сьогодні по модулях</span>${bd.length?`<span style="font-weight:800;color:${today>=0?'var(--green)':'var(--red)'}">${today>=0?'+':''}${fmt(today)} XP</span>`:''}</div>${chips}`+
     (bd.length?`<div class="muted" style="font-size:11px;text-align:center;margin-top:10px">середнє по модулях × серія ×${mult}</div>`:'');
   xpInfo.showModal();}
 function weekMonday(d){const x=new Date(d);const dow=(x.getDay()+6)%7;x.setDate(x.getDate()-dow);x.setHours(0,0,0,0);return x;}
@@ -1064,9 +1064,9 @@ function dayEmpty(d){ // день існує, але нічого не зало�
 function dayComponents(k){const d=state.days[k];if(!d||dayEmpty(d))return null;const S=state.settings,a=[];
   const add=o=>{o.ratio=compRatio(o);o.pct=o.ratio;o.ok=(o.kind==='limit')?(o.v<=o.mx):(o.v>=o.goal);a.push(o);};
   if(mod('water'))add({label:'Вода',kind:'goal',v:d.water||0,goal:S.waterGoal,txt:((d.water||0)/1000).toFixed(1)+'л / '+(S.waterGoal/1000)+'л'});
-  if(mod('activity'))S.exercises.forEach(ex=>{const t=exTarget(ex,k),v=d.exercises[ex.id]||0;add({label:ex.name,kind:'goal',v,goal:t,txt:v+' / '+t});});
-  if(mod('limits'))S.limitHabits.forEach(l=>{if(l.mode==='week')return;const v=d.limits[l.id]||0,mx=limitMaxOn(l,k);add({label:l.name,kind:'limit',v,mx,txt:v+' / ≤'+mx+(l.unit?(' '+l.unit):'')});});
-  if(mod('counters'))S.counters.forEach(c=>{if(c.mode==='week')return;const v=d.counters[c.id]||0,g=counterGoalOn(c,k);add({label:c.name,kind:'goal',v,goal:g,txt:fmt(v)+' / '+fmt(g)});});
+  if(mod('activity'))S.exercises.forEach(ex=>{if(ex.since&&k<ex.since)return;const t=exTarget(ex,k),v=d.exercises[ex.id]||0;add({label:ex.name,kind:'goal',v,goal:t,txt:v+' / '+t});});
+  if(mod('limits'))S.limitHabits.forEach(l=>{if(l.mode==='week'||(l.since&&k<l.since))return;const v=d.limits[l.id]||0,mx=limitMaxOn(l,k);add({label:l.name,kind:'limit',v,mx,txt:v+' / ≤'+mx+(l.unit?(' '+l.unit):'')});});
+  if(mod('counters'))S.counters.forEach(c=>{if(c.mode==='week'||(c.since&&k<c.since))return;const v=d.counters[c.id]||0,g=counterGoalOn(c,k);add({label:c.name,kind:'goal',v,goal:g,txt:fmt(v)+' / '+fmt(g)});});
   return a;}
 function compColor(c){if(c.pct>=1)return 'var(--green)';if(c.kind!=='limit'&&c.pct>=.5)return 'var(--yellow)';return 'var(--red)';}
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
@@ -1207,9 +1207,11 @@ const BADGE_GROUPS=[['level','📈 Рівень','📈 Level'],['streak','🔥 �
 const BADGE_DEFS=[
  {id:'lvl1',g:'level',e:'🌱',n:'Рівень 1',ne:'Level 1',f:'Початок шляху — усе попереду',fe:'The journey begins',need:1,u:'рівень',ue:'level',k:'level'},
  {id:'lvl10',g:'level',e:'⭐',n:'Рівень 10',ne:'Level 10',f:'Десятий рівень — ти в темі',fe:'Level ten — you are rolling',need:10,u:'рівень',ue:'level',k:'level'},
+ {id:'lvl25',g:'level',e:'🌠',n:'Рівень 25',ne:'Level 25',f:'Чверть сотні — набрана швидкість',fe:'A quarter to a hundred',need:25,u:'рівень',ue:'level',k:'level'},
  {id:'lvl50',g:'level',e:'🌟',n:'Рівень 50',ne:'Level 50',f:'Півсотні рівнів дисципліни',fe:'Fifty levels of discipline',need:50,u:'рівень',ue:'level',k:'level'},
  {id:'lvl100',g:'level',e:'👑',n:'Рівень 100',ne:'Level 100',f:'Сотий рівень — легенда',fe:'Level one hundred — a legend',need:100,u:'рівень',ue:'level',k:'level'},
  {id:'xp1000',g:'level',e:'🔆',n:'1000 XP',ne:'1000 XP',f:'Тисяча XP — машина звичок',fe:'A thousand XP — a habit machine',need:1000,u:'XP',ue:'XP',k:'xpTotal'},
+ {id:'xp5000',g:'level',e:'💠',n:'5000 XP',ne:'5000 XP',f:'П’ять тисяч досвіду за плечима',fe:'Five thousand experience banked',need:5000,u:'XP',ue:'XP',k:'xpTotal'},
  {id:'xp10000',g:'level',e:'💫',n:'10 000 XP',ne:'10,000 XP',f:'Десять тисяч досвіду',fe:'Ten thousand experience',need:10000,u:'XP',ue:'XP',k:'xpTotal'},
  {id:'xp50000',g:'level',e:'🌟',n:'50 000 XP',ne:'50,000 XP',f:'П’ятдесят тисяч — рідкісна порода',fe:'Fifty thousand — a rare breed',need:50000,u:'XP',ue:'XP',k:'xpTotal'},
  {id:'xp100000',g:'level',e:'🏆',n:'100 000 XP',ne:'100,000 XP',f:'Сто тисяч XP — це вже стиль життя',fe:'A hundred thousand XP — a lifestyle',need:100000,u:'XP',ue:'XP',k:'xpTotal'},
@@ -1220,6 +1222,7 @@ const BADGE_DEFS=[
  {id:'perfect1',g:'score',e:'⭐',n:'Ідеальний день',ne:'Perfect day',f:'100% — навіть кома на місці',fe:'100% — flawless',need:1,u:'день на 100%',ue:'perfect day',k:'perfect'},
  {id:'perfect5',g:'score',e:'🌟',n:'П`ять зірок',ne:'Five stars',f:'Мішленівський рівень',fe:'Michelin level',need:5,u:'днів на 100%',ue:'perfect days',k:'perfect'},
  {id:'good30',g:'score',e:'💚',n:'Хороша форма',ne:'In good shape',f:'30 днів у зеленій зоні',fe:'30 days in the green',need:30,u:'хороших днів',ue:'good days',k:'good'},
+ {id:'perfStreak3',g:'score',e:'✨',n:'3 ідеальних поспіль',ne:'3 perfect in a row',f:'Три дні по 100% без перерви',fe:'Three flawless days straight',need:3,u:'днів на 100% поспіль',ue:'perfect days in a row',k:'perfectStreak'},
  {id:'perfWeek',g:'score',e:'🗓️',n:'Ідеальний тиждень',ne:'Perfect week',f:'7 днів по 100% поспіль',fe:'7 flawless days in a row',need:7,u:'днів на 100% поспіль',ue:'perfect days in a row',k:'perfectStreak'},
  {id:'score200',g:'score',e:'🔥',n:'Бал 200%',ne:'Score 200%',f:'День на 200% — усе вдвічі',fe:'A 200% day — everything doubled',need:200,u:'% балу за день',ue:'% day score',k:'maxDayScore'},
  {id:'score300',g:'score',e:'💥',n:'Бал 300%',ne:'Score 300%',f:'Потрійне перевиконання',fe:'Triple over-achievement',need:300,u:'% балу за день',ue:'% day score',k:'maxDayScore'},
@@ -1438,7 +1441,7 @@ function curMetric(){return metricList().find(m=>m.id===metricSel)||metricList()
 function metricGoal(mt){if(mt.id==='water')return state.settings.waterGoal;if(mt.id==='sleep')return state.settings.sleepGoal||8;if(mt.id==='weight')return null;if(mt.id==='score')return 80;if(mt.kind==='goal')return mt.ref.goal;if(mt.kind==='limit')return mt.ref.max;return null;}
 function metricDay(mt,k){const d=state.days[k];if(!d)return{has:false};
   if(mt.id==='score'){const sc=dayScore(k);return{v:sc,goal:100,ok:sc>=70,has:sc!=null};}
-  if(mt.kind==='xp'){const has=!dayEmpty(d);return{v:has?dayXP(k):0,goal:null,ok:true,has};}
+  if(mt.kind==='xp'){const has=!dayEmpty(d);return{v:has?Math.max(0,dayXP(k)):0,goal:null,ok:true,has};}
   if(mt.id==='water'){return{v:d.water||0,goal:state.settings.waterGoal,ok:(d.water||0)>=state.settings.waterGoal,has:true};}
   if(mt.id==='sleep'){const h=sleepHours(k),g=state.settings.sleepGoal||8;return{v:h,goal:g,ok:h>=g,has:h>0};}
   if(mt.id==='weight'){const v=d.weight||0;return{v,goal:null,ok:true,has:v>0};}
@@ -1618,7 +1621,12 @@ function buildMonthReportSVG(mkArg){
   </svg>`;
 }
 let _reportMk=null;
-function openMonthReport(mkArg){_reportMk=mkArg||monthKey();$('monthReportBody').innerHTML=buildMonthReportSVG(_reportMk)+'<div style="text-align:center;margin-top:14px"><button class="acc" onclick="downloadReport()">⬇ Зберегти картинкою</button></div>';if(typeof photoLib!=='undefined'&&photoLib.open)photoLib.close();monthReport.showModal();}
+function monthEndOpen(mk){const cur=monthKey();if(mk<cur)return true;if(mk>cur)return false;const now=new Date();const daysIn=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();return now.getDate()>=daysIn-2;} // останні 3 дні місяця або минулі місяці
+function monthNoteHTML(mk){const note=(state.months&&state.months[mk]&&state.months[mk].note)||'';
+  if(monthEndOpen(mk))return `<div style="margin-top:16px"><div style="font-weight:700;font-size:13px;margin-bottom:6px">📝 Мої підсумки місяця <span class="muted" style="font-weight:400;font-size:11px">— чого досяг, що змінилось</span></div><textarea id="monthNote" style="width:100%;min-height:120px;box-sizing:border-box" placeholder="Напиши підсумки цього місяця…" oninput="saveMonthNote()">${esc(note)}</textarea></div>`;
+  return `<div class="muted" style="margin-top:16px;text-align:center;font-size:12.5px">📝 Підсумки місяця можна записати в останні дні місяця</div>`+(note?`<div style="margin-top:8px;white-space:pre-wrap;font-size:13px">${esc(note)}</div>`:'');}
+function saveMonthNote(){const el=$('monthNote');if(!el||!_reportMk)return;if(!state.months)state.months={};state.months[_reportMk]=state.months[_reportMk]||{};state.months[_reportMk].note=el.value;scheduleSync();}
+function openMonthReport(mkArg){_reportMk=mkArg||monthKey();$('monthReportBody').innerHTML=buildMonthReportSVG(_reportMk)+'<div style="text-align:center;margin-top:14px"><button class="acc" onclick="downloadReport()">⬇ Зберегти картинкою</button></div>'+monthNoteHTML(_reportMk);if(typeof photoLib!=='undefined'&&photoLib.open)photoLib.close();monthReport.showModal();}
 function downloadReport(){const svgEl=$('monthReportBody').querySelector('svg');const xml=new XMLSerializer().serializeToString(svgEl);const url='data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(xml)));const vb=svgEl.viewBox.baseVal,sc=2,W=vb.width*sc,H=vb.height*sc;const img=new Image();img.width=vb.width;img.height=vb.height;img.onload=function(){const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');x.fillStyle='#0a0c14';x.fillRect(0,0,W,H);x.drawImage(img,0,0,W,H);try{const a=document.createElement('a');a.download='life-os-'+(_reportMk||monthKey())+'.png';a.href=c.toDataURL('image/png');a.click();toast('Звіт збережено 📸');}catch(e){toast('Не вдалось зберегти');}};img.onerror=function(){toast('Помилка рендеру');};img.src=url;}
 // ===== ФОТОТЕКА: звіти по місяцях =====
 function monthsWithData(){const set={};Object.keys(state.days||{}).forEach(k=>{if(!dayEmpty(state.days[k]))set[k.slice(0,7)]=1;});Object.keys(state.months||{}).forEach(mk=>set[mk]=1);return Object.keys(set).sort().reverse();}
@@ -1756,12 +1764,12 @@ function readL(elId,type){return [...$(elId).querySelectorAll('.settings-item')]
   if(type==='lim'){const mode=g('mode')||'day';const o={id:uid(),name:g('name')||'Ліміт',mode,entry:g('entry')||'input',unit:g('unit')||'',max:+g('max')||1};if(mode==='week'){o.startPerWeek=+g('startPerWeek')||5;o.stepPerWeek=+g('stepPerWeek')||1;o.minPerWeek=+g('minPerWeek')||1;o.startDate=weekMondayKey(new Date());}return o;}
   if(type==='cnt'){const mode=g('mode')||'day';const o={id:uid(),name:g('name')||'Лічильник',mode,entry:g('entry')||'input',goal:+g('goal')||1,unit:g('unit')||''};if(mode==='week')o.goalPerWeek=+g('goalPerWeek')||3;return o;}
   if(type==='loan')return{id:uid(),name:g('name')||'Кредит'};});}
-function addExercise(){state.settings.exercises.push({id:uid(),name:'Нова вправа',base:10,penalty:2,grow:0});rl('setExercises',state.settings.exercises,'ex');}
-function addLimit(){state.settings.limitHabits.push({id:uid(),name:'Новий ліміт',max:1,unit:'год'});rl('setLimits',state.settings.limitHabits,'lim');}
-function addCounter(){state.settings.counters.push({id:uid(),name:'Лічильник',goal:100,unit:''});rl('setCounters',state.settings.counters,'cnt');}
+function addExercise(){state.settings.exercises.push({id:uid(),name:'Нова вправа',base:10,penalty:2,grow:0,since:todayKey()});rl('setExercises',state.settings.exercises,'ex');}
+function addLimit(){state.settings.limitHabits.push({id:uid(),name:'Новий ліміт',max:1,unit:'год',since:todayKey()});rl('setLimits',state.settings.limitHabits,'lim');}
+function addCounter(){state.settings.counters.push({id:uid(),name:'Лічильник',goal:100,unit:'',since:todayKey()});rl('setCounters',state.settings.counters,'cnt');}
 function addLoan(){state.settings.loans.push({id:uid(),name:'Кредит'});rl('setLoans',state.settings.loans,'loan');}
 function delItem(type,i){const map={ex:'exercises',lim:'limitHabits',cnt:'counters',loan:'loans'},el={ex:'setExercises',lim:'setLimits',cnt:'setCounters',loan:'setLoans'};state.settings[map[type]].splice(i,1);rl(el[type],state.settings[map[type]],type);}
-function saveSettings(){const S=state.settings,keep=(a,o)=>a.map((n,i)=>o[i]?{...n,id:o[i].id}:n);S.exercises=keep(readL('setExercises','ex'),S.exercises);S.limitHabits=readL('setLimits','lim').map((n,i)=>{const o=S.limitHabits[i];if(!o)return {...n,maxHist:[{d:'2000-01-01',max:n.max}]};let mh=o.maxHist||[{d:'2000-01-01',max:o.max}];if(n.mode!=='week'&&n.max!==o.max){mh=(n.max>o.max)?[{d:'2000-01-01',max:n.max}]:mh.concat([{d:todayKey(),max:n.max}]);}return {...n,id:o.id,maxHist:mh,startDate:(n.mode==='week'?(o.mode==='week'&&o.startDate?o.startDate:n.startDate):undefined)};});S.counters=keep(readL('setCounters','cnt'),S.counters);S.loans=keep(readL('setLoans','loan'),S.loans);S.waterGoal=+$('setWaterGoal').value||2000;S.sleepGoal=+$('setSleepGoal').value||8;S.currency=$('setCurrency').value||'₴';S.reminders={on:$('remOn').checked,everyMin:Math.max(15,+$('remEvery').value||120),from:Math.min(23,Math.max(0,+$('remFrom').value||9)),to:Math.min(24,Math.max(1,+$('remTo').value||21))};const mods={};document.querySelectorAll('#setModules input[data-modk]').forEach(cb=>{mods[cb.dataset.modk]=cb.checked;});S.modules=mods;const ov={};document.querySelectorAll('#setOverview input[data-ovk]').forEach(cb=>{ov[cb.dataset.ovk]=cb.checked;});S.overview=ov;settings.close();save();startReminders();}
+function saveSettings(){const S=state.settings,keep=(a,o)=>a.map((n,i)=>o[i]?{...n,id:o[i].id,since:o[i].since}:{...n,since:todayKey()});S.exercises=keep(readL('setExercises','ex'),S.exercises);S.limitHabits=readL('setLimits','lim').map((n,i)=>{const o=S.limitHabits[i];if(!o)return {...n,maxHist:[{d:'2000-01-01',max:n.max}],since:todayKey()};let mh=o.maxHist||[{d:'2000-01-01',max:o.max}];if(n.mode!=='week'&&n.max!==o.max){mh=(n.max>o.max)?[{d:'2000-01-01',max:n.max}]:mh.concat([{d:todayKey(),max:n.max}]);}return {...n,id:o.id,maxHist:mh,since:o.since,startDate:(n.mode==='week'?(o.mode==='week'&&o.startDate?o.startDate:n.startDate):undefined)};});S.counters=keep(readL('setCounters','cnt'),S.counters);S.loans=keep(readL('setLoans','loan'),S.loans);S.waterGoal=+$('setWaterGoal').value||2000;S.sleepGoal=+$('setSleepGoal').value||8;S.currency=$('setCurrency').value||'₴';S.reminders={on:$('remOn').checked,everyMin:Math.max(15,+$('remEvery').value||120),from:Math.min(23,Math.max(0,+$('remFrom').value||9)),to:Math.min(24,Math.max(1,+$('remTo').value||21))};const mods={};document.querySelectorAll('#setModules input[data-modk]').forEach(cb=>{mods[cb.dataset.modk]=cb.checked;});S.modules=mods;const ov={};document.querySelectorAll('#setOverview input[data-ovk]').forEach(cb=>{ov[cb.dataset.ovk]=cb.checked;});S.overview=ov;settings.close();save();startReminders();}
 function resetAll(){if(confirm('Скинути ВСІ дані?')){localStorage.removeItem(cacheKey);state=structuredClone(defaults);if(sb)sb.from('solo').upsert({id:SOLO_ID,data:state,updated_at:new Date().toISOString()});settings.close();render();}}
 
 function exportData(){const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='lifeos-backup-'+todayKey()+'.json';a.click();}
