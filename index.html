@@ -1405,7 +1405,7 @@ function svgMultiBars({series,labels,w=800,h=190,unit='',hidden={},toggle=false}
   const yl=`<text x="8" y="${(pad.t+ih).toFixed(1)}" fill="#7d859c" font-size="10">0</text><text x="8" y="${(Y(maxY*.9)+3).toFixed(1)}" fill="#7d859c" font-size="10">${fmt(Math.round(maxY*.9))}${unit}</text>`;
   return legHtml+`<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;display:block">${bars}${xl}${yl}</svg>`;
 }
-function svgMultiLine({series,labels,w=800,h=190,unit='',hidden={},toggle=false,yMin=null,yMax=null,yFmt=null}){
+function svgMultiLine({series,labels,w=800,h=190,unit='',hidden={},toggle=false,yMin=null,yMax=null,yFmt=null,tipExtra=null}){
   const n=series[0]?series[0].data.length:0;
   const leg=series.map(s=>{const off=!!hidden[s.name];return `<span ${toggle?`onclick="toggleLine('${String(s.name).replace(/'/g,'')}')"`:''} style="display:inline-flex;align-items:center;gap:5px;margin-right:14px;${toggle?'cursor:pointer;':''}opacity:${off?.35:1}"><span style="width:12px;height:3px;background:${s.color};display:inline-block;border-radius:2px"></span><span style="${off?'text-decoration:line-through':''}">${s.name}</span></span>`;}).join('');
   const legHtml=`<div class="muted" style="margin-bottom:6px">${leg}${toggle?' <span style="opacity:.5">· тисни, щоб приховати</span>':''}</div>`;
@@ -1425,7 +1425,7 @@ function svgMultiLine({series,labels,w=800,h=190,unit='',hidden={},toggle=false,
   const step=Math.max(1,Math.ceil(n/9));let xl='';series[0].data.forEach((d,i)=>{if(i%step===0||i===n-1)xl+=`<text x="${X(i).toFixed(1)}" y="${h-8}" fill="#7d859c" font-size="10" text-anchor="middle">${d.x}</text>`;});
   const loT=yFmt?yFmt(lo):('0'), hiT=yFmt?yFmt(hi):(fmt(Math.round(hi*.9))+unit);
   const yl=`<text x="8" y="${Y(lo).toFixed(1)}" fill="#7d859c" font-size="10">${loT}</text><text x="8" y="${(Y(yFmt?hi:hi*.9)+9).toFixed(1)}" fill="#7d859c" font-size="10">${hiT}</text>`;
-  const seg=n>1?iw/(n-1):iw;let hits='';series[0].data.forEach((d,i)=>{const tip=(labels?labels[i]:d.x)+'¶'+vis.map(s=>s.name+': '+(s.data[i].y==null?'—':(yFmt?yFmt(s.data[i].y):fmt(s.data[i].y)+' '+unit))).join('¶');hits+=`<rect x="${(X(i)-seg/2).toFixed(1)}" y="0" width="${seg.toFixed(1)}" height="${h}" fill="transparent" data-tip="${tip.replace(/"/g,'&quot;')}"/>`;});
+  const seg=n>1?iw/(n-1):iw;let hits='';series[0].data.forEach((d,i)=>{const ex=tipExtra?tipExtra(i):'';const tip=(labels?labels[i]:d.x)+'¶'+vis.map(s=>s.name+': '+(s.data[i].y==null?'—':(yFmt?yFmt(s.data[i].y):fmt(s.data[i].y)+' '+unit))).join('¶')+(ex?('¶'+ex):'');hits+=`<rect x="${(X(i)-seg/2).toFixed(1)}" y="0" width="${seg.toFixed(1)}" height="${h}" fill="transparent" data-tip="${tip.replace(/"/g,'&quot;')}"/>`;});
   return legHtml+`<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;display:block">${paths}${xl}${yl}${hits}</svg>`;
 }
 
@@ -1505,8 +1505,9 @@ function renderMonth(){
       else{
         const lo=Math.max(0,Math.floor(Math.min(...all))-1),hi=Math.min(24,Math.ceil(Math.max(...all))+1);
         const yFmt=v=>{const hh=Math.round((v+18)%24);return String(((hh%24)+24)%24).padStart(2,'0')+':00';};
-        $('monthBody').innerHTML=svgMultiLine({series:[bed,wake],labels,h:236,hidden:hiddenLines,toggle:true,yMin:lo,yMax:hi,yFmt});
-        $('monthLegend').textContent='Час засинання і підйому по днях (відстань між лініями = тривалість сну). Розриви — дні без даних.';
+        const durTip=i=>{const k=dayKey(new Date(y,mo,i+1)),h=sleepHours(k);return h>0?('Спав: '+h+' год'):'';};
+        $('monthBody').innerHTML=svgMultiLine({series:[bed,wake],labels,h:236,hidden:hiddenLines,toggle:true,yMin:lo,yMax:hi,yFmt,tipExtra:durTip});
+        $('monthLegend').textContent='Час засинання і підйому по днях; у підказці — скільки спав. Розриви — дні без даних.';
       }
     } else if(gm.kind==='limit'&&gm.ref&&socId&&gm.ref.id===socId&&Object.keys(screenApps).length){
       const apps=['Instagram','TikTok','Threads'],colors={Instagram:'#e56b7b',TikTok:'#5cc9dd',Threads:'#9d8ad6'};
@@ -1515,7 +1516,7 @@ function renderMonth(){
       $('monthBody').innerHTML=(monthView==='bar')?svgMultiBars({series,labels,unit:'хв',h:236,hidden:hiddenLines,toggle:true}):svgMultiLine({series:[total].concat(series),labels,unit:'хв',h:236,hidden:hiddenLines,toggle:true});
       $('monthLegend').textContent=(monthView==='bar')?'Хвилини по кожному застосунку/день (стовпчики). Тисни назву в легенді, щоб приховати.':'Жовта «Всього» — сума хв/день. Тисни лінію в легенді, щоб приховати.';
     } else {
-      const data=[];for(let dd=1;dd<=lastDay;dd++){const k=dayKey(new Date(y,mo,dd)),r=metricDay(gm,k);if(gm.id==='score'||gm.kind==='xp'){data.push({x:dd,y:r.has?r.v:0,day:k});}else{data.push({x:dd,y:r.has?r.v:0,tip:dd+' '+msh+': '+(r.has?metricValTxt(gm,r.v):'немає даних')});}}
+      const data=[];for(let dd=1;dd<=lastDay;dd++){const k=dayKey(new Date(y,mo,dd)),r=metricDay(gm,k);if(gm.id==='score'){data.push({x:dd,y:r.has?r.v:0,day:k});}else{data.push({x:dd,y:r.has?r.v:0,tip:dd+' '+msh+': '+(r.has?metricValTxt(gm,r.v):'немає даних')});}}
       const color=gm.kind==='limit'?'#e56b7b':'#5cc9dd';
       $('monthBody').innerHTML=(monthView==='bar')?svgMetricBars({data,color,goal:metricGoal(gm),goalLabel:gm.kind==='limit'?'ліміт':'ціль',h:236}):svgLine({data,color,goal:metricGoal(gm),goalLabel:gm.kind==='limit'?'ліміт':'ціль',h:236,avg:true});
       $('monthLegend').textContent=(gm.kind==='limit'?'Значення по днях; зелена пунктирна — ліміт.':'Значення по днях; зелена пунктирна — ціль.');
