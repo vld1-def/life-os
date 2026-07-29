@@ -1489,6 +1489,8 @@ function metricColor(mt,r){if(!r.has)return{bg:'rgba(255,255,255,.05)',col:'var(
   if(pct>=.5)return{bg:'rgba(227,189,104,.78)',col:'#2a1e02'};
   return{bg:'rgba(229,107,123,.72)',col:'#2a0708'};}
 function metricValTxt(mt,v){if(mt.id==='water')return(v/1000).toFixed(1)+'л';if(mt.id==='sleep')return v+'г';if(mt.id==='weight')return v+'кг';if(mt.id==='score')return v+'%';return fmt(v)+(mt.unit?(' '+mt.unit):'');}
+function exShort(name){if(/віджим|push/i.test(name))return 'В';if(/присід|squat/i.test(name))return 'П';if(/планк|plank/i.test(name))return 'Пл';if(/руханк/i.test(name))return 'Р';const c=String(name).replace(/\(.*?\)/g,'').trim();return (c[0]||'?').toUpperCase();}
+function isSecEx(name){return /планк|plank|\(сек\)|\(sec\)/i.test(name);}
 function renderMonth(){
   $('metricBar').innerHTML=metricList().map(m=>`<button class="sm ${m.id===metricSel?'acc':''}" onclick="setMetric('${m.id}')">${m.label}</button>`).join('');
   applyMetricBar();
@@ -1513,8 +1515,8 @@ function renderMonth(){
     for(let dd=1;dd<=days;dd++){const k=dayKey(new Date(y,mo,dd)),t=k===todayKey(),rest=!!(state.restDays&&state.restDays[k]);const gotB=Object.values(state.badges||{}).includes(k);const num=dd+(rest?' 🛡':'')+(gotB?' 🏅':'');const ol=t?'outline:2px solid var(--cyan);outline-offset:1px':(k===selDay?'outline:2px solid var(--yellow);outline-offset:1px':'');
       if(mt.id==='all'){const comps=dayComponents(k);const dots=comps?`<div class="mdots">${comps.map(c=>`<i style="background:${compColor(c)}"></i>`).join('')}</div>`:'';
         cells+=`<div class="d" data-tip-day="${k}" onclick="cellTap('${k}',event)" style="cursor:pointer;${ol}"><b>${num}</b>${dots}</div>`;
-      } else if(mt.kind==='exall'){const d2=state.days[k];const vals=(d2&&d2.exercises)?state.settings.exercises.filter(ex=>!ex.since||k>=ex.since).map(ex=>d2.exercises[ex.id]||0):[];const has=vals.some(v=>v>0);
-        cells+=`<div class="d" data-tip-day="${k}" onclick="cellTap('${k}',event)" style="cursor:pointer;${ol}"><b>${num}</b>${has?`<small style="font-size:9px;line-height:1.15;color:var(--green)">${vals.join('·')}</small>`:''}</div>`;
+      } else if(mt.kind==='exall'){const d2=state.days[k];const exs=state.settings.exercises.filter(ex=>!ex.since||k>=ex.since);const has=d2&&d2.exercises&&exs.some(ex=>(d2.exercises[ex.id]||0)>0);const txt=has?exs.map(ex=>exShort(ex.name)+':'+((d2.exercises[ex.id]||0))+(isSecEx(ex.name)?'с':'')).join(' '):'';
+        cells+=`<div class="d" data-tip-day="${k}" onclick="cellTap('${k}',event)" style="cursor:pointer;${ol}"><b>${num}</b>${txt?`<small style="font-size:8.5px;line-height:1.2;color:var(--green)">${txt}</small>`:''}</div>`;
       } else {const r=metricDay(mt,k),c=metricColor(mt,r);
         cells+=`<div class="d" data-tip-day="${k}" onclick="cellTap('${k}',event)" style="cursor:pointer;background:${c.bg};color:${c.col};${ol}"><b>${num}</b>${r.has?`<small>${metricValTxt(mt,r.v)}</small>`:''}</div>`;}
     }
