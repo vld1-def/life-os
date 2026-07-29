@@ -1466,12 +1466,13 @@ function toggleMetricBar(){metricOpen=!metricOpen;applyMetricBar();}
 function applyMetricBar(){const bar=$('metricBar'),tog=$('metricToggle'),cur=$('metricCur');if(bar)bar.classList.toggle('collapsed',!metricOpen);if(tog)tog.classList.toggle('open',metricOpen);if(cur)cur.textContent=curMetric().label;}
 function setMetric(id){metricSel=id;renderMonth();}
 function setMonthView(v){monthView=v;renderMonth();}
-function metricList(){const S=state.settings;const a=[{id:'all',label:'Усі',kind:'all'},{id:'score',label:'Бал дня',unit:'%',kind:'score'},{id:'xp',label:'XP/день',unit:'XP',kind:'xp'}];if(mod('water'))a.push({id:'water',label:'Вода',unit:'мл',kind:'goal'});if(mod('sleep'))a.push({id:'sleep',label:'Сон',unit:'год',kind:'sleep'});if(mod('weight'))a.push({id:'weight',label:'Вага',unit:'кг',kind:'weight'});if(mod('counters'))S.counters.forEach(c=>{if(c.mode==='week')return;a.push({id:'cnt:'+c.id,label:c.name,unit:c.unit,kind:'goal',ref:c});});if(mod('limits'))S.limitHabits.forEach(l=>{if(l.mode==='week')return;a.push({id:'lim:'+l.id,label:l.name,unit:l.unit,kind:'limit',ref:l});});if(mod('activity')&&S.exercises.length)a.push({id:'exmaxAll',label:'🏆 Макс/підхід',unit:'реп',kind:'exmaxAll'});return a;}
+function metricList(){const S=state.settings;const a=[{id:'all',label:'Усі',kind:'all'},{id:'score',label:'Бал дня',unit:'%',kind:'score'},{id:'xp',label:'XP/день',unit:'XP',kind:'xp'}];if(mod('water'))a.push({id:'water',label:'Вода',unit:'мл',kind:'goal'});if(mod('sleep'))a.push({id:'sleep',label:'Сон',unit:'год',kind:'sleep'});if(mod('weight'))a.push({id:'weight',label:'Вага',unit:'кг',kind:'weight'});if(mod('counters'))S.counters.forEach(c=>{if(c.mode==='week')return;a.push({id:'cnt:'+c.id,label:c.name,unit:c.unit,kind:'goal',ref:c});});if(mod('limits'))S.limitHabits.forEach(l=>{if(l.mode==='week')return;a.push({id:'lim:'+l.id,label:l.name,unit:l.unit,kind:'limit',ref:l});});if(mod('activity')&&S.exercises.length){a.push({id:'exall',label:'💪 Вправи',unit:'',kind:'exall'});a.push({id:'exmaxAll',label:'🏆 Макс/підхід',unit:'реп',kind:'exmaxAll'});}return a;}
 function curMetric(){return metricList().find(m=>m.id===metricSel)||metricList()[0];}
 function metricGoal(mt){if(mt.id==='water')return state.settings.waterGoal;if(mt.id==='sleep')return state.settings.sleepGoal||8;if(mt.id==='weight')return null;if(mt.id==='score')return 80;if(mt.kind==='goal')return mt.ref.goal;if(mt.kind==='limit')return mt.ref.max;return null;}
 function metricDay(mt,k){const d=state.days[k];if(!d)return{has:false};
   if(mt.id==='score'){const sc=dayScore(k);return{v:sc,goal:100,ok:sc>=70,has:sc!=null};}
   if(mt.kind==='xp'){const has=!dayEmpty(d);return{v:has?Math.max(0,dayXP(k)):0,goal:null,ok:true,has};}
+  if(mt.kind==='exall'){let s=0;(state.settings.exercises||[]).forEach(ex=>{if(ex.since&&k<ex.since)return;s+=(d.exercises&&d.exercises[ex.id])||0;});return{v:s,goal:null,ok:true,has:s>0};}
   if(mt.id==='water'){return{v:d.water||0,goal:state.settings.waterGoal,ok:(d.water||0)>=state.settings.waterGoal,has:true};}
   if(mt.id==='sleep'){const h=sleepHours(k),g=state.settings.sleepGoal||8;return{v:h,goal:g,ok:h>=g,has:h>0};}
   if(mt.id==='weight'){const v=d.weight||0;return{v,goal:null,ok:true,has:v>0};}
@@ -1479,7 +1480,7 @@ function metricDay(mt,k){const d=state.days[k];if(!d)return{has:false};
   if(mt.kind==='exmax'){const v=exMaxSet(mt.ref.id,k);return{v,goal:null,ok:true,has:v>0};}
   const v=(d.limits&&d.limits[mt.ref.id])||0,mx=limitMaxOn(mt.ref,k);return{v,goal:mx,ok:v<=mx,has:true};}
 function metricColor(mt,r){if(!r.has)return{bg:'rgba(255,255,255,.05)',col:'var(--muted)'};
-  if(mt.kind==='xp')return{bg:'rgba(79,197,150,.72)',col:'#04140d'};
+  if(mt.kind==='xp'||mt.kind==='exall')return{bg:'rgba(79,197,150,.72)',col:'#04140d'};
   if(mt.kind==='weight')return{bg:'rgba(111,151,221,.6)',col:'#06121a'};
   if(mt.kind==='exmax')return{bg:'rgba(79,197,150,.72)',col:'#04140d'};
   if(mt.kind==='limit')return r.ok?{bg:'rgba(79,197,150,.8)',col:'#04140d'}:{bg:'rgba(229,107,123,.72)',col:'#2a0708'};
@@ -1512,11 +1513,13 @@ function renderMonth(){
     for(let dd=1;dd<=days;dd++){const k=dayKey(new Date(y,mo,dd)),t=k===todayKey(),rest=!!(state.restDays&&state.restDays[k]);const gotB=Object.values(state.badges||{}).includes(k);const num=dd+(rest?' 🛡':'')+(gotB?' 🏅':'');const ol=t?'outline:2px solid var(--cyan);outline-offset:1px':(k===selDay?'outline:2px solid var(--yellow);outline-offset:1px':'');
       if(mt.id==='all'){const comps=dayComponents(k);const dots=comps?`<div class="mdots">${comps.map(c=>`<i style="background:${compColor(c)}"></i>`).join('')}</div>`:'';
         cells+=`<div class="d" data-tip-day="${k}" onclick="cellTap('${k}',event)" style="cursor:pointer;${ol}"><b>${num}</b>${dots}</div>`;
+      } else if(mt.kind==='exall'){const d2=state.days[k];const vals=(d2&&d2.exercises)?state.settings.exercises.filter(ex=>!ex.since||k>=ex.since).map(ex=>d2.exercises[ex.id]||0):[];const has=vals.some(v=>v>0);
+        cells+=`<div class="d" data-tip-day="${k}" onclick="cellTap('${k}',event)" style="cursor:pointer;${ol}"><b>${num}</b>${has?`<small style="font-size:9px;line-height:1.15;color:var(--green)">${vals.join('·')}</small>`:''}</div>`;
       } else {const r=metricDay(mt,k),c=metricColor(mt,r);
         cells+=`<div class="d" data-tip-day="${k}" onclick="cellTap('${k}',event)" style="cursor:pointer;background:${c.bg};color:${c.col};${ol}"><b>${num}</b>${r.has?`<small>${metricValTxt(mt,r.v)}</small>`:''}</div>`;}
     }
     $('monthBody').innerHTML=`<div class="calbig">${head}</div><div class="calbig">${cells}</div>`;
-    $('monthLegend').textContent=mt.id==='all'?'':(mt.kind==='limit'?'🟩 в межах ліміту · 🟥 перебір · ▫️ немає даних':'🟩 ціль виконана · 🟨 частково · 🟥 мало · ▫️ немає даних');
+    $('monthLegend').textContent=mt.id==='all'?'':(mt.kind==='exall'?('Виконано за день: '+state.settings.exercises.map(e=>e.name).join(' · ')):(mt.kind==='limit'?'🟩 в межах ліміту · 🟥 перебір · ▫️ немає даних':'🟩 ціль виконана · 🟨 частково · 🟥 мало · ▫️ немає даних'));
   } else {
     const gm=mt.id==='all'?metricList().find(m=>m.id==='score'):mt;
     const msh=now.toLocaleDateString(LOC(),{month:'short'});
