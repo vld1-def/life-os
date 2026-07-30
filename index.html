@@ -611,6 +611,7 @@
   <div class="game-menu">
     <a id="lnkReaction" class="game-opt" href="./reaction.html"><span class="ge">⚡</span><div><div class="gt">Тест реакції</div><div class="gd">Тисни щойно позеленіє — міряй мілісекунди</div></div></a>
     <a id="lnkRunner" class="game-opt" href="./game.html"><span class="ge">🏃</span><div><div class="gt">Раннер</div><div class="gd">Біжи, стрибай, лови монетки за 30 сек</div></div></a>
+    <a id="lnkWordForge" class="game-opt" href="./wordforge.html"><span class="ge">🔤</span><div><div class="gt">Word Forge</div><div class="gd">Склади слова з літер — множники, бонуси, отрута</div></div></a>
   </div>
 </dialog>
 
@@ -934,7 +935,7 @@ function exPenaltyOn(ex,k){const p=prevKey(k);if(!state.days[p])return 0;const c
 function addWater(n){const d=getDay(activeDay());d.water=Math.max(0,d.water+n);save();}
 function addEx(id,n){const d=getDay(activeDay());d.exercises[id]=Math.max(0,(d.exercises[id]||0)+n);save();}
 function profileName(){return (profiles.find(p=>p.id===PROFILE)||{}).name||PROFILE;}
-function updateGameLink(){const q='?u='+encodeURIComponent(PROFILE)+'&n='+encodeURIComponent(profileName());const r=$('lnkRunner');if(r)r.href='./game.html'+q;const a=$('lnkReaction');if(a)a.href='./reaction.html'+q;}
+function updateGameLink(){const q='?u='+encodeURIComponent(PROFILE)+'&n='+encodeURIComponent(profileName());const r=$('lnkRunner');if(r)r.href='./game.html'+q;const a=$('lnkReaction');if(a)a.href='./reaction.html'+q;const w=$('lnkWordForge');if(w)w.href='./wordforge.html'+q;}
 function openGamePick(){updateGameLink();gamePick.showModal();}
 function exNameOf(id){const e=state.settings.exercises.find(x=>x.id===id);return e?e.name:'вправа';}
 function addSet(id){const inp=$('setin-'+id);const v=Math.round(+inp.value||0);if(v<=0)return;const d=getDay(activeDay());d.exSets=d.exSets||{};const oldRec=exRecord(id);(d.exSets[id]=d.exSets[id]||[]).push(v);d.exercises[id]=(d.exercises[id]||0)+v;inp.value='';
