@@ -173,6 +173,9 @@
   .week-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(128px,1fr)); gap:10px}
   #metricBar{gap:5px}
   #metricBar button{padding:4px 9px; font-size:11px; border-radius:8px}
+  .metric-wrap{display:flex;align-items:center;gap:8px;background:var(--glass2);border:1px solid var(--stroke);border-radius:12px;padding:4px 10px}
+  .metric-select{flex:1;min-width:0;appearance:none;-webkit-appearance:none;background:transparent;border:0;color:var(--text);font-family:inherit;font-size:13px;font-weight:600;padding:7px 4px;cursor:pointer;outline:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238791a3' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 2px center;padding-right:20px}
+  .metric-select option,.metric-select optgroup{background:#141a2e;color:var(--text)}
   .hidden{display:none!important}
   .sync-dot{width:8px;height:8px;border-radius:50%;background:var(--green);transition:.3s}
   .sync-dot.busy{background:var(--yellow)} .sync-dot.off{background:var(--red)}
@@ -361,9 +364,8 @@
         <button class="sm" id="btnRest" onclick="toggleRest()" title="Зробити сьогодні вихідним — серія 🔥 не перерветься">🛡</button>
       </div>
     </div>
-    <button class="sm metric-toggle" id="metricToggle" onclick="toggleMetricBar()" style="margin-top:10px" title="Показник для календаря/графіка"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="opacity:.75"><path d="M6 20V10M12 20V4M18 20v-6"/></svg><span id="metricCur">Усі</span><svg class="chev" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
-    <div class="chip-row collapsed" id="metricBar" style="margin-top:8px"></div>
-    <div id="monthBody" style="margin-top:4px"></div>
+    <div class="metric-wrap" style="margin-top:10px"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="opacity:.6;flex:0 0 auto"><path d="M6 20V10M12 20V4M18 20v-6"/></svg><select id="metricSelect" class="metric-select" onchange="setMetric(this.value)"></select></div>
+    <div id="monthBody" style="margin-top:8px"></div>
     <div class="muted" id="monthLegend" style="margin-top:10px"></div>
   </div>
 
@@ -1463,11 +1465,11 @@ function svgMultiLine({series,labels,w=800,h=190,unit='',hidden={},toggle=false,
 /* ===== ПРОГРЕС ===== */
 let metricSel='all', monthView='cal', hiddenLines={}, metricOpen=false;
 function toggleLine(name){hiddenLines[name]=!hiddenLines[name];renderMonth();}
-function toggleMetricBar(){metricOpen=!metricOpen;applyMetricBar();}
-function applyMetricBar(){const bar=$('metricBar'),tog=$('metricToggle'),cur=$('metricCur');if(bar)bar.classList.toggle('collapsed',!metricOpen);if(tog)tog.classList.toggle('open',metricOpen);if(cur)cur.textContent=curMetric().label;}
+function metricGroup(m){if(['all','score','xp'].includes(m.id))return 'Загальне';if(['water','sleep','weight'].includes(m.id))return 'Показники';if(m.kind==='limit')return 'Ліміти';if(m.kind==='exall'||m.kind==='exmaxAll'||m.kind==='exone')return '💪 Вправи';if(m.kind==='goal')return 'Лічильники';return 'Інше';}
+function applyMetricBar(){const sel=$('metricSelect');if(!sel)return;const ml=metricList(),groups={};ml.forEach(m=>{const g=metricGroup(m);(groups[g]=groups[g]||[]).push(m);});const order=['Загальне','Показники','Лічильники','Ліміти','💪 Вправи','Інше'];sel.innerHTML=order.filter(g=>groups[g]).map(g=>`<optgroup label="${g}">${groups[g].map(m=>`<option value="${m.id}"${m.id===metricSel?' selected':''}>${esc(m.label)}</option>`).join('')}</optgroup>`).join('');}
 function setMetric(id){metricSel=id;renderMonth();}
 function setMonthView(v){monthView=v;renderMonth();}
-function metricList(){const S=state.settings;const a=[{id:'all',label:'Усі',kind:'all'},{id:'score',label:'Бал дня',unit:'%',kind:'score'},{id:'xp',label:'XP/день',unit:'XP',kind:'xp'}];if(mod('water'))a.push({id:'water',label:'Вода',unit:'мл',kind:'goal'});if(mod('sleep'))a.push({id:'sleep',label:'Сон',unit:'год',kind:'sleep'});if(mod('weight'))a.push({id:'weight',label:'Вага',unit:'кг',kind:'weight'});if(mod('counters'))S.counters.forEach(c=>{if(c.mode==='week')return;a.push({id:'cnt:'+c.id,label:c.name,unit:c.unit,kind:'goal',ref:c});});if(mod('limits'))S.limitHabits.forEach(l=>{if(l.mode==='week')return;a.push({id:'lim:'+l.id,label:l.name,unit:l.unit,kind:'limit',ref:l});});if(mod('activity')&&S.exercises.length){a.push({id:'exall',label:'💪 Вправи',unit:'',kind:'exall'});a.push({id:'exmaxAll',label:'🏆 Макс/підхід',unit:'реп',kind:'exmaxAll'});S.exercises.forEach(ex=>a.push({id:'exone:'+ex.id,label:ex.name,unit:'',kind:'exone',ref:ex,exOne:true}));}return a;}
+function metricList(){const S=state.settings;const a=[{id:'all',label:'Усі',kind:'all'},{id:'score',label:'Бал дня',unit:'%',kind:'score'},{id:'xp',label:'XP/день',unit:'XP',kind:'xp'}];if(mod('water'))a.push({id:'water',label:'Вода',unit:'мл',kind:'goal'});if(mod('sleep'))a.push({id:'sleep',label:'Сон',unit:'год',kind:'sleep'});if(mod('weight'))a.push({id:'weight',label:'Вага',unit:'кг',kind:'weight'});if(mod('counters'))S.counters.forEach(c=>{if(c.mode==='week')return;a.push({id:'cnt:'+c.id,label:c.name,unit:c.unit,kind:'goal',ref:c});});if(mod('limits'))S.limitHabits.forEach(l=>{if(l.mode==='week')return;a.push({id:'lim:'+l.id,label:l.name,unit:l.unit,kind:'limit',ref:l});});if(mod('activity')&&S.exercises.length){a.push({id:'exall',label:'Всі разом',unit:'',kind:'exall'});a.push({id:'exmaxAll',label:'Макс/підхід',unit:'реп',kind:'exmaxAll'});S.exercises.forEach(ex=>a.push({id:'exone:'+ex.id,label:ex.name,unit:'',kind:'exone',ref:ex,exOne:true}));}return a;}
 function curMetric(){return metricList().find(m=>m.id===metricSel)||metricList()[0];}
 function metricGoal(mt){if(mt.id==='water')return state.settings.waterGoal;if(mt.id==='sleep')return state.settings.sleepGoal||8;if(mt.id==='weight')return null;if(mt.id==='score')return 80;if(mt.kind==='goal')return mt.ref.goal;if(mt.kind==='limit')return mt.ref.max;return null;}
 function metricDay(mt,k){const d=state.days[k];if(!d)return{has:false};
@@ -1494,10 +1496,6 @@ function metricValTxt(mt,v){if(mt.id==='water')return(v/1000).toFixed(1)+'л';if
 function exShort(name){if(/віджим|push/i.test(name))return 'В';if(/присід|squat/i.test(name))return 'П';if(/планк|plank/i.test(name))return 'Пл';if(/руханк/i.test(name))return 'Р';const c=String(name).replace(/\(.*?\)/g,'').trim();return (c[0]||'?').toUpperCase();}
 function isSecEx(name){return /планк|plank|\(сек\)|\(sec\)/i.test(name);}
 function renderMonth(){
-  {const ml=metricList();const btns=ml.filter(m=>!m.exOne).map(m=>`<button class="sm ${m.id===metricSel?'acc':''}" onclick="setMetric('${m.id}')">${m.label}</button>`).join('');
-    const exs=ml.filter(m=>m.exOne),act=exs.find(m=>m.id===metricSel);
-    const sel=exs.length?`<select class="sm${act?' acc':''}" onchange="if(this.value)setMetric(this.value)" style="max-width:160px;font-family:inherit"><option value="">💪 вправа ▾</option>${exs.map(m=>`<option value="${m.id}" ${m.id===metricSel?'selected':''}>${esc(m.ref.name)}</option>`).join('')}</select>`:'';
-    $('metricBar').innerHTML=btns+sel;}
   applyMetricBar();
   $('btnCal').className='sm '+(monthView==='cal'?'acc':'');
   $('btnLine').className='sm '+(monthView==='line'?'acc':'');
