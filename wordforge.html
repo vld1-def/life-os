@@ -74,10 +74,12 @@
 </div>
 <div class="wrap"><div class="card" id="card"></div></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const _qp=new URLSearchParams(location.search), PROFILE=_qp.get('u')||'me';
 const BKEY='wf_best'+(PROFILE==='me'?'':'_'+PROFILE);
 const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const ROUNDS=10, ROUND_SEC=60, MIN_LEN=3, RACK_N=16;
 const ALPHA='абвгґдеєжзиіїйклмнопрстуфхцчшщьюя'.split('');
 
@@ -209,6 +211,87 @@ $('best').textContent=best?('рекорд: '+best):'рекорд: —';
 let round=0, total=0, endTO=null;
 let tiles=[], validSet=new Set(), cur=[], pu={swap:0,hint:0}, swapMode=false, pickIdx=-1;
 
+// ===== ОНЛАЙН (кімнати через Supabase) =====
+const SB_URL='https://xezhbqcteaihrlrykbkr.supabase.co', SB_KEY='sb_publishable_qNcUyFxMlWAWAry3uSHndg_ADVMCE3a';
+const sb=(window.supabase&&window.supabase.createClient)?window.supabase.createClient(SB_URL,SB_KEY):null;
+let online={on:false,code:'',pid:'',name:'',isHost:false,room:null,poll:null,view:'',to:null,busy:false};
+function roomId(){return 'wfroom_'+online.code;}
+function code4(){const c='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let s='';for(let i=0;i<4;i++)s+=c[Math.floor(Math.random()*c.length)];return s;}
+function genRack(rnd){let tr=0,rk='',valid=[];do{const seed=SEEDS[Math.floor(Math.random()*SEEDS.length)]||'слово';rk=seed.replace(/'/g,'');while(rk.length<RACK_N)rk+=randLetter();if(rk.length>RACK_N)rk=rk.slice(0,RACK_N);valid=WORDS_U.filter(w=>w.indexOf("'")<0&&w.length>=MIN_LEN&&fits(w,letterCount(rk)));tr++;}while(valid.length<8&&tr<80);const arr=rk.split('').sort(()=>Math.random()-0.5).map(ch=>({ch,kind:'',mx:0}));const ix=[...Array(arr.length).keys()].sort(()=>Math.random()-0.5);arr[ix[0]].kind='mult';arr[ix[0]].mx=(rnd>=6&&Math.random()<0.5)?3:2;arr[ix[1]].kind='bonus';if(rnd>=3)arr[ix[2]].kind='poison';return arr;}
+async function saveRoom(mut){if(!sb)return null;const {data}=await sb.from('solo').select('data').eq('id',roomId()).maybeSingle();const st=data&&data.data;if(!st)return null;mut(st);st.updated=Date.now();await sb.from('solo').upsert({id:roomId(),data:st,updated_at:new Date().toISOString()});online.room=st;return st;}
+function startPoll(){stopPoll();online.poll=setInterval(fetchRoom,1500);fetchRoom();}
+function stopPoll(){if(online.poll){clearInterval(online.poll);online.poll=null;}}
+async function fetchRoom(){if(!sb||!online.code||online.busy)return;try{const {data}=await sb.from('solo').select('data').eq('id',roomId()).maybeSingle();if(data&&data.data){online.room=data.data;await hostTick();renderOnline();}}catch(e){}}
+async function hostTick(){const r=online.room;if(!online.isHost||!r||r.phase!=='playing')return;const ps=Object.values(r.players||{});const allDone=ps.length&&ps.every(p=>p.roundDone);const timeUp=(Date.now()-r.roundStart)/1000>=r.roundSec+1;if(allDone||timeUp){online.busy=true;await saveRoom(st=>{if(st.phase!=='playing')return;st.phase='result';st.lastRound={round:st.round,words:{}};Object.keys(st.players).forEach(pid=>{const p=st.players[pid];st.lastRound.words[pid]={name:p.name,word:p.roundWord||'',score:p.roundScore||0};});});online.busy=false;renderOnline();}}
+function leaderboard(){const r=online.room,ps=Object.entries(r.players||{}).map(([id,p])=>({id,name:p.name,score:p.score||0}));ps.sort((a,b)=>b.score-a.score);return ps;}
+
+async function createRoom(){const nm=($('nmIn')&&$('nmIn').value.trim())||'Ведучий';online.name=nm;online.pid='host';online.isHost=true;online.code=code4();online.on=true;
+  const st={code:online.code,host:nm,phase:'lobby',round:0,rounds:ROUNDS,roundSec:ROUND_SEC,rack:[],roundStart:0,players:{host:{name:nm,score:0,roundDone:false,roundWord:'',roundScore:0}},lastRound:null,updated:Date.now()};
+  if(sb)await sb.from('solo').upsert({id:roomId(),data:st,updated_at:new Date().toISOString()});online.room=st;startPoll();renderOnline();}
+async function joinRoom(codeArg){const code=(codeArg||($('codeIn')&&$('codeIn').value)||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,4);if(code.length<4){alert('Введи код кімнати (4 символи)');return;}online.code=code;
+  const {data}=sb?await sb.from('solo').select('data').eq('id',roomId()).maybeSingle():{data:null};if(!data||!data.data){alert('Кімнату не знайдено');online.code='';return;}
+  const nm=($('nmIn')&&$('nmIn').value.trim())||('Гравець'+Math.floor(Math.random()*90+10));online.name=nm;online.pid='p'+Math.random().toString(36).slice(2,8);online.isHost=false;online.on=true;
+  await saveRoom(st=>{st.players[online.pid]={name:nm,score:0,roundDone:false,roundWord:'',roundScore:0};});startPoll();renderOnline();}
+async function hostStart(){online.busy=true;await saveRoom(st=>{st.phase='playing';st.round=1;st.rack=genRack(1);st.roundStart=Date.now();Object.values(st.players).forEach(p=>{p.roundDone=false;p.roundWord='';p.roundScore=0;});st.lastRound=null;});online.busy=false;renderOnline();}
+async function hostNext(){const r=online.room;online.busy=true;if(r.round>=r.rounds){await saveRoom(st=>{st.phase='finished';});}else{await saveRoom(st=>{st.round++;st.phase='playing';st.rack=genRack(st.round);st.roundStart=Date.now();Object.values(st.players).forEach(p=>{p.roundDone=false;p.roundWord='';p.roundScore=0;});st.lastRound=null;});}online.busy=false;renderOnline();}
+async function submitOnline(){const r=online.room;if(!r||r.phase!=='playing')return;const me=r.players[online.pid];if(me&&me.roundDone)return;const word=cur.map(t=>t.ch).join('');if(word.length&&(word.length<MIN_LEN||!validSet.has(word))){msg(word.length<MIN_LEN?('Мінімум '+MIN_LEN):('«'+word.toUpperCase()+'» немає в словнику'),0);return;}const {sc}=word.length?scoreWord():{sc:0};online.busy=true;await saveRoom(st=>{const p=st.players[online.pid];if(p&&!p.roundDone){p.roundDone=true;p.roundWord=word;p.roundScore=sc;p.score=(p.score||0)+sc;}});online.busy=false;renderOnline();}
+function autoSubmitOnline(){const r=online.room;if(!r||r.phase!=='playing')return;const me=r.players[online.pid];if(me&&me.roundDone)return;const word=cur.map(t=>t.ch).join('');if(word.length>=MIN_LEN&&validSet.has(word)){submitOnline();}else{online.busy=true;saveRoom(st=>{const p=st.players[online.pid];if(p&&!p.roundDone){p.roundDone=true;p.roundWord='';p.roundScore=0;}}).then(()=>{online.busy=false;renderOnline();});}}
+function leaveOnline(){stopPoll();if(online.to)clearTimeout(online.to);online={on:false,code:'',pid:'',name:'',isHost:false,room:null,poll:null,view:'',to:null,busy:false};intro();}
+
+function renderOnline(){const r=online.room;if(!r){return;}
+  if(r.phase==='lobby')return renderLobby();
+  if(r.phase==='finished')return renderFinished();
+  if(r.phase==='result')return renderResult();
+  if(r.phase==='playing'){const key='play#'+r.round;if(online.view!==key){online.view=key;renderPlay();}else updatePlayLive();}
+}
+function renderLobby(){online.view='lobby';const r=online.room;const list=Object.values(r.players).map(p=>`<div style="padding:6px 0;border-bottom:1px solid var(--stroke)">${esc(p.name)}${p.name===r.host?' <span style="color:var(--gold)">👑</span>':''}</div>`).join('');
+  $('card').innerHTML=`<div class="center"><div style="font-size:13px;color:var(--muted)">Код кімнати</div><div class="big" style="letter-spacing:8px">${r.code}</div>
+    <div class="rules" style="text-align:center">Поділись кодом. Гравці заходять на цю ж сторінку → «Онлайн» → вводять код.<br>Гравців: <b>${Object.keys(r.players).length}</b></div>
+    <div style="text-align:left;max-width:320px;margin:0 auto 12px">${list}</div>
+    ${online.isHost?`<button class="btn primary" style="max-width:280px;margin:0 auto" onclick="hostStart()">▶ Почати (${r.rounds} раундів)</button>`:`<div class="msg gold">Чекаємо, поки ведучий почне…</div>`}
+    <button class="btn" style="max-width:200px;margin:12px auto 0" onclick="leaveOnline()">Вийти</button></div>`;
+}
+function renderPlay(){const r=online.room;tiles=r.rack.map(t=>({ch:t.ch,kind:t.kind||'',mx:t.mx||0}));computeValid();cur=[];swapMode=false;
+  const me=r.players[online.pid],done=me&&me.roundDone;
+  $('card').innerHTML=`<div class="hud"><div>Раунд <b>${r.round}</b>/${r.rounds}</div><div>🌐 ${r.code}</div><div>Ти: <span class="sc">${me?me.score:0}</span></div></div>
+    <div id="timebar"><i id="tb"></i></div>
+    <div class="cur" id="cur"></div>
+    <div class="rack" id="rack"></div>
+    <div class="actions"><button class="btn ghost" onclick="backspace()">⌫</button><button class="btn primary" onclick="submitOnline()">Скласти ✓</button><button class="btn ghost" onclick="clearWord()">✕</button></div>
+    <div class="msg" id="msg"></div>
+    <div id="doneRow" class="legend"></div>`;
+  drawRack();updatePlayLive();startOnlineTimer();
+  if(done)lockPlay();
+}
+function startOnlineTimer(){const r=online.room;if(online.to)clearTimeout(online.to);const rem=Math.max(0,r.roundSec-(Date.now()-r.roundStart)/1000);const tb=$('tb');if(tb){tb.style.transition='none';tb.style.width=(rem/r.roundSec*100)+'%';void tb.offsetWidth;tb.style.transition='width '+rem+'s linear';tb.style.width='0%';}online.to=setTimeout(autoSubmitOnline,rem*1000+200);}
+function updatePlayLive(){const r=online.room,me=r.players[online.pid];const dr=$('doneRow');if(dr){const ps=Object.values(r.players);dr.innerHTML=ps.map(p=>`<i style="${p.roundDone?'border-color:var(--green);color:var(--green)':''}">${p.roundDone?'✅':'⏳'} ${esc(p.name)}</i>`).join('');}
+  if(me&&me.roundDone)lockPlay();}
+function lockPlay(){const rk=$('rack');if(rk)rk.style.pointerEvents='none';const m=$('msg');if(m){m.textContent='Твоє слово прийнято ✓ Чекаємо інших…';m.className='msg ok';}if(online.to)clearTimeout(online.to);}
+function renderResult(){const key='res#'+online.room.round;if(online.view===key)return;online.view=key;const r=online.room;const lb=leaderboard();const words=r.lastRound?r.lastRound.words:{};
+  const wrows=Object.keys(words).map(id=>{const w=words[id];return `<div class="between" style="padding:5px 0;border-bottom:1px solid var(--stroke)"><span>${esc(w.name)}</span><span><b style="letter-spacing:1px">${w.word?w.word.toUpperCase():'—'}</b> <span style="color:var(--gold);font-weight:800">+${w.score}</span></span></div>`;}).join('');
+  const lbrows=lb.map((p,i)=>`<div class="between" style="padding:6px 0"><span>${i+1}. ${esc(p.name)}${i===0?' 👑':''}</span><b class="sc" style="font-size:16px">${p.score}</b></div>`).join('');
+  $('card').innerHTML=`<div class="center"><div style="font-size:13px;color:var(--muted)">Раунд ${r.round} завершено</div>
+    <div style="font-weight:800;margin:8px 0 4px">📋 Слова раунду</div><div style="text-align:left;max-width:360px;margin:0 auto 14px">${wrows||'<div class="muted">—</div>'}</div>
+    <div style="font-weight:800;margin-bottom:2px">🏆 Таблиця лідерів</div><div style="text-align:left;max-width:360px;margin:0 auto 14px">${lbrows}</div>
+    ${online.isHost?`<button class="btn primary" style="max-width:280px;margin:0 auto" onclick="hostNext()">${r.round<r.rounds?'Наступний раунд →':'Фінал 🏆'}</button>`:`<div class="msg gold">Чекаємо ведучого…</div>`}
+    <button class="btn" style="max-width:200px;margin:12px auto 0" onclick="leaveOnline()">Вийти</button></div>`;
+}
+function renderFinished(){online.view='fin';const r=online.room;const lb=leaderboard();
+  $('card').innerHTML=`<div class="center"><div class="big">🏆 Гру завершено</div>
+    <div style="text-align:left;max-width:360px;margin:14px auto">${lb.map((p,i)=>`<div class="between" style="padding:7px 0;border-bottom:1px solid var(--stroke)"><span style="font-size:${i===0?'18px':'15px'};font-weight:${i===0?800:600}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'.'} ${esc(p.name)}</span><b class="sc">${p.score}</b></div>`).join('')}</div>
+    <button class="btn primary" style="max-width:280px;margin:0 auto" onclick="leaveOnline()">У меню</button></div>`;
+}
+function openOnline(){$('card').innerHTML=`<div class="center"><div class="big">🌐 Онлайн</div>
+    <div class="rules" style="text-align:center">Грай з друзями по коду кімнати. Реєстрація не потрібна.</div>
+    <input id="nmIn" placeholder="Твоє імʼя" style="width:100%;max-width:280px;padding:12px;border-radius:12px;border:1px solid var(--stroke);background:rgba(255,255,255,.05);color:var(--text);font-size:15px;text-align:center;margin:0 auto 10px;display:block">
+    <button class="btn primary" style="max-width:280px;margin:0 auto 14px" onclick="createRoom()">Створити кімнату</button>
+    <div class="muted" style="font-size:12px;margin-bottom:8px">— або приєднатись —</div>
+    <input id="codeIn" placeholder="КОД" maxlength="4" style="width:120px;padding:12px;border-radius:12px;border:1px solid var(--stroke);background:rgba(255,255,255,.05);color:var(--text);font-size:20px;text-align:center;letter-spacing:6px;text-transform:uppercase;margin:0 auto 10px;display:block">
+    <button class="btn" style="max-width:280px;margin:0 auto" onclick="joinRoom()">Увійти в кімнату</button>
+    <button class="btn" style="max-width:200px;margin:14px auto 0;opacity:.7" onclick="intro()">← Назад</button></div>`;
+  const rc=_qp.get('room');if(rc){const ci=$('codeIn');if(ci)ci.value=rc.toUpperCase();}
+}
+
 function computeValid(){const rc=letterCount(tiles.map(t=>t.ch).join(''));validSet=new Set(WORDS_U.filter(w=>w.indexOf("'")<0&&w.length>=MIN_LEN&&fits(w,rc)));}
 
 function buildRound(){
@@ -301,6 +384,7 @@ function scoreWord(){
   return {sc:Math.max(0,sc), diamond};
 }
 function submitWord(){
+  if(online.on)return submitOnline();
   const word=cur.map(t=>t.ch).join('');
   if(word.length<MIN_LEN){msg('Мінімум '+MIN_LEN+' літери',0);return;}
   if(!validSet.has(word)){msg('«'+word.toUpperCase()+'» немає в словнику',0);return;}
@@ -353,8 +437,8 @@ function intro(){
       На <b>5-му раунді</b> — безкоштовна заміна букви (сам вибираєш яку літеру поставити).<br>
       Бали рахуються <b>наживо</b>, поки складаєш. Довші слова коштують більше.
     </div>
-    <button class="btn primary" style="max-width:280px;margin:8px auto 0" onclick="start()">▶ Грати</button>
-    <div style="color:var(--muted);font-size:11px;margin-top:12px">Словник вбудований (${WORDS_U.length} слів) — офлайн.</div>
+    <div class="actions" style="max-width:340px;margin:8px auto 0"><button class="btn primary" onclick="start()">▶ Одиночна</button><button class="btn" onclick="openOnline()" ${sb?'':'disabled'}>🌐 Онлайн</button></div>
+    <div style="color:var(--muted);font-size:11px;margin-top:12px">Словник вбудований (${WORDS_U.length} слів) — офлайн.${sb?'':' Онлайн недоступний (немає звʼязку).'}</div>
   </div>`;
 }
 document.addEventListener('keydown',e=>{
@@ -362,9 +446,9 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Enter'){submitWord();return;}
   if(e.key==='Backspace'){backspace();return;}
   const ch=(e.key||'').toLowerCase();
-  if(tiles.length&&!swapMode){const i=tiles.findIndex((t,idx)=>t.ch===ch&&!cur.some(c=>c.idx===idx));if(i>=0)tapTile(i);}
+  if(tiles.length&&!swapMode&&!online.on){const i=tiles.findIndex((t,idx)=>t.ch===ch&&!cur.some(c=>c.idx===idx));if(i>=0)tapTile(i);}
 });
-intro();
+if(_qp.get('room')&&sb){openOnline();}else{intro();}
 </script>
 </body>
 </html>
