@@ -9,46 +9,47 @@
   :root{--text:#e7ecf3;--muted:#8791a3;--cyan:#5cc9dd;--purple:#9d8ad6;--stroke:rgba(255,255,255,.1);--green:#4fc596;--red:#e56b7b;--gold:#e3bd68}
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   body{margin:0;font-family:'Inter','Segoe UI',system-ui,sans-serif;color:var(--text);background:radial-gradient(1200px 600px at 50% -10%,#141a30,#0a0c14 70%);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:16px}
-  .top{width:100%;max-width:640px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+  .top{width:100%;max-width:520px;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
   a.back{color:var(--text);text-decoration:none;background:rgba(255,255,255,.07);border:1px solid var(--stroke);border-radius:12px;padding:8px 14px;font-size:14px;font-weight:600}
   h1{font-size:20px;margin:0;letter-spacing:1px}
   h1 span{background:linear-gradient(90deg,var(--cyan),var(--purple));-webkit-background-clip:text;background-clip:text;color:transparent}
   .best{font-size:12px;color:var(--muted)}
-  .wrap{width:100%;max-width:640px}
+  .wrap{width:100%;max-width:520px}
   .card{border:1px solid var(--stroke);border-radius:20px;background:linear-gradient(180deg,#141a30,#0e1120);padding:18px}
   .hud{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--muted);margin-bottom:12px}
   .hud b{color:var(--text);font-size:16px}
   .hud .sc{color:var(--gold);font-weight:800;font-size:20px;font-variant-numeric:tabular-nums}
   #timebar{height:5px;border-radius:3px;background:rgba(255,255,255,.1);overflow:hidden;margin-bottom:14px}
   #timebar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,var(--green),var(--cyan));transition:width .25s linear}
-  .cur{min-height:52px;border:1px dashed var(--stroke);border-radius:14px;display:flex;align-items:center;justify-content:center;gap:4px;font-size:26px;font-weight:800;letter-spacing:2px;margin-bottom:12px;padding:6px;flex-wrap:wrap}
+  .cur{min-height:52px;border:1px dashed var(--stroke);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;letter-spacing:3px;margin-bottom:12px;padding:6px;flex-wrap:wrap}
   .cur .ph{color:var(--muted);font-size:15px;font-weight:500;letter-spacing:0}
-  .rack{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:12px}
-  .tile{position:relative;width:52px;height:56px;border-radius:12px;border:1px solid var(--stroke);background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;cursor:pointer;user-select:none;transition:.1s}
-  .tile:active{transform:scale(.92)}
-  .tile.used{opacity:.28;pointer-events:none}
-  .tile .v{position:absolute;bottom:3px;right:5px;font-size:10px;font-weight:700;color:var(--muted)}
+  .rack{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:12px}
+  .tile{position:relative;aspect-ratio:1/1;border-radius:13px;border:1px solid var(--stroke);background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;cursor:pointer;user-select:none;transition:.1s}
+  .tile:active{transform:scale(.9)}
+  .tile.used{opacity:.25;pointer-events:none}
+  .tile.pick{outline:2px solid var(--cyan);outline-offset:2px}
+  .tile .v{position:absolute;bottom:4px;right:6px;font-size:11px;font-weight:700;color:var(--muted)}
   .tile.mult{border-color:var(--gold);box-shadow:inset 0 0 0 1px var(--gold)}
-  .tile.mult .tag{position:absolute;top:2px;left:4px;font-size:9px;font-weight:800;color:var(--gold)}
+  .tile.mult .tag,.tile.bonus .tag,.tile.poison .tag{position:absolute;top:3px;left:5px;font-size:11px;font-weight:800}
+  .tile.mult .tag{color:var(--gold)}
   .tile.bonus{border-color:var(--cyan);box-shadow:inset 0 0 0 1px var(--cyan)}
-  .tile.bonus .tag{position:absolute;top:2px;left:4px;font-size:11px}
   .tile.poison{border-color:var(--red);box-shadow:inset 0 0 0 1px var(--red)}
-  .tile.poison .tag{position:absolute;top:2px;left:4px;font-size:11px}
-  .actions{display:flex;gap:8px;margin-bottom:12px}
+  .powers{display:flex;gap:7px;margin-bottom:10px}
+  .pw{flex:1;padding:9px 6px;border-radius:11px;border:1px solid var(--stroke);background:rgba(255,255,255,.05);color:var(--text);font-weight:700;font-size:12.5px;cursor:pointer}
+  .pw:disabled{opacity:.35;cursor:default}
+  .pw:active:not(:disabled){transform:scale(.96)}
+  .actions{display:flex;gap:8px;margin-bottom:10px}
   .btn{flex:1;padding:13px;border-radius:13px;border:1px solid var(--stroke);background:rgba(255,255,255,.06);color:var(--text);font-weight:700;font-size:15px;cursor:pointer}
   .btn:active{transform:scale(.97)}
   .btn.primary{background:linear-gradient(90deg,#2f8b66,#1f6d4e);border-color:transparent}
   .btn.ghost{flex:0 0 auto;padding:13px 16px}
-  .msg{min-height:20px;text-align:center;font-size:13px;font-weight:600;margin-bottom:8px}
-  .msg.ok{color:var(--green)}.msg.bad{color:var(--red)}
-  .found{display:flex;flex-wrap:wrap;gap:6px}
-  .found span{font-size:12px;padding:4px 9px;border-radius:9px;background:rgba(79,197,150,.13);border:1px solid rgba(79,197,150,.3);font-weight:700}
-  .found span b{color:var(--gold)}
+  .msg{min-height:20px;text-align:center;font-size:13px;font-weight:600}
+  .msg.ok{color:var(--green)}.msg.bad{color:var(--red)}.msg.gold{color:var(--gold)}
   .center{text-align:center}
   .big{font-size:40px;font-weight:800;line-height:1.1;margin:6px 0}
-  .rules{font-size:13px;color:var(--muted);line-height:1.7;text-align:left;max-width:460px;margin:14px auto}
+  .rules{font-size:13px;color:var(--muted);line-height:1.7;text-align:left;max-width:440px;margin:14px auto}
   .rules b{color:var(--text)}
-  .legend{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;font-size:11px;color:var(--muted);margin-top:10px}
+  .legend{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;font-size:11px;color:var(--muted)}
   .legend i{font-style:normal;padding:2px 7px;border-radius:7px;border:1px solid var(--stroke)}
 </style>
 </head>
@@ -65,196 +66,249 @@
 const _qp=new URLSearchParams(location.search), PROFILE=_qp.get('u')||'me';
 const BKEY='wf_best'+(PROFILE==='me'?'':'_'+PROFILE);
 const $=id=>document.getElementById(id);
-const ROUNDS=5, ROUND_SEC=75, MIN_LEN=3;
+const ROUNDS=10, ROUND_SEC=60, MIN_LEN=3, RACK_N=16;
 
-// цінність літер (рідкісні — дорожчі)
 const VAL={'а':1,'о':1,'е':1,'и':1,'і':1,'н':1,'т':1,'р':1,'с':1,'в':1,'к':2,'л':2,'д':2,'м':2,'п':2,'у':2,'я':2,
 'б':3,'г':3,'з':3,'й':2,'ь':1,'ч':3,'х':3,'ж':4,'ю':4,'є':4,'ї':4,'ц':4,'ш':4,'щ':6,'ф':5,'ґ':6};
 const letterVal=ch=>VAL[ch]||2;
 
-// вбудований словник (іменники/слова у словниковій формі)
-const WORDS=("рік дім сік лід ніч сон ліс сад мак рак кіт рот ніс вік бік рів дар жар пар час газ віз рис лис вус мед під над рід вид код мир сир дуб зуб суп лоб гриб гра рука нога вода небо море поле село місто мова слово діло тіло рука очі вухо ніс зуби губа щока лоб брова коса вуса борода палець нога рука плече спина живіт серце мозок кров кістка "+
-"кава чай сік мед сіль цукор хліб масло сир яйце м'ясо риба борщ каша суп салат перець часник цибуля морква буряк капуста огірок помідор картопля яблуко груша слива вишня диня кавун виноград лимон банан горіх ягода малина полуниця "+
-"дерево квітка трава листя корінь гілка кущ ліс поле луг гора річка озеро море хмара дощ сніг вітер грім блискавка сонце місяць зірка небо земля вогонь дим "+
-"кіт пес кінь корова свиня коза вівця курка півень гуска качка риба жаба змія миша щур заєць лисиця вовк ведмідь олень лось їжак білка бобер "+
+const WORDS=("рік дім сік лід ніч сон ліс сад мак рак кіт рот ніс вік бік рів дар жар пар час газ віз рис лис вус мед під над рід вид код мир сир дуб зуб суп лоб гриб гра рука нога вода небо море поле село місто мова слово діло тіло очі вухо зуби губа щока лоб брова коса вуса борода палець плече спина живіт серце мозок кров кістка "+
+"кава чай мед сіль цукор хліб масло сир яйце риба борщ каша суп салат перець часник цибуля морква буряк капуста огірок помідор картопля яблуко груша слива вишня диня кавун виноград лимон банан горіх ягода малина полуниця "+
+"дерево квітка трава листя корінь гілка кущ луг гора річка озеро хмара дощ сніг вітер грім блискавка сонце місяць зірка земля вогонь дим "+
+"пес кінь корова свиня коза вівця курка півень гуска качка жаба змія миша щур заєць лисиця вовк ведмідь олень лось їжак білка бобер "+
 "птах орел сокіл ворона голуб горобець синиця сова лебідь журавель бджола оса муха комар павук метелик "+
 "стіл стілець ліжко шафа полиця вікно двері стіна підлога стеля дах кухня кімната ванна двір паркан ворота міст дорога стежка "+
 "книга ручка олівець зошит папір фарба пензель ножиці клей лінійка гумка сумка рюкзак валіза гаманець ключ замок "+
 "машина автобус потяг літак корабель човен велосипед колесо мотор кермо "+
 "робота гроші банк ринок магазин крамниця товар ціна знижка каса чек "+
 "друг сусід родина мати батько син дочка брат сестра дід баба онук "+
-"день ніч ранок вечір тиждень місяць рік весна літо осінь зима "+
-"радість сум страх гнів любов надія мрія сила воля розум пам'ять думка "+
+"день ранок вечір тиждень весна літо осінь зима "+
+"радість сум страх гнів любов надія мрія сила воля розум думка "+
 "хата пекар лікар вчитель учень майстер швець кухар водій пілот "+
-"звук голос пісня музика танець гра казка вірш малюнок кіно театр "+
+"звук голос пісня музика танець казка вірш малюнок кіно театр "+
 "світло тінь колір форма розмір вага число літера цифра крапка лінія коло квадрат "+
-"пил бруд вода мило рушник щітка віник відро "+
-"вогонь жар іскра попіл вугілля свічка ліхтар "+
+"пил бруд мило рушник щітка віник відро "+
+"іскра попіл вугілля свічка ліхтар "+
 "золото срібло залізо мідь скло камінь пісок глина цегла "+
-"білка лапа хвіст ріг копито крило перо шерсть луска "+
-"сон мрія казка диво чудо тайна загадка секрет "+
-"біг стрибок крок рух швидкість сила спорт м'яч ворота гол "+
+"лапа хвіст ріг копито крило перо шерсть луска "+
+"диво чудо тайна загадка секрет "+
+"біг стрибок крок рух швидкість спорт гол "+
 "ложка виделка ніж тарілка чашка склянка каструля сковорода чайник "+
-"рос коса роса раса маса каса меса лоза база фаза ваза "+
-"кора нора пора гора кара міра віра гира дира лира "+
-"мороз береза калина верба дуб клен липа сосна ялина тополя")
-.split(/\s+/).filter(w=>w.length>=3);
+"роса раса маса лоза база фаза ваза "+
+"кора нора пора кара міра віра лира дира "+
+"мороз береза калина верба клен липа сосна ялина тополя "+
+"акт факт такт парк марка карта карман буран баран банан канат "+
+"рама лама гама сама драма мама тато "+
+"тон фон дон зон кон монітор моно "+
+"кот бот лот пот сорт торт корт форт спорт порт "+
+"стан план клан пан ран сан тан кран "+
+"лан ганок ранок танок вінок садок листок місток "+
+"воля роль моль біль пиль тіль "+
+"вар нар бар кар товар "+
+"лів гнів спів наспів "+
+"око вікно волокно молоко колосок голосок "+
+"ціна вина міна ліна "+
+"мука лука щука штука наука байка гайка майка чайка зайка лайка "+
+"осел козел котел орел вузол посол "+
+"нитка гілка спілка балка палка галка "+
+"мода сода урода природа погода нагорода "+
+"крот грот брат трата страта варта "+
+"слід плід виліт приліт заліт політ "+
+"вила мила жила крила "+
+"крем клен план плащ плече плюс "+
+"старт стук студент стакан "+
+"радар радіо рада правда громада порада "+
+"горе доле коле роле "+
+"панорама програма реклама "+
+"вино дно зерно сукно полотно "+
+"тісто просто чисто густо пусто "+
+"замок замочок ключик мурашка "+
+"груша душа каша чаша миша тиша паша "+
+"біс кіс міс "+
+"скеля земля "+
+"шлях монах горіх сміх дах "+
+"вежа межа мережа "+
+"тачка качка пачка бочка дочка нічка "+
+"калач палац каблук ланцюг "+
+"метро ядро відро "+
+"загроза погроза "+
+"промінь камінь ремінь корінь "+
+"квас бас раз таз наказ показ образ "+
+"дим "+
+"сани рани грани стани "+
+"пшениця дзвіниця вулиця границя "+
+"дорога облога тривога перемога "+
+"тварина картина людина година хвилина "+
+"поїзд гнізд виїзд "+
+"смак знак "+
+"труба губа шуба доба "+
+"кит нить сіть "+
+"місяць заєць палець кінець ранець вінець "+
+"садиба скиба "+
+"глина стеблина хмарина "+
+"весло крісло число ремесло "+
+"молоток "+
+"крапля цибуля неділя стеля хвиля "+
+"суниця столиця водиця "+
+"трактор доктор фактор сектор мотор автор актор "+
+"вокзал канал журнал сигнал метал портал квартал "+
+// ще доповнення (більший словник)
+"алея армія азот акула апарат банка билина буква вежа вода воля ворог гараж герой гілка гриб гроза дама дача діра дошка драбина ера ефір жаба жага жало жир завод захід зброя зерно зима зона іграшка ідея їжа кабан казан калюжа канава квас квота кит клас клен клин коза колба колір колос конус копил корж кошик крапка куля лава лада лебідь лінза липа лоза лужа люк льон маля мана мед межа мідь моль мошка мул муляр набір навіс налив намет нива нирка ніша нога нора носик нота обід образ обруч оса острів отара пава палата панда пара парта паста паша печера пилка піна пісок плита плід поле пора порт порядок посуд потік похід призма пух рама рана роса рудник саж сани сани сатин світ село сила сітка скеля скло слон смак сова солома сom сон сорт спека спис стеля степ стіг сук суп тайна тато тінь товар тоска трава труба тур туча удар узвар узор ураган урок факел фарба ферма фото хазяїн халат хата хвиля хижа хмара хома хор хула цап цегла цибуля цирк час чашка чек черга черево число чоло чорт чуб шайба шапка шар шаром шафа шина шипшина шкіра шлях шов штора шум щавель щастя щока щука ялина ясен яхта")
+.split(/\s+/).map(w=>w.toLowerCase().trim()).filter(w=>w.length>=3 && /^[а-яіїєґ']+$/.test(w));
 const WSET=new Set(WORDS);
-// сортовані «ключі» мультимножин для швидкої перевірки підмножини не потрібні — робимо просту перевірку
+const WORDS_U=[...WSET];
+const SEEDS=WORDS_U.filter(w=>w.indexOf("'")<0 && w.length>=6 && w.length<=9);
 
 function letterCount(str){const m={};for(const c of str)m[c]=(m[c]||0)+1;return m;}
-function fits(word,rack){const rc=letterCount(rack),need=letterCount(word);for(const c in need){if((rc[c]||0)<need[c])return false;}return true;}
-
-// набір «сідів» (довші слова), з яких генеруємо раунди
-const SEEDS=WORDS.filter(w=>w.length>=6&&w.length<=9&&/^[а-яіїєґ']+$/.test(w));
+function fits(word,rc){const need=letterCount(word);for(const c in need){if((rc[c]||0)<need[c])return false;}return true;}
+const POOL='ааааоооееииіінтрсвклдмпуяб';
+const randLetter=()=>POOL[Math.floor(Math.random()*POOL.length)];
 
 let best=+localStorage.getItem(BKEY)||0;
 $('best').textContent=best?('рекорд: '+best):'рекорд: —';
 
 let round=0, total=0, timer=null, timeLeft=0;
-let rack='', tiles=[], found=[], validSet=new Set(), special={};
+let tiles=[], validSet=new Set(), cur=[], pu={swap:0,hint:0}, swapMode=false;
+
+function computeValid(){const rc=letterCount(tiles.map(t=>t.ch).join(''));validSet=new Set(WORDS_U.filter(w=>w.indexOf("'")<0&&w.length>=MIN_LEN&&fits(w,rc)));}
 
 function buildRound(){
-  // підбираємо сід так, щоб було достатньо слів
-  let tries=0, rk='', valid=[];
+  let tr=0, rk='', valid=[];
   do{
-    const seed=SEEDS[Math.floor(Math.random()*SEEDS.length)]||'';
+    const seed=SEEDS[Math.floor(Math.random()*SEEDS.length)]||'слово';
     rk=seed.replace(/'/g,'');
-    // додаємо 1-2 випадкові поширені літери
-    const extra='аоеинтрсвк';
-    const addN=1+Math.floor(Math.random()*2);
-    for(let i=0;i<addN;i++)rk+=extra[Math.floor(Math.random()*extra.length)];
-    valid=WORDS.filter(w=>w.indexOf("'")<0 && w.length>=MIN_LEN && fits(w,rk));
-    tries++;
-  }while(valid.length<5 && tries<40);
-  rack=rk.split('').sort(()=>Math.random()-0.5).join('');
-  validSet=new Set(valid);
-  found=[];
-  // спецплитки на позиціях
-  special={};
-  const idxs=[...Array(rack.length).keys()].sort(()=>Math.random()-0.5);
-  special[idxs[0]]='mult';            // ×2 для літери
-  if(idxs.length>1)special[idxs[1]]='bonus';   // +5 за використання
-  if(round>=3 && idxs.length>2)special[idxs[2]]='poison'; // -6 штраф
+    while(rk.length<RACK_N)rk+=randLetter();
+    if(rk.length>RACK_N)rk=rk.slice(0,RACK_N);
+    valid=WORDS_U.filter(w=>w.indexOf("'")<0&&w.length>=MIN_LEN&&fits(w,letterCount(rk)));
+    tr++;
+  }while(valid.length<8 && tr<80);
+  const arr=rk.split('').sort(()=>Math.random()-0.5);
+  tiles=arr.map(ch=>({ch,kind:''}));
+  const idxs=[...Array(tiles.length).keys()].sort(()=>Math.random()-0.5);
+  tiles[idxs[0]].kind='mult';
+  tiles[idxs[1]].kind='bonus';
+  if(round>=3)tiles[idxs[2]].kind='poison';
+  cur=[];swapMode=false;
+  computeValid();
 }
 
-function tileClass(kind){return kind?(' '+kind):'';}
 function renderRound(){
   buildRound();
+  if(round===5){pu.swap++;} // бонус 5-го раунду: заміна букви
   timeLeft=ROUND_SEC;
-  const c=$('card');
-  c.innerHTML=`
-    <div class="hud"><div>Раунд <b>${round}</b>/${ROUNDS}</div><div>Знайдено <b id="fcount">0</b>/${validSet.size}</div><div>Рахунок <span class="sc" id="score">${total}</span></div></div>
+  $('card').innerHTML=`
+    <div class="hud"><div>Раунд <b>${round}</b>/${ROUNDS}</div><div>1 слово</div><div>Рахунок <span class="sc" id="score">${total}</span></div></div>
     <div id="timebar"><i id="tb"></i></div>
-    <div class="cur" id="cur"><span class="ph">клацай літери й склади слово (мін. ${MIN_LEN})</span></div>
+    <div class="cur" id="cur"></div>
     <div class="rack" id="rack"></div>
-    <div class="msg" id="msg"></div>
+    <div class="powers" id="powers"></div>
     <div class="actions">
       <button class="btn ghost" onclick="backspace()">⌫</button>
       <button class="btn primary" onclick="submitWord()">Скласти ✓</button>
       <button class="btn ghost" onclick="clearWord()">✕</button>
     </div>
-    <div class="legend"><i style="border-color:var(--gold);color:var(--gold)">★ ×2</i><i style="border-color:var(--cyan);color:var(--cyan)">💎 +5</i><i style="border-color:var(--red);color:var(--red)">☠ −6</i></div>
-    <div class="found" id="found"></div>`;
-  cur=[]; drawRack(); tick();
+    <div class="msg" id="msg">${round===5?'🎁 Бонус раунду: заміна букви!':''}</div>
+    <div class="legend"><i style="border-color:var(--gold);color:var(--gold)">★ ×2</i><i style="border-color:var(--cyan);color:var(--cyan)">💎 таємний бонус</i><i style="border-color:var(--red);color:var(--red)">☠ −6</i></div>`;
+  drawRack(); drawPowers(); tick();
 }
-let cur=[]; // масив {ch, idx}
 function drawRack(){
-  const r=$('rack');
-  r.innerHTML=rack.split('').map((ch,i)=>{
-    const kind=special[i]||'';
-    const used=cur.some(t=>t.idx===i)?' used':'';
-    const tag=kind==='mult'?'<span class="tag">★</span>':kind==='bonus'?'<span class="tag">💎</span>':kind==='poison'?'<span class="tag">☠</span>':'';
-    return `<div class="tile${tileClass(kind)}${used}" onclick="tapTile(${i})">${ch.toUpperCase()}${tag}<span class="v">${letterVal(ch)}</span></div>`;
+  $('rack').innerHTML=tiles.map((t,i)=>{
+    const used=cur.some(c=>c.idx===i)?' used':'';const pick=swapMode?' pick':'';
+    const tag=t.kind==='mult'?'<span class="tag">★</span>':t.kind==='bonus'?'<span class="tag">💎</span>':t.kind==='poison'?'<span class="tag">☠</span>':'';
+    return `<div class="tile${t.kind?(' '+t.kind):''}${used}${pick}" onclick="tapTile(${i})">${t.ch.toUpperCase()}${tag}<span class="v">${letterVal(t.ch)}</span></div>`;
   }).join('');
-  const cu=$('cur');
-  cu.innerHTML=cur.length?cur.map(t=>t.ch.toUpperCase()).join(''):'<span class="ph">клацай літери й склади слово (мін. '+MIN_LEN+')</span>';
+  const c=$('cur');if(c)c.innerHTML=cur.length?cur.map(t=>t.ch.toUpperCase()).join(''):'<span class="ph">склади одне слово (мін. '+MIN_LEN+')</span>';
 }
-function tapTile(i){ if(cur.some(t=>t.idx===i))return; cur.push({ch:rack[i],idx:i}); drawRack(); }
-function backspace(){ cur.pop(); drawRack(); }
-function clearWord(){ cur=[]; drawRack(); }
-function msg(t,ok){const m=$('msg');if(!m)return;m.textContent=t;m.className='msg '+(ok?'ok':'bad');}
+function drawPowers(){
+  const p=$('powers');if(!p)return;
+  p.innerHTML=`<button class="pw" onclick="shuffleRack()">🔀 Перемішати</button>
+    <button class="pw" ${pu.swap>0?'':'disabled'} onclick="useSwap()">♻ Заміна${pu.swap>0?' ('+pu.swap+')':''}</button>
+    <button class="pw" ${pu.hint>0?'':'disabled'} onclick="useHint()">💡 Підказка${pu.hint>0?' ('+pu.hint+')':''}</button>`;
+}
+function tapTile(i){
+  if(swapMode){const nc=randLetter();tiles[i]={ch:nc,kind:tiles[i].kind};swapMode=false;cur=cur.filter(t=>t.idx!==i);computeValid();drawRack();drawPowers();msg('Замінено на «'+nc.toUpperCase()+'»',1);return;}
+  if(cur.some(t=>t.idx===i))return;cur.push({ch:tiles[i].ch,idx:i});drawRack();
+}
+function backspace(){cur.pop();drawRack();}
+function clearWord(){cur=[];drawRack();}
+function msg(t,type){const m=$('msg');if(m){m.textContent=t;m.className='msg '+(type===1?'ok':type===2?'gold':'bad');}}
+function shuffleRack(){const order=[...Array(tiles.length).keys()].sort(()=>Math.random()-0.5);tiles=order.map(i=>tiles[i]);cur=[];drawRack();msg('Перемішано 🔀',1);}
+function useSwap(){if(pu.swap<=0)return;pu.swap--;swapMode=true;drawRack();drawPowers();msg('Тапни літеру, яку замінити',2);}
+function useHint(){if(pu.hint<=0)return;pu.hint--;const opts=[...validSet].filter(w=>w.length>=3&&w.length<=5);const w=opts.length?opts[Math.floor(Math.random()*opts.length)]:[...validSet][0];drawPowers();msg('💡 Спробуй: '+(w?w.toUpperCase():'—'),2);}
 
+function scoreWord(){
+  let base=0,used=cur.map(t=>tiles[t.idx].kind);
+  cur.forEach(t=>{let v=letterVal(t.ch);if(tiles[t.idx].kind==='mult')v*=2;base+=v;});
+  const lenMult=1+Math.max(0,cur.length-3)*0.3;
+  let sc=Math.round(base*lenMult);
+  cur.forEach(t=>{if(tiles[t.idx].kind==='poison')sc-=6;});
+  return {sc:Math.max(0,sc), diamond:used.includes('bonus')};
+}
 function submitWord(){
   const word=cur.map(t=>t.ch).join('');
   if(word.length<MIN_LEN){msg('Мінімум '+MIN_LEN+' літери',0);return;}
-  if(found.includes(word)){msg('Вже склав це слово',0);return;}
-  if(!validSet.has(word)){msg('«'+word.toUpperCase()+'» — немає в словнику',0);clearWord();return;}
-  // рахунок
-  let base=0, note=[];
-  cur.forEach(t=>{let v=letterVal(t.ch);if(special[t.idx]==='mult'){v*=2;note.push('★');}base+=v;});
-  const lenMult=1+Math.max(0,word.length-3)*0.3;
-  let sc=Math.round(base*lenMult);
-  let bonus=0;
-  cur.forEach(t=>{if(special[t.idx]==='bonus'){bonus+=5;note.push('💎');}if(special[t.idx]==='poison'){bonus-=6;note.push('☠');}});
-  sc+=bonus;
-  if(sc<0)sc=0;
-  total+=sc; found.push(word);
-  $('score').textContent=total; $('fcount').textContent=found.length;
-  const f=$('found');f.innerHTML=found.map(w=>`<span>${w.toUpperCase()} <b>+${wordScoreCache[w]||''}</b></span>`).join('');
-  wordScoreCache[word]=sc;
-  f.innerHTML=found.map(w=>`<span>${w.toUpperCase()} <b>+${wordScoreCache[w]}</b></span>`).join('');
-  msg('+'+sc+' очок'+(note.length?(' '+note.join('')):'')+(word.length>=5?' 🔥':''),1);
-  clearWord();
+  if(!validSet.has(word)){msg('«'+word.toUpperCase()+'» немає в словнику',0);return;}
+  const {sc,diamond}=scoreWord();
+  total+=sc;
+  let secret='';
+  if(diamond){const kind=Math.random()<0.5?'swap':'hint';pu[kind]++;secret=(kind==='swap'?'♻ заміна букви':'💡 підказка');}
+  roundDone(word,sc,secret);
 }
-const wordScoreCache={};
-
-function tick(){
+function roundDone(word,sc,secret){
   clearInterval(timer);
-  timer=setInterval(()=>{
-    timeLeft--;
-    const tb=$('tb');if(tb)tb.style.width=(timeLeft/ROUND_SEC*100)+'%';
-    if(timeLeft<=0){clearInterval(timer);endRound();}
-  },1000);
-  const tb=$('tb');if(tb)tb.style.width='100%';
-}
-
-function endRound(){
-  clearInterval(timer);
-  const c=$('card');
-  const missed=[...validSet].filter(w=>!found.includes(w)).sort((a,b)=>b.length-a.length).slice(0,8);
-  c.innerHTML=`<div class="center">
-    <div style="color:var(--muted);font-size:13px">Раунд ${round} завершено</div>
-    <div class="big">${found.length} слів</div>
-    <div style="color:var(--gold);font-weight:800;font-size:22px;margin-bottom:6px">разом ${total} очок</div>
-    ${missed.length?`<div class="rules center" style="text-align:center"><b>Можна було ще:</b><br>${missed.map(w=>w.toUpperCase()).join(' · ')}</div>`:''}
-    <button class="btn primary" style="max-width:280px;margin:14px auto 0" onclick="nextRound()">${round<ROUNDS?'Наступний раунд →':'Підсумок 🏆'}</button>
+  const bestW=[...validSet].sort((a,b)=>b.length-a.length||0)[0]||'';
+  $('card').innerHTML=`<div class="center">
+    <div style="color:var(--muted);font-size:13px">Раунд ${round}/${ROUNDS}</div>
+    <div class="big">${word?word.toUpperCase():'— пропуск —'}</div>
+    <div style="color:var(--gold);font-weight:800;font-size:24px">+${sc} очок</div>
+    <div style="color:var(--muted);font-size:13px;margin-top:8px">Разом: <b style="color:var(--text)">${total}</b></div>
+    ${secret?`<div style="color:var(--cyan);font-weight:700;font-size:14px;margin-top:8px">💎 Таємний бонус: ${secret}!</div>`:''}
+    ${bestW&&bestW!==word?`<div class="rules" style="text-align:center;margin-top:10px">Найдовше можливе: <b>${bestW.toUpperCase()}</b> (${bestW.length} лт)</div>`:''}
+    <button class="btn primary" style="max-width:280px;margin:16px auto 0" onclick="nextRound()">${round<ROUNDS?'Наступний раунд →':'Підсумок 🏆'}</button>
   </div>`;
 }
-function nextRound(){ if(round<ROUNDS){round++;renderRound();} else finish(); }
-
+function tick(){
+  clearInterval(timer);const tb=$('tb');if(tb)tb.style.width='100%';
+  timer=setInterval(()=>{
+    timeLeft--;const tb=$('tb');if(tb)tb.style.width=(timeLeft/ROUND_SEC*100)+'%';
+    if(timeLeft<=0){clearInterval(timer);
+      const w=cur.map(t=>t.ch).join('');
+      if(w.length>=MIN_LEN&&validSet.has(w)){const {sc,diamond}=scoreWord();total+=sc;let secret='';if(diamond){const kind=Math.random()<0.5?'swap':'hint';pu[kind]++;secret=(kind==='swap'?'♻ заміна':'💡 підказка');}roundDone(w,sc,secret);}
+      else roundDone('',0,'');
+    }
+  },1000);
+}
+function nextRound(){if(round<ROUNDS){round++;renderRound();}else finish();}
 function finish(){
-  const c=$('card');
   const isRec=total>best;
   if(isRec){best=total;localStorage.setItem(BKEY,best);$('best').textContent='рекорд: '+best;}
-  c.innerHTML=`<div class="center">
+  $('card').innerHTML=`<div class="center">
     <div class="big">🏆 ${total} очок</div>
     <div style="color:${isRec?'var(--gold)':'var(--muted)'};font-weight:700;margin-bottom:6px">${isRec?'🎉 Новий рекорд!':'рекорд: '+best}</div>
     <button class="btn primary" style="max-width:280px;margin:14px auto 0" onclick="start()">Грати ще 🔁</button>
   </div>`;
 }
-
-function start(){ round=1; total=0; renderRound(); }
-
+function start(){round=1;total=0;pu={swap:0,hint:0};renderRound();}
 function intro(){
   $('card').innerHTML=`<div class="center">
     <div class="big">🔤 Word Forge</div>
     <div class="rules">
-      Щораунду дається набір <b>літер</b> (кожна має свою ціну — рідкісні дорожчі).<br>
-      Склади якнайбільше <b>справжніх слів</b> (мін. ${MIN_LEN} літери), кожну літеру — скільки разів показана.<br>
-      <b>★ ×2</b> — подвоює ціну своєї літери · <b>💎</b> — +5 очок за використання · <b>☠</b> — −6 штраф.<br>
-      Довші слова коштують більше (множник за довжину). ${ROUNDS} раундів по ${ROUND_SEC} с.
+      Поле <b>4×4 (16 літер)</b>, кожна має ціну (рідкісні дорожчі).<br>
+      <b>1 раунд = 1 слово</b>: склади одне справжнє слово (мін. ${MIN_LEN} лт), ${ROUNDS} раундів по ${ROUND_SEC} с.<br>
+      <b>★ ×2</b> подвоює ціну літери · <b>☠ −6</b> штраф.<br>
+      <b>💎</b> якщо використаєш літеру з діамантом — <b>таємний бонус</b> (заміна або підказка).<br>
+      На <b>5-му раунді</b> — безкоштовна заміна букви.<br>
+      Бонуси: <b>🔀 перемішати</b>, <b>♻ заміна букви</b>, <b>💡 підказка</b>. Довші слова коштують більше.
     </div>
     <button class="btn primary" style="max-width:280px;margin:8px auto 0" onclick="start()">▶ Грати</button>
-    <div style="color:var(--muted);font-size:11px;margin-top:12px">Словник вбудований (${WORDS.length} слів) — офлайн. Слів немає? Напиши Владу — розширимо.</div>
+    <div style="color:var(--muted);font-size:11px;margin-top:12px">Словник вбудований (${WORDS_U.length} слів) — офлайн.</div>
   </div>`;
 }
-// клавіатура
 document.addEventListener('keydown',e=>{
   if(e.key==='Enter'){submitWord();return;}
   if(e.key==='Backspace'){backspace();return;}
-  const ch=e.key.toLowerCase();
-  if(rack&&rack.includes(ch)){const i=rack.split('').findIndex((c,idx)=>c===ch&&!cur.some(t=>t.idx===idx));if(i>=0){tapTile(i);}}
+  const ch=(e.key||'').toLowerCase();
+  if(tiles.length&&!swapMode){const i=tiles.findIndex((t,idx)=>t.ch===ch&&!cur.some(c=>c.idx===idx));if(i>=0)tapTile(i);}
 });
 intro();
 </script>

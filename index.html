@@ -1467,13 +1467,14 @@ function toggleMetricBar(){metricOpen=!metricOpen;applyMetricBar();}
 function applyMetricBar(){const bar=$('metricBar'),tog=$('metricToggle'),cur=$('metricCur');if(bar)bar.classList.toggle('collapsed',!metricOpen);if(tog)tog.classList.toggle('open',metricOpen);if(cur)cur.textContent=curMetric().label;}
 function setMetric(id){metricSel=id;renderMonth();}
 function setMonthView(v){monthView=v;renderMonth();}
-function metricList(){const S=state.settings;const a=[{id:'all',label:'Усі',kind:'all'},{id:'score',label:'Бал дня',unit:'%',kind:'score'},{id:'xp',label:'XP/день',unit:'XP',kind:'xp'}];if(mod('water'))a.push({id:'water',label:'Вода',unit:'мл',kind:'goal'});if(mod('sleep'))a.push({id:'sleep',label:'Сон',unit:'год',kind:'sleep'});if(mod('weight'))a.push({id:'weight',label:'Вага',unit:'кг',kind:'weight'});if(mod('counters'))S.counters.forEach(c=>{if(c.mode==='week')return;a.push({id:'cnt:'+c.id,label:c.name,unit:c.unit,kind:'goal',ref:c});});if(mod('limits'))S.limitHabits.forEach(l=>{if(l.mode==='week')return;a.push({id:'lim:'+l.id,label:l.name,unit:l.unit,kind:'limit',ref:l});});if(mod('activity')&&S.exercises.length){a.push({id:'exall',label:'💪 Вправи',unit:'',kind:'exall'});a.push({id:'exmaxAll',label:'🏆 Макс/підхід',unit:'реп',kind:'exmaxAll'});}return a;}
+function metricList(){const S=state.settings;const a=[{id:'all',label:'Усі',kind:'all'},{id:'score',label:'Бал дня',unit:'%',kind:'score'},{id:'xp',label:'XP/день',unit:'XP',kind:'xp'}];if(mod('water'))a.push({id:'water',label:'Вода',unit:'мл',kind:'goal'});if(mod('sleep'))a.push({id:'sleep',label:'Сон',unit:'год',kind:'sleep'});if(mod('weight'))a.push({id:'weight',label:'Вага',unit:'кг',kind:'weight'});if(mod('counters'))S.counters.forEach(c=>{if(c.mode==='week')return;a.push({id:'cnt:'+c.id,label:c.name,unit:c.unit,kind:'goal',ref:c});});if(mod('limits'))S.limitHabits.forEach(l=>{if(l.mode==='week')return;a.push({id:'lim:'+l.id,label:l.name,unit:l.unit,kind:'limit',ref:l});});if(mod('activity')&&S.exercises.length){a.push({id:'exall',label:'💪 Вправи',unit:'',kind:'exall'});a.push({id:'exmaxAll',label:'🏆 Макс/підхід',unit:'реп',kind:'exmaxAll'});S.exercises.forEach(ex=>a.push({id:'exone:'+ex.id,label:ex.name,unit:'',kind:'exone',ref:ex,exOne:true}));}return a;}
 function curMetric(){return metricList().find(m=>m.id===metricSel)||metricList()[0];}
 function metricGoal(mt){if(mt.id==='water')return state.settings.waterGoal;if(mt.id==='sleep')return state.settings.sleepGoal||8;if(mt.id==='weight')return null;if(mt.id==='score')return 80;if(mt.kind==='goal')return mt.ref.goal;if(mt.kind==='limit')return mt.ref.max;return null;}
 function metricDay(mt,k){const d=state.days[k];if(!d)return{has:false};
   if(mt.id==='score'){const sc=dayScore(k);return{v:sc,goal:100,ok:sc>=70,has:sc!=null};}
   if(mt.kind==='xp'){const has=!dayEmpty(d);return{v:has?Math.max(0,dayXP(k)):0,goal:null,ok:true,has};}
   if(mt.kind==='exall'){let s=0;(state.settings.exercises||[]).forEach(ex=>{if(ex.since&&k<ex.since)return;s+=(d.exercises&&d.exercises[ex.id])||0;});return{v:s,goal:null,ok:true,has:s>0};}
+  if(mt.kind==='exone'){const ex=mt.ref;if(ex.since&&k<ex.since)return{has:false};const t=exTarget(ex,k),v=(d.exercises&&d.exercises[ex.id])||0;return{v,goal:t,ok:v>=t,has:true};}
   if(mt.id==='water'){return{v:d.water||0,goal:state.settings.waterGoal,ok:(d.water||0)>=state.settings.waterGoal,has:true};}
   if(mt.id==='sleep'){const h=sleepHours(k),g=state.settings.sleepGoal||8;return{v:h,goal:g,ok:h>=g,has:h>0};}
   if(mt.id==='weight'){const v=d.weight||0;return{v,goal:null,ok:true,has:v>0};}
@@ -1489,11 +1490,14 @@ function metricColor(mt,r){if(!r.has)return{bg:'rgba(255,255,255,.05)',col:'var(
   if(r.ok||pct>=1)return{bg:'rgba(79,197,150,.82)',col:'#04140d'};
   if(pct>=.5)return{bg:'rgba(227,189,104,.78)',col:'#2a1e02'};
   return{bg:'rgba(229,107,123,.72)',col:'#2a0708'};}
-function metricValTxt(mt,v){if(mt.id==='water')return(v/1000).toFixed(1)+'л';if(mt.id==='sleep')return v+'г';if(mt.id==='weight')return v+'кг';if(mt.id==='score')return v+'%';return fmt(v)+(mt.unit?(' '+mt.unit):'');}
+function metricValTxt(mt,v){if(mt.id==='water')return(v/1000).toFixed(1)+'л';if(mt.id==='sleep')return v+'г';if(mt.id==='weight')return v+'кг';if(mt.id==='score')return v+'%';if(mt.kind==='exone')return fmt(v)+(isSecEx(mt.ref.name)?'с':'');return fmt(v)+(mt.unit?(' '+mt.unit):'');}
 function exShort(name){if(/віджим|push/i.test(name))return 'В';if(/присід|squat/i.test(name))return 'П';if(/планк|plank/i.test(name))return 'Пл';if(/руханк/i.test(name))return 'Р';const c=String(name).replace(/\(.*?\)/g,'').trim();return (c[0]||'?').toUpperCase();}
 function isSecEx(name){return /планк|plank|\(сек\)|\(sec\)/i.test(name);}
 function renderMonth(){
-  $('metricBar').innerHTML=metricList().map(m=>`<button class="sm ${m.id===metricSel?'acc':''}" onclick="setMetric('${m.id}')">${m.label}</button>`).join('');
+  {const ml=metricList();const btns=ml.filter(m=>!m.exOne).map(m=>`<button class="sm ${m.id===metricSel?'acc':''}" onclick="setMetric('${m.id}')">${m.label}</button>`).join('');
+    const exs=ml.filter(m=>m.exOne),act=exs.find(m=>m.id===metricSel);
+    const sel=exs.length?`<select class="sm${act?' acc':''}" onchange="if(this.value)setMetric(this.value)" style="max-width:160px;font-family:inherit"><option value="">💪 вправа ▾</option>${exs.map(m=>`<option value="${m.id}" ${m.id===metricSel?'selected':''}>${esc(m.ref.name)}</option>`).join('')}</select>`:'';
+    $('metricBar').innerHTML=btns+sel;}
   applyMetricBar();
   $('btnCal').className='sm '+(monthView==='cal'?'acc':'');
   $('btnLine').className='sm '+(monthView==='line'?'acc':'');
@@ -1512,8 +1516,9 @@ function renderMonth(){
   if(monthView==='cal'){
     const start=(new Date(y,mo,1).getDay()+6)%7;
     const head=['Пн','Вт','Ср','Чт','Пт','Сб','Нд'].map(h=>`<div class="hd">${h}</div>`).join('');
+    const coffeeId=(state.settings.limitHabits.find(l=>/кав|coffee/i.test(l.name))||{}).id;
     let cells='';for(let i=0;i<start;i++)cells+='<div></div>';
-    for(let dd=1;dd<=days;dd++){const k=dayKey(new Date(y,mo,dd)),t=k===todayKey(),rest=!!(state.restDays&&state.restDays[k]);const gotB=Object.values(state.badges||{}).includes(k);const num=dd+(rest?' 🛡':'')+(gotB?' 🏅':'');const ol=t?'outline:2px solid var(--cyan);outline-offset:1px':(k===selDay?'outline:2px solid var(--yellow);outline-offset:1px':'');
+    for(let dd=1;dd<=days;dd++){const k=dayKey(new Date(y,mo,dd)),t=k===todayKey(),rest=!!(state.restDays&&state.restDays[k]);const gotB=Object.values(state.badges||{}).includes(k);const coffee=coffeeId&&state.days[k]&&state.days[k].limits&&(state.days[k].limits[coffeeId]||0)>0;const num=dd+(rest?' 🛡':'')+(gotB?' 🏅':'')+(coffee?' ☕':'');const ol=t?'outline:2px solid var(--cyan);outline-offset:1px':(k===selDay?'outline:2px solid var(--yellow);outline-offset:1px':'');
       if(mt.id==='all'){const comps=dayComponents(k);const dots=comps?`<div class="mdots">${comps.map(c=>`<i style="background:${compColor(c)}"></i>`).join('')}</div>`:'';
         cells+=`<div class="d" data-tip-day="${k}" onclick="cellTap('${k}',event)" style="cursor:pointer;${ol}"><b>${num}</b>${dots}</div>`;
       } else if(mt.kind==='exall'){const d2=state.days[k];const exs=state.settings.exercises.filter(ex=>!ex.since||k>=ex.since);const has=d2&&d2.exercises&&exs.some(ex=>(d2.exercises[ex.id]||0)>0);const txt=has?exs.map(ex=>exShort(ex.name)+':'+((d2.exercises[ex.id]||0))+(isSecEx(ex.name)?'с':'')).join(' '):'';
