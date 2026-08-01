@@ -364,7 +364,7 @@
         <button class="sm" id="btnRest" onclick="toggleRest()" title="Зробити сьогодні вихідним — серія 🔥 не перерветься">🛡</button>
       </div>
     </div>
-    <div class="metric-wrap" style="margin-top:10px"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="opacity:.6;flex:0 0 auto"><path d="M6 20V10M12 20V4M18 20v-6"/></svg><select id="metricSelect" class="metric-select" onchange="setMetric(this.value)"></select></div>
+    <div class="metric-wrap" style="margin-top:10px"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="opacity:.6;flex:0 0 auto"><path d="M6 20V10M12 20V4M18 20v-6"/></svg><select id="metricSelect" class="metric-select" onchange="setMetric(this.value)"></select><button class="sm" onclick="shiftMonth(-1)" style="flex:0 0 auto;padding:5px 10px">‹</button><span id="monthTitle" style="flex:0 0 auto;font-size:12px;font-weight:700;min-width:74px;text-align:center;text-transform:capitalize"></span><button class="sm" id="monthNextBtn" onclick="shiftMonth(1)" style="flex:0 0 auto;padding:5px 10px">›</button></div>
     <div id="monthBody" style="margin-top:8px"></div>
     <div class="muted" id="monthLegend" style="margin-top:10px"></div>
   </div>
@@ -1032,7 +1032,11 @@ function xpTotal(){const set={};Object.keys(state.days).forEach(k=>{if(!dayEmpty
     if(prev){const gap=Math.round((new Date(k+'T00:00:00')-new Date(prev+'T00:00:00'))/86400000);if(gap!==1)streak=0;}
     if(good)streak++;else streak=0;
     total=Math.max(0,total+Math.round(dayXPraw(k)*streakMult(streak)));prev=k;});
-  return total+weeklyBonusXP();}
+  const t=total+weeklyBonusXP();
+  // 🛡 захист рівня: XP не падає при зміні налаштувань (цілі/вправи перераховують історію) — тримаємо найвищий досягнутий
+  const bank=state.xpBank||0;
+  if(t>bank){state.xpBank=t;return t;}
+  return bank;}
 // тижневі бонуси за завершені тижні (Пн–Нд): +50 XP за модуль, який був «чистим» цілий тиждень
 // (вода/вправа/лічильник — виконав тижневу норму; ліміт — у межах щодня, напр. CS2 не грав). Розбивка по модулях.
 function weeklyBonusData(){const S=state.settings,WB=50;
@@ -1463,7 +1467,8 @@ function svgMultiLine({series,labels,w=800,h=190,unit='',hidden={},toggle=false,
 }
 
 /* ===== ПРОГРЕС ===== */
-let metricSel='all', monthView='cal', hiddenLines={}, metricOpen=false;
+let metricSel='all', monthView='cal', hiddenLines={}, metricOpen=false, monthOffset=0;
+function shiftMonth(d){monthOffset=Math.min(0,monthOffset+d);renderMonth();}
 function toggleLine(name){hiddenLines[name]=!hiddenLines[name];renderMonth();}
 function metricGroup(m){if(['all','score','xp'].includes(m.id))return 'Загальне';if(['water','sleep','weight'].includes(m.id))return 'Показники';if(m.kind==='limit')return 'Ліміти';if(m.kind==='exall'||m.kind==='exmaxAll'||m.kind==='exone')return '💪 Вправи';if(m.kind==='goal')return 'Лічильники';return 'Інше';}
 function applyMetricBar(){const sel=$('metricSelect');if(!sel)return;const ml=metricList(),groups={};ml.forEach(m=>{const g=metricGroup(m);(groups[g]=groups[g]||[]).push(m);});const order=['Загальне','Показники','Лічильники','Ліміти','💪 Вправи','Інше'];sel.innerHTML=order.filter(g=>groups[g]).map(g=>`<optgroup label="${g}">${groups[g].map(m=>`<option value="${m.id}"${m.id===metricSel?' selected':''}>${esc(m.label)}</option>`).join('')}</optgroup>`).join('');}
@@ -1502,10 +1507,11 @@ function renderMonth(){
   {const b=$('btnBar');if(b)b.className='sm '+(monthView==='bar'?'acc':'');}
   {const rb=$('btnRest');rb.className='sm '+(state.restDays&&state.restDays[activeDay()]?'acc':'');const tt=(activeDay()===todayKey()?'Зробити сьогодні':'Зробити '+activeDay())+' вихідним — серія 🔥 не перерветься';rb.title=tt;rb._o=rb._o||{};rb._o.title=tt;}
   const mt=curMetric();
-  const now=new Date(),y=now.getFullYear(),mo=now.getMonth(),days=new Date(y,mo+1,0).getDate();
+  const now=new Date(new Date().getFullYear(),new Date().getMonth()+monthOffset,1),y=now.getFullYear(),mo=now.getMonth(),days=new Date(y,mo+1,0).getDate(),isCurM=monthOffset===0;
+  {const t=$('monthTitle');if(t)t.textContent=now.toLocaleDateString(LOC(),{month:'short',year:'2-digit'});const nb=$('monthNextBtn');if(nb)nb.disabled=isCurM;}
   if(mt.kind==='exmaxAll'){
     const exs=state.settings.exercises,cols=['#5cc9dd','#4fc596','#e3bd68','#9d8ad6','#e56b7b'];
-    const series=exs.map((ex,i)=>({name:ex.name,color:cols[i%cols.length],data:[]})),labels=[],msh=now.toLocaleDateString(LOC(),{month:'short'}),last=new Date().getDate();
+    const series=exs.map((ex,i)=>({name:ex.name,color:cols[i%cols.length],data:[]})),labels=[],msh=now.toLocaleDateString(LOC(),{month:'short'}),last=isCurM?new Date().getDate():days;
     for(let dd=1;dd<=last;dd++){const k=dayKey(new Date(y,mo,dd));labels.push(dd+' '+msh);exs.forEach((ex,i)=>series[i].data.push({x:dd,y:exMaxSet(ex.id,k)}));}
     $('monthBody').innerHTML=exs.length?(monthView==='bar'?svgMultiBars({series,labels,unit:'реп',h:236,hidden:hiddenLines,toggle:true}):svgMultiLine({series,labels,unit:'реп',h:236,hidden:hiddenLines,toggle:true})):'<div class="empty">немає вправ</div>';
     $('monthLegend').textContent='Макс за підхід по днях — окрема '+(monthView==='bar'?'група стовпчиків':'лінія')+' на кожну вправу.';
@@ -1529,7 +1535,7 @@ function renderMonth(){
   } else {
     const gm=mt.id==='all'?metricList().find(m=>m.id==='score'):mt;
     const msh=now.toLocaleDateString(LOC(),{month:'short'});
-    const lastDay=new Date().getDate();
+    const lastDay=isCurM?new Date().getDate():days;
     const socId=screenLimitId();
     if(gm.id==='sleep'){
       // дві лінії: коли заснув / коли прокинувся (вісь — час доби, ніч безперервна)
@@ -1630,11 +1636,12 @@ function buildMonthReportSVG(mkArg){
   // плитки лише з наявних даних цього профілю
   const tiles=[];
   if(r.hasSteps&&r.totSteps>0){tiles.push([C.white,fmt(r.totSteps),'кроків за місяць']);tiles.push([C.cyan,fmt(r.avgSteps),'середньо/день']);}
-  if(mod('water')&&r.waterL>0)tiles.push([C.blue,r.waterL+' л','води випито']);
+  const perDay=(v,u)=>r.activeDays?('≈'+(Math.round(v/r.activeDays*10)/10)+' '+u+'/день'):'';
+  if(mod('water')&&r.waterL>0)tiles.push([C.blue,r.waterL+' л','води випито',perDay(r.waterL,'л')]);
   tiles.push([C.green,r.good+'/'+r.daysIn,'хороші дні']);
   if(mod('sleep')&&r.sleepTot>0){tiles.push([C.purple,r.sleepTot+' год','сну всього']);tiles.push([C.purple,r.sleepAvg+' год','сон/ніч']);}
-  if(PROFILE==='me'&&r.gamesH>0)tiles.push([C.yellow,r.gamesH+' год','CS2']);
-  if(r.socialH>0)tiles.push([C.yellow,r.socialH+' год','соцмережі']);
+  if(PROFILE==='me'&&r.gamesH>0)tiles.push([C.yellow,r.gamesH+' год','CS2',perDay(r.gamesH,'год')]);
+  if(r.socialH>0)tiles.push([C.yellow,r.socialH+' год','соцмережі',perDay(r.socialH,'год')]);
   if(r.gymSessions>0)tiles.push([C.green,fmt(r.gymSessions),'занять у залі']);
   if(r.bookPages>0)tiles.push([C.cyan,fmt(r.bookPages),'сторінок прочитано']);
   if(mod('finance')&&r.spent>0){tiles.push([C.red,fmt(Math.round(r.spent))+' '+cur,'витрати']);tiles.push([C.red,fmt(r.avgSpent)+' '+cur,'витрати/день']);}
@@ -1644,7 +1651,7 @@ function buildMonthReportSVG(mkArg){
   const gap=rows>1?Math.min(104,(botA-topA)/(rows-1)):0,startY=Math.round((topA+botA)/2-(rows-1)*gap/2);
   const colX=[W*0.28,W*0.72];
   let sg='';tiles.forEach((st,i)=>{const row=Math.floor(i/2),lastSingle=(i===tiles.length-1&&tiles.length%2===1),cx=lastSingle?W/2:colX[i%2],y=startY+row*gap;
-    sg+=`<text x="${cx}" y="${y}" font-size="40" font-weight="800" text-anchor="middle" fill="${st[0]}" font-family="Arial,sans-serif">${st[1]}</text><text x="${cx}" y="${y+27}" font-size="16.5" text-anchor="middle" fill="#8791a3" font-family="Arial,sans-serif">${st[2]}</text>`;});
+    sg+=`<text x="${cx}" y="${y}" font-size="40" font-weight="800" text-anchor="middle" fill="${st[0]}" font-family="Arial,sans-serif">${st[1]}</text><text x="${cx}" y="${y+27}" font-size="16.5" text-anchor="middle" fill="#8791a3" font-family="Arial,sans-serif">${st[2]}</text>${st[3]?`<text x="${cx}" y="${y+43}" font-size="12" text-anchor="middle" fill="#5a6273" font-family="Arial,sans-serif">${st[3]}</text>`:''}`;});
   const exTotStr=(r.exTotals||[]).map(e=>`${esc(e.name)} ${fmt(e.total)}`).join('    ·    ');
   const totLine=exTotStr?`<text x="${W/2}" y="892" font-size="15.5" text-anchor="middle" fill="#8791a3" font-family="Arial,sans-serif">${exTotStr}</text>`:'';
   const recBlock=recs.length?`${dv(756)}<text x="${W/2}" y="805" font-size="17" text-anchor="middle" fill="#8791a3" letter-spacing="2" font-family="Arial,sans-serif">РЕКОРДИ ЗА ПІДХІД</text><text x="${W/2}" y="853" font-size="36" font-weight="800" text-anchor="middle" fill="#e7ecf3" font-family="Arial,sans-serif">${recs.join('   ·   ')}</text>${totLine}`:'';
