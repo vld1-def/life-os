@@ -1056,22 +1056,24 @@ function weeklyBonusData(){const S=state.settings,WB=50;
       const wd=[];for(let i=0;i<7;i++){const dd=new Date(wk);dd.setDate(dd.getDate()+i);wd.push(dayKey(dd));}
       const wkStart=wd[0];if(wd.filter(k=>state.days[k]&&!dayEmpty(state.days[k])).length<5)continue;
       items.forEach(it=>{const r=it.ref;if(r&&r.since&&wkStart<r.since)return;
-        if(it.kind==='water'){let d=0,g=0;wd.forEach(k=>{if(state.days[k]){d+=state.days[k].water||0;g+=S.waterGoal;}});if(g>0&&d>=g)agg[it.key]+=WB;}
-        else if(it.kind==='ex'){let d=0,t=0;wd.forEach(k=>{if(state.days[k]){d+=(state.days[k].exercises&&state.days[k].exercises[r.id])||0;t+=exTarget(r,k);}});if(t>0&&d>=t)agg[it.key]+=WB;}
-        else if(it.kind==='cnt'){let d=0,g=0;wd.forEach(k=>{if(state.days[k]){d+=(state.days[k].counters&&state.days[k].counters[r.id])||0;g+=counterGoalOn(r,k)||r.goal||0;}});if(g>0&&d>=g)agg[it.key]+=WB;}
+        // норма — за ВСІ 7 днів тижня (а не лише за дні з даними)
+        if(it.kind==='water'){let d=0,g=0;wd.forEach(k=>{d+=(state.days[k]&&state.days[k].water)||0;g+=S.waterGoal;});if(g>0&&d>=g)agg[it.key]+=WB;}
+        else if(it.kind==='ex'){let d=0,t=0;wd.forEach(k=>{d+=(state.days[k]&&state.days[k].exercises&&state.days[k].exercises[r.id])||0;t+=exTarget(r,k);});if(t>0&&d>=t)agg[it.key]+=WB;}
+        else if(it.kind==='cnt'){let d=0,g=0;wd.forEach(k=>{d+=(state.days[k]&&state.days[k].counters&&state.days[k].counters[r.id])||0;g+=counterGoalOn(r,k)||r.goal||0;});if(g>0&&d>=g)agg[it.key]+=WB;}
         else if(it.kind==='lim'){if(wd.every(k=>{const dy=state.days[k];return ((dy&&dy.limits&&dy.limits[r.id])||0)<=limitMaxOn(r,k);}))agg[it.key]+=WB;}
       });
     }
   }
   // прогрес ПОТОЧНОГО тижня (ще не зарахований — зарахується, коли тиждень завершиться)
   const cw={};const mon=weekMonday(new Date());const cwd=[];for(let i=0;i<7;i++){const dd=new Date(mon);dd.setDate(dd.getDate()+i);cwd.push(dayKey(dd));}
-  items.forEach(it=>{const r=it.ref;let done=0,need=0,broke=false;
-    cwd.forEach(k=>{const dy=state.days[k];if(!dy)return;if(r&&r.since&&k<r.since)return;
-      if(it.kind==='water'){done+=dy.water||0;need+=S.waterGoal;}
-      else if(it.kind==='ex'){done+=(dy.exercises&&dy.exercises[r.id])||0;need+=exTarget(r,k);}
-      else if(it.kind==='cnt'){done+=(dy.counters&&dy.counters[r.id])||0;need+=counterGoalOn(r,k)||r.goal||0;}
-      else if(it.kind==='lim'){if(((dy.limits&&dy.limits[r.id])||0)>limitMaxOn(r,k))broke=true;}});
-    cw[it.key]=(it.kind==='lim')?{pct:broke?0:100,broke}:{pct:need>0?Math.min(100,Math.round(done/need*100)):0,done,need};});
+  const tk=todayKey();
+  items.forEach(it=>{const r=it.ref;let done=0,need=0,broke=false,cleanDays=0,passedDays=0;
+    cwd.forEach(k=>{const dy=state.days[k];if(r&&r.since&&k<r.since)return;
+      if(it.kind==='water'){done+=(dy&&dy.water)||0;need+=S.waterGoal;}
+      else if(it.kind==='ex'){done+=(dy&&dy.exercises&&dy.exercises[r.id])||0;need+=exTarget(r,k);}
+      else if(it.kind==='cnt'){done+=(dy&&dy.counters&&dy.counters[r.id])||0;need+=counterGoalOn(r,k)||r.goal||0;}
+      else if(it.kind==='lim'){if(k<=tk){passedDays++;if(((dy&&dy.limits&&dy.limits[r.id])||0)>limitMaxOn(r,k))broke=true;else cleanDays++;}}});
+    cw[it.key]=(it.kind==='lim')?{pct:broke?0:Math.round(cleanDays/7*100),broke,cleanDays,passedDays}:{pct:need>0?Math.min(100,Math.round(done/need*100)):0,done,need};});
   return items.map(it=>({label:it.label,xp:agg[it.key],cur:cw[it.key],kind:it.kind}));}
 function weeklyBonusXP(){return weeklyBonusData().reduce((a,b)=>a+b.xp,0);}
 function cumXP(L){return (L-1)*(15*L+70);} // XP щоб досягти рівня L
@@ -1080,8 +1082,12 @@ function openXP(){const xi=levelInfo(xpTotal()),tk=todayKey(),today=dayXP(tk),mu
   const bd=xpBreakdown(tk);
   const chips=bd.length?`<div class="xp-chips">`+bd.map(c=>{const p=Math.round(c.pts);return `<div class="xp-chip ${p>=0?'pos':'neg'}" title="${esc(c.label)}"><div class="lab">${esc(c.label)}</div><div class="pts">${p>=0?'+':''}${p}</div></div>`;}).join('')+`</div>`:'<div class="muted" style="text-align:center;padding:14px">Сьогодні ще немає даних — почни виконувати цілі 💪</div>';
   const wbd=weeklyBonusData(),wb=wbd.reduce((a,b)=>a+b.xp,0);
-  const wbRows=wbd.map(b=>{const c=b.cur||{pct:0};const on=c.pct>=100;
-    return `<div class="between" style="padding:4px 0"><span style="${b.xp>0?'':'color:var(--muted)'}">${esc(b.label)}</span><span style="display:flex;align-items:center;gap:8px"><span title="цей тиждень" style="font-size:11px;font-weight:700;padding:2px 7px;border-radius:7px;background:${on?'rgba(79,197,150,.16)':'rgba(255,255,255,.05)'};color:${on?'var(--green)':'var(--muted)'}">${on?'✓ тиждень':c.pct+'%'}</span><b style="color:${b.xp>0?'var(--green)':'var(--muted)'};min-width:56px;text-align:right">${b.xp>0?'+':''}${fmt(b.xp)} XP</b></span></div>`;}).join('');
+  const wbRows=wbd.map(b=>{const c=b.cur||{pct:0};const isLim=b.kind==='lim';
+    const done=isLim?(!c.broke&&c.cleanDays>=7):(c.pct>=100);
+    const txt=isLim?(c.broke?'✗ зірвано':(done?'✓ тиждень':c.cleanDays+'/7 днів')):(done?'✓ норма':c.pct+'%');
+    const col=done?'var(--green)':(isLim&&c.broke?'var(--red)':'var(--muted)');
+    const bg=done?'rgba(79,197,150,.16)':(isLim&&c.broke?'rgba(229,107,123,.14)':'rgba(255,255,255,.05)');
+    return `<div class="between" style="padding:4px 0"><span style="${b.xp>0?'':'color:var(--muted)'}">${esc(b.label)}</span><span style="display:flex;align-items:center;gap:8px"><span title="прогрес цього тижня" style="font-size:11px;font-weight:700;padding:2px 7px;border-radius:7px;background:${bg};color:${col};white-space:nowrap">${txt}</span><b style="color:${b.xp>0?'var(--green)':'var(--muted)'};min-width:56px;text-align:right">${b.xp>0?'+':''}${fmt(b.xp)} XP</b></span></div>`;}).join('');
   $('xpBody').innerHTML=`<div style="text-align:center;margin:4px 0 16px"><div style="font-size:46px;font-weight:800;line-height:1" class="neon-green">${xi.level}</div><div class="muted" style="font-size:11.5px;letter-spacing:1px;margin-top:3px">РІВЕНЬ · ${fmt(xi.total)} XP</div><div class="xp-bar" style="height:9px;margin:13px auto 6px;max-width:280px"><i style="width:${xi.pct}%"></i></div><div class="muted" style="font-size:12px">${fmt(xi.into)} / ${fmt(xi.span)} XP до рівня ${xi.level+1}</div></div>`+
     `<div class="between" style="margin:2px 0"><span style="font-size:13px;font-weight:700">Сьогодні по модулях</span>${bd.length?`<span style="font-weight:800;color:${today>=0?'var(--green)':'var(--red)'}">${today>=0?'+':''}${fmt(today)} XP</span>`:''}</div>${chips}`+
     (bd.length?`<div class="muted" style="font-size:11px;text-align:center;margin-top:10px">середнє по модулях × серія ×${mult}</div>`:'')+
