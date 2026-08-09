@@ -52,9 +52,18 @@
   .pill .big{font-size:20px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1}
   .pill .lbl{font-size:9.5px; color:var(--muted); letter-spacing:.4px; text-transform:uppercase}
   .neon-cyan{color:var(--cyan)} .neon-purple{color:var(--purple)} .neon-green{color:var(--green)} .neon-red{color:var(--red)}
-  .tx-filters{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}
-  .tx-filters input,.tx-filters select{background:var(--glass2);border:1px solid var(--stroke);border-radius:10px;color:var(--text);font-family:inherit;font-size:12.5px;padding:8px 10px;min-width:0}
-  .tx-filters #txQ{grid-column:1/-1}
+  .tx-filters{display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap}
+  .tx-filters input[type=date],.tx-filters select{background:var(--glass2);border:1px solid var(--stroke);border-radius:9px;color:var(--text);font-family:inherit;font-size:12px;font-weight:600;padding:6px 8px;min-width:0;outline:none}
+  .tx-filters input[type=date]{width:118px;color-scheme:dark}
+  .tx-filters input[type=date]::-webkit-calendar-picker-indicator{filter:invert(.62);cursor:pointer;opacity:.7;padding:0;margin-left:2px}
+  .tx-filters input[type=date]:focus,.tx-filters select:focus{border-color:rgba(92,201,221,.55)}
+  .tx-filters select{appearance:none;-webkit-appearance:none;padding-right:20px;max-width:150px;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%238791a3' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 6px center}
+  .tx-filters select option{background:#141a2e}
+  .tx-dash{color:var(--muted);font-size:12px}
+  .tx-sep{flex:1 1 8px;min-width:0}
+  .tx-chip{background:transparent;border:1px solid var(--stroke);border-radius:9px;color:var(--muted);font-family:inherit;font-size:11.5px;font-weight:700;padding:6px 9px;cursor:pointer;white-space:nowrap}
+  .tx-chip.on{background:rgba(92,201,221,.14);border-color:rgba(92,201,221,.45);color:var(--cyan)}
+  @media(hover:hover){.tx-chip:hover{border-color:rgba(255,255,255,.24);color:var(--text)}}
   .tx-list{max-height:340px;overflow:auto;border:1px solid var(--stroke);border-radius:12px}
   .tx-day{position:sticky;top:0;background:#111627;padding:5px 11px;font-size:11px;font-weight:700;color:var(--muted);border-bottom:1px solid var(--stroke);z-index:1}
   .tx-item{display:flex;align-items:center;gap:9px;padding:8px 11px;border-bottom:1px solid rgba(255,255,255,.05)}
@@ -415,12 +424,17 @@
     </div>
     <div id="txPanel" class="hidden">
       <div class="tx-filters">
-        <input type="date" id="txFrom" onchange="renderTx()" title="Від дати">
-        <input type="date" id="txTo" onchange="renderTx()" title="До дати">
+        <input type="date" id="txFrom" onchange="txMark('')||renderTx()" title="Від дати">
+        <span class="tx-dash">–</span>
+        <input type="date" id="txTo" onchange="txMark('')||renderTx()" title="До дати">
         <select id="txCat" onchange="renderTx()"><option value="">усі категорії</option></select>
-        <input type="search" id="txQ" placeholder="пошук у коментарях…" oninput="renderTx()">
+        <span class="tx-sep"></span>
+        <button class="tx-chip" data-p="today" onclick="txPreset('today')">Сьогодні</button>
+        <button class="tx-chip" data-p="yday" onclick="txPreset('yday')">Вчора</button>
+        <button class="tx-chip" data-p="month" onclick="txPreset('month')">Місяць</button>
+        <button class="tx-chip" data-p="prev" onclick="txPreset('prev')">Минулий</button>
+        <button class="tx-chip" data-p="all" onclick="txPreset('all')">Усе</button>
       </div>
-      <div class="chip-row" style="margin:8px 0"><button class="sm" onclick="txPreset('month')">Цей місяць</button><button class="sm" onclick="txPreset('prev')">Минулий</button><button class="sm" onclick="txPreset('7')">7 днів</button><button class="sm" onclick="txPreset('30')">30 днів</button><button class="sm" onclick="txPreset('all')">Усе</button></div>
       <div id="txSummary" class="muted" style="font-size:12.5px;margin-bottom:6px"></div>
       <div id="txList"></div>
     </div>
@@ -1794,21 +1808,22 @@ async function testPush(){
 /* ===== ТРАНЗАКЦІЇ: фільтр по даті + список з коментарями ===== */
 let txOpen=false;
 function toggleTx(){txOpen=!txOpen;$('txPanel').classList.toggle('hidden',!txOpen);$('txToggle').textContent=txOpen?'Сховати':'Показати';if(txOpen){if(!$('txFrom').value&&!$('txTo').value)txPreset('month');else renderTx();}}
+function txMark(p){document.querySelectorAll('.tx-chip').forEach(b=>b.classList.toggle('on',b.dataset.p===p));return false;}
 function txPreset(p){
-  const f=$('txFrom'),t=$('txTo');const today=new Date();
+  const f=$('txFrom'),t=$('txTo');
   if(p==='all'){f.value='';t.value='';}
+  else if(p==='today'){f.value=todayKey();t.value=todayKey();}
+  else if(p==='yday'){const d=new Date();d.setDate(d.getDate()-1);f.value=dayKey(d);t.value=dayKey(d);}
   else if(p==='month'){const mk=monthKey();f.value=mk+'-01';t.value=todayKey();}
   else if(p==='prev'){const pm=prevMonth(monthKey()),[y,m]=pm.split('-').map(Number);f.value=pm+'-01';t.value=pm+'-'+String(new Date(y,m,0).getDate()).padStart(2,'0');}
-  else {const n=+p;const d=new Date(today);d.setDate(d.getDate()-(n-1));f.value=dayKey(d);t.value=todayKey();}
-  renderTx();
+  txMark(p);renderTx();
 }
 function txRows(){
   const from=$('txFrom')?$('txFrom').value:'',to=$('txTo')?$('txTo').value:'';
-  const cat=$('txCat')?$('txCat').value:'',q=($('txQ')?$('txQ').value:'').trim().toLowerCase();
+  const cat=$('txCat')?$('txCat').value:'';
   return (expRows||[]).filter(r=>{
     if(from&&r.d<from)return false; if(to&&r.d>to)return false;
     if(cat&&r.cat!==cat)return false;
-    if(q&&!((r.comm||'').toLowerCase().includes(q)||(r.cat||'').toLowerCase().includes(q)||(r.sub||'').toLowerCase().includes(q)))return false;
     return true;}).sort((a,b)=>b.d.localeCompare(a.d));
 }
 function renderTx(){
