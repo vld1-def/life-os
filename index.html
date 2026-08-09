@@ -52,6 +52,17 @@
   .pill .big{font-size:20px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1}
   .pill .lbl{font-size:9.5px; color:var(--muted); letter-spacing:.4px; text-transform:uppercase}
   .neon-cyan{color:var(--cyan)} .neon-purple{color:var(--purple)} .neon-green{color:var(--green)} .neon-red{color:var(--red)}
+  .tx-filters{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}
+  .tx-filters input,.tx-filters select{background:var(--glass2);border:1px solid var(--stroke);border-radius:10px;color:var(--text);font-family:inherit;font-size:12.5px;padding:8px 10px;min-width:0}
+  .tx-filters #txQ{grid-column:1/-1}
+  .tx-list{max-height:340px;overflow:auto;border:1px solid var(--stroke);border-radius:12px}
+  .tx-day{position:sticky;top:0;background:#111627;padding:5px 11px;font-size:11px;font-weight:700;color:var(--muted);border-bottom:1px solid var(--stroke);z-index:1}
+  .tx-item{display:flex;align-items:center;gap:9px;padding:8px 11px;border-bottom:1px solid rgba(255,255,255,.05)}
+  .tx-item:last-child{border-bottom:0}
+  .tx-main{flex:1;min-width:0}
+  .tx-cat{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tx-comm{font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tx-sum{font-weight:800;font-size:14px;color:var(--red);white-space:nowrap;font-variant-numeric:tabular-nums}
   .mobile-only{display:none}
   .xp-chips{display:grid; grid-template-columns:repeat(auto-fill,minmax(88px,1fr)); gap:8px; margin-top:10px}
   .xp-chip{border-radius:13px; padding:11px 8px; text-align:center; background:rgba(255,255,255,.04); border:1px solid var(--stroke)}
@@ -398,6 +409,21 @@
     </div>
     <div id="finChart" style="margin-top:8px"></div>
     <div id="catBreak"></div>
+    <div class="between" style="margin-top:18px">
+      <div class="sec-title" style="margin:0">🧾 Транзакції</div>
+      <div class="flex"><button class="sm" onclick="toggleTx()" id="txToggle">Показати</button></div>
+    </div>
+    <div id="txPanel" class="hidden">
+      <div class="tx-filters">
+        <input type="date" id="txFrom" onchange="renderTx()" title="Від дати">
+        <input type="date" id="txTo" onchange="renderTx()" title="До дати">
+        <select id="txCat" onchange="renderTx()"><option value="">усі категорії</option></select>
+        <input type="search" id="txQ" placeholder="пошук у коментарях…" oninput="renderTx()">
+      </div>
+      <div class="chip-row" style="margin:8px 0"><button class="sm" onclick="txPreset('month')">Цей місяць</button><button class="sm" onclick="txPreset('prev')">Минулий</button><button class="sm" onclick="txPreset('7')">7 днів</button><button class="sm" onclick="txPreset('30')">30 днів</button><button class="sm" onclick="txPreset('all')">Усе</button></div>
+      <div id="txSummary" class="muted" style="font-size:12.5px;margin-bottom:6px"></div>
+      <div id="txList"></div>
+    </div>
     <div class="sec-title" style="margin-top:18px">💳 Кредити — впиши поточний борг (зберігається на сьогодні)</div>
     <div id="loanList"></div>
     <div class="between" style="margin-top:16px">
@@ -859,9 +885,9 @@ function save(){ render(); scheduleSync(); }
 let expRows=null;
 async function loadExpenses(){
   if(!sb) return;
-  const {data,error}=await sb.from('expenses').select('sum,categoria,subcategory,date').eq('who',ME);
+  const {data,error}=await sb.from('expenses').select('sum,categoria,subcategory,date,comm,metod').eq('who',ME);
   if(error){ toast('Витрати: '+error.message); return; }
-  expRows=data.map(r=>({sum:+r.sum||0,cat:r.categoria||'—',sub:r.subcategory||'без підкатегорії',ym:(r.date||'').slice(0,7),day:+((r.date||'').slice(8,10))||0}));
+  expRows=data.map(r=>({sum:+r.sum||0,cat:r.categoria||'—',sub:r.subcategory||'без підкатегорії',ym:(r.date||'').slice(0,7),day:+((r.date||'').slice(8,10))||0,d:(r.date||'').slice(0,10),comm:r.comm||'',metod:r.metod||''}));
   renderFinance();
 }
 function monthTotal(ym){return (expRows||[]).reduce((s,r)=>s+(r.ym===ym?r.sum:0),0);}
@@ -1630,42 +1656,43 @@ function monthStats(mkArg){
 /* ===== ЗВІТ МІСЯЦЯ КАРТИНКОЮ ===== */
 function monthReportStats(mkArg){
   const mk=mkArg||monthKey();const s=monthStats(mk);const C=state.settings.counters;const stepC=C.find(c=>/крок|steps/i.test(c.name)),bookC=C.find(c=>/книг|book/i.test(c.name)),gymC=C.find(c=>/зал|gym/i.test(c.name));
-  const exL=state.settings.exercises||[],exTot={};
-  let totSteps=0,bestStepsDay=0,waterMl=0,activeDays=0,socialMin=0,sleepTot=0,sleepN=0,bookPages=0,gymSessions=0;
+  const exL=state.settings.exercises||[],exTot={},exRecM={};
+  const pushEx=exL.find(e=>/віджим|push/i.test(e.name)),squatEx=exL.find(e=>/присід|squat/i.test(e.name)),plankEx=exL.find(e=>/планк|plank/i.test(e.name));
+  let totSteps=0,bestStepsDay=0,waterMl=0,activeDays=0,socialMin=0,sleepTot=0,sleepN=0,bookPages=0,gymSessions=0,restUsed=0;
   for(let dd=1;dd<=s.elapsed;dd++){const k=mk+'-'+String(dd).padStart(2,'0'),d=state.days[k];
     if(screenApps[k])socialMin+=Object.values(screenApps[k]).reduce((a,b)=>a+b,0);
     const sh=sleepHours(k);if(sh>0){sleepTot+=sh;sleepN++;}
+    if(state.restDays&&state.restDays[k])restUsed++;
     if(!d)continue;activeDays++;
-    exL.forEach(ex=>{exTot[ex.id]=(exTot[ex.id]||0)+((d.exercises&&d.exercises[ex.id])||0);});
+    exL.forEach(ex=>{exTot[ex.id]=(exTot[ex.id]||0)+((d.exercises&&d.exercises[ex.id])||0);const ms=exMaxSet(ex.id,k);if(ms>(exRecM[ex.id]||0))exRecM[ex.id]=ms;});
     if(stepC){const v=(d.counters&&d.counters[stepC.id])||0;totSteps+=v;if(v>bestStepsDay)bestStepsDay=v;}
     if(bookC)bookPages+=(d.counters&&d.counters[bookC.id])||0;
     if(gymC)gymSessions+=(d.counters&&d.counters[gymC.id])||0;
     waterMl+=d.water||0;}
-  const bs=badgeStats();
-  return {...s,totSteps,avgSteps:activeDays?Math.round(totSteps/activeDays):0,bestStepsDay,waterL:Math.round(waterMl/100)/10,activeDays,hasSteps:!!stepC,bookPages,gymSessions,
+  return {...s,totSteps,avgSteps:activeDays?Math.round(totSteps/activeDays):0,bestStepsDay,waterL:Math.round(waterMl/100)/10,activeDays,hasSteps:!!stepC,bookPages,gymSessions,restUsed,
     exTotals:exL.map(ex=>({name:ex.name,total:exTot[ex.id]||0})).filter(e=>e.total>0),
     socialH:Math.round(socialMin/60*10)/10,sleepTot:Math.round(sleepTot),sleepAvg:sleepN?Math.round(sleepTot/sleepN*10)/10:0,avgSpent:s.elapsed?Math.round(s.spent/s.elapsed):0,
-    recPush:bs.recPushSet,recSquat:bs.recSquatSet,recPlank:bs.recPlankSet,streak:computeStreak()};
+    recPush:pushEx?(exRecM[pushEx.id]||0):0,recSquat:squatEx?(exRecM[squatEx.id]||0):0,recPlank:plankEx?(exRecM[plankEx.id]||0):0,streak:computeStreak()};
 }
 function buildMonthReportSVG(mkArg){
   const mk=mkArg||monthKey(),[yy,mm]=mk.split('-').map(Number);
   const r=monthReportStats(mk),mn=new Date(yy,mm-1,1).toLocaleDateString('uk-UA',{month:'long',year:'numeric'}),cur=state.settings.currency||'₴';
   const W=800,H=1000,pad=60;  // 4:5
   const C={green:'#4fc596',cyan:'#5cc9dd',purple:'#9d8ad6',blue:'#7cc5ff',yellow:'#e3bd68',red:'#e56b7b',white:'#e7ecf3'};
-  // плитки лише з наявних даних цього профілю
+  // плитки за активними модулями профілю; якщо даних немає — показуємо 0
   const tiles=[];
-  if(r.hasSteps&&r.totSteps>0){tiles.push([C.white,fmt(r.totSteps),'кроків за місяць']);tiles.push([C.cyan,fmt(r.avgSteps),'середньо/день']);}
-  const perDay=(v,u)=>r.activeDays?('≈'+(Math.round(v/r.activeDays*10)/10)+' '+u+'/день'):'';
-  if(mod('water')&&r.waterL>0)tiles.push([C.blue,r.waterL+' л','води випито',perDay(r.waterL,'л')]);
+  const perDay=(v,u)=>r.activeDays?('≈'+(Math.round(v/r.activeDays*10)/10)+' '+u+'/день'):('0 '+u+'/день');
+  if(r.hasSteps){tiles.push([C.white,fmt(r.totSteps),'кроків за місяць']);tiles.push([C.cyan,fmt(r.avgSteps),'середньо/день']);}
+  if(mod('water'))tiles.push([C.blue,r.waterL+' л','води випито',perDay(r.waterL,'л')]);
   tiles.push([C.green,r.good+'/'+r.daysIn,'хороші дні']);
-  if(mod('sleep')&&r.sleepTot>0){tiles.push([C.purple,r.sleepTot+' год','сну всього']);tiles.push([C.purple,r.sleepAvg+' год','сон/ніч']);}
-  if(PROFILE==='me'&&r.gamesH>0)tiles.push([C.yellow,r.gamesH+' год','CS2',perDay(r.gamesH,'год')]);
-  if(r.socialH>0)tiles.push([C.yellow,r.socialH+' год','соцмережі',perDay(r.socialH,'год')]);
+  if(mod('sleep')){tiles.push([C.purple,r.sleepTot+' год','сну всього']);tiles.push([C.purple,r.sleepAvg+' год','сон/ніч']);}
+  if(PROFILE==='me')tiles.push([C.yellow,(r.gamesH||0)+' год','CS2',perDay(r.gamesH||0,'год')]);
+  tiles.push([C.yellow,(r.socialH||0)+' год','соцмережі',perDay(r.socialH||0,'год')]);
   if(r.gymSessions>0)tiles.push([C.green,fmt(r.gymSessions),'занять у залі']);
   if(r.bookPages>0)tiles.push([C.cyan,fmt(r.bookPages),'сторінок прочитано']);
-  if(mod('finance')&&r.spent>0){tiles.push([C.red,fmt(Math.round(r.spent))+' '+cur,'витрати']);tiles.push([C.red,fmt(r.avgSpent)+' '+cur,'витрати/день']);}
+  if(mod('finance')){tiles.push([C.red,fmt(Math.round(r.spent||0))+' '+cur,'витрати']);tiles.push([C.red,fmt(r.avgSpent||0)+' '+cur,'витрати/день']);}
   const dv=y=>`<line x1="${pad}" y1="${y}" x2="${W-pad}" y2="${y}" stroke="rgba(255,255,255,0.09)" stroke-width="1"/>`;
-  const recs=[];if(r.recPush>0)recs.push('💪 '+r.recPush);if(r.recSquat>0)recs.push('🦵 '+r.recSquat);if(r.recPlank>0)recs.push('🧘 '+r.recPlank+'с');
+  const recs=[];if(mod('activity')){recs.push('💪 '+(r.recPush||0));recs.push('🦵 '+(r.recSquat||0));recs.push('🧘 '+(r.recPlank||0)+'с');}
   const botA=recs.length?740:900,topA=250,rows=Math.max(1,Math.ceil(tiles.length/2));
   const gap=rows>1?Math.min(104,(botA-topA)/(rows-1)):0,startY=Math.round((topA+botA)/2-(rows-1)*gap/2);
   const colX=[W*0.28,W*0.72];
@@ -1673,13 +1700,13 @@ function buildMonthReportSVG(mkArg){
     sg+=`<text x="${cx}" y="${y}" font-size="40" font-weight="800" text-anchor="middle" fill="${st[0]}" font-family="Arial,sans-serif">${st[1]}</text><text x="${cx}" y="${y+27}" font-size="16.5" text-anchor="middle" fill="#8791a3" font-family="Arial,sans-serif">${st[2]}</text>${st[3]?`<text x="${cx}" y="${y+43}" font-size="12" text-anchor="middle" fill="#5a6273" font-family="Arial,sans-serif">${st[3]}</text>`:''}`;});
   const exTotStr=(r.exTotals||[]).map(e=>`${esc(e.name)} ${fmt(e.total)}`).join('    ·    ');
   const totLine=exTotStr?`<text x="${W/2}" y="892" font-size="15.5" text-anchor="middle" fill="#8791a3" font-family="Arial,sans-serif">${exTotStr}</text>`:'';
-  const recBlock=recs.length?`${dv(756)}<text x="${W/2}" y="805" font-size="17" text-anchor="middle" fill="#8791a3" letter-spacing="2" font-family="Arial,sans-serif">РЕКОРДИ ЗА ПІДХІД</text><text x="${W/2}" y="853" font-size="36" font-weight="800" text-anchor="middle" fill="#e7ecf3" font-family="Arial,sans-serif">${recs.join('   ·   ')}</text>${totLine}`:'';
+  const recBlock=recs.length?`${dv(756)}<text x="${W/2}" y="805" font-size="17" text-anchor="middle" fill="#8791a3" letter-spacing="2" font-family="Arial,sans-serif">РЕКОРДИ ЗА ПІДХІД · ЦЕЙ МІСЯЦЬ</text><text x="${W/2}" y="853" font-size="36" font-weight="800" text-anchor="middle" fill="#e7ecf3" font-family="Arial,sans-serif">${recs.join('   ·   ')}</text>${totLine}`:'';
   return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;border-radius:16px">
     <defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5cc9dd"/><stop offset="1" stop-color="#9d8ad6"/></linearGradient></defs>
     <rect width="${W}" height="${H}" fill="#0a0c14"/>
     <text x="${pad}" y="82" font-size="24" font-weight="800" fill="url(#rg)" letter-spacing="5" font-family="Arial,sans-serif">LIFE OS</text>
     <text x="${pad}" y="148" font-size="44" font-weight="800" fill="#e7ecf3" font-family="Arial,sans-serif">${mn}</text>
-    <text x="${pad}" y="185" font-size="20" fill="#8791a3" font-family="Arial,sans-serif">${profileName()} · ${r.activeDays} днів активності · 🔥 серія ${r.streak}</text>
+    <text x="${pad}" y="185" font-size="20" fill="#8791a3" font-family="Arial,sans-serif">${profileName()} · ${r.activeDays} днів активності · 🔥 серія ${r.streak} · 🛡 захист ${r.restUsed||0}</text>
     ${dv(218)}
     ${sg}
     ${recBlock}
@@ -1764,8 +1791,48 @@ async function testPush(){
   catch(e){try{new Notification('LIFE OS',{body:'✅ Тест'});}catch(_){toast('Не вдалося показати');return;}}
   toast('Надіслано ✅');
 }
+/* ===== ТРАНЗАКЦІЇ: фільтр по даті + список з коментарями ===== */
+let txOpen=false;
+function toggleTx(){txOpen=!txOpen;$('txPanel').classList.toggle('hidden',!txOpen);$('txToggle').textContent=txOpen?'Сховати':'Показати';if(txOpen){if(!$('txFrom').value&&!$('txTo').value)txPreset('month');else renderTx();}}
+function txPreset(p){
+  const f=$('txFrom'),t=$('txTo');const today=new Date();
+  if(p==='all'){f.value='';t.value='';}
+  else if(p==='month'){const mk=monthKey();f.value=mk+'-01';t.value=todayKey();}
+  else if(p==='prev'){const pm=prevMonth(monthKey()),[y,m]=pm.split('-').map(Number);f.value=pm+'-01';t.value=pm+'-'+String(new Date(y,m,0).getDate()).padStart(2,'0');}
+  else {const n=+p;const d=new Date(today);d.setDate(d.getDate()-(n-1));f.value=dayKey(d);t.value=todayKey();}
+  renderTx();
+}
+function txRows(){
+  const from=$('txFrom')?$('txFrom').value:'',to=$('txTo')?$('txTo').value:'';
+  const cat=$('txCat')?$('txCat').value:'',q=($('txQ')?$('txQ').value:'').trim().toLowerCase();
+  return (expRows||[]).filter(r=>{
+    if(from&&r.d<from)return false; if(to&&r.d>to)return false;
+    if(cat&&r.cat!==cat)return false;
+    if(q&&!((r.comm||'').toLowerCase().includes(q)||(r.cat||'').toLowerCase().includes(q)||(r.sub||'').toLowerCase().includes(q)))return false;
+    return true;}).sort((a,b)=>b.d.localeCompare(a.d));
+}
+function renderTx(){
+  if(!$('txList'))return;
+  const cur=state.settings.currency,rows=txRows();
+  // селектор категорій (одноразово наповнюємо)
+  const sel=$('txCat');
+  if(sel&&sel.options.length<=1&&expRows){const cats=[...new Set(expRows.map(r=>r.cat))].sort();sel.innerHTML='<option value="">усі категорії</option>'+cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');}
+  const total=rows.reduce((a,r)=>a+r.sum,0);
+  const days=new Set(rows.map(r=>r.d)).size;
+  $('txSummary').innerHTML=rows.length?`<b style="color:var(--text)">${rows.length}</b> транзакцій · <b style="color:var(--red)">${fmt(Math.round(total))} ${cur}</b>${days?` · ≈${fmt(Math.round(total/days))} ${cur}/день`:''}`:'';
+  if(!rows.length){$('txList').innerHTML='<div class="empty">немає транзакцій за цей період</div>';return;}
+  let html='<div class="tx-list">',lastD='';
+  rows.slice(0,300).forEach(r=>{
+    if(r.d!==lastD){lastD=r.d;const dt=new Date(r.d+'T00:00:00');const dayTot=rows.filter(x=>x.d===r.d).reduce((a,x)=>a+x.sum,0);
+      html+=`<div class="tx-day">${dt.toLocaleDateString(LOC(),{weekday:'short',day:'numeric',month:'short'})} · ${fmt(Math.round(dayTot))} ${cur}</div>`;}
+    html+=`<div class="tx-item"><div class="tx-main"><div class="tx-cat">${esc(r.cat)}${r.sub&&r.sub!=='без підкатегорії'?' <span class="muted" style="font-weight:400">· '+esc(r.sub)+'</span>':''}</div>${r.comm?`<div class="tx-comm">💬 ${esc(r.comm)}</div>`:''}</div><div class="tx-sum">${fmt(Math.round(r.sum))}</div></div>`;
+  });
+  html+='</div>'+(rows.length>300?`<div class="muted" style="font-size:11px;margin-top:6px">показано перші 300 із ${rows.length}</div>`:'');
+  $('txList').innerHTML=html;
+}
 function renderFinance(){
   const mk=monthKey(),pmk=prevMonth(mk),cur=state.settings.currency;
+  if(txOpen)renderTx();
   $('finMonthLabel').textContent=new Date().toLocaleDateString(LOC(),{month:'long',year:'numeric'});
   const have=!!expRows;
   const exp=have?monthTotal(mk):0, pexp=have?monthTotal(pmk):0;
