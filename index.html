@@ -1807,6 +1807,8 @@ async function testPush(){
 }
 /* ===== ТРАНЗАКЦІЇ: фільтр по даті + список з коментарями ===== */
 let txOpen=false;
+let showClosedLoans=localStorage.getItem('lifeos_showClosedLoans')==='1'; // закриті кредити за замовчуванням приховані
+function toggleClosedLoans(){showClosedLoans=!showClosedLoans;localStorage.setItem('lifeos_showClosedLoans',showClosedLoans?'1':'0');renderFinance();}
 function toggleTx(){txOpen=!txOpen;$('txPanel').classList.toggle('hidden',!txOpen);$('txToggle').textContent=txOpen?'Сховати':'Показати';if(txOpen){if(!$('txFrom').value&&!$('txTo').value)txPreset('month');else renderTx();}}
 function txMark(p){document.querySelectorAll('.tx-chip').forEach(b=>b.classList.toggle('on',b.dataset.p===p));return false;}
 function txPreset(p){
@@ -1883,14 +1885,20 @@ function renderFinance(){
     }
     $('catBreak').innerHTML=html;
   } else $('catBreak').innerHTML='';
-  // кредити
-  $('loanList').innerHTML=state.settings.loans.map(l=>{
+  // кредити (закриті можна приховати)
+  {const all=state.settings.loans, closed=all.filter(l=>loanLatest(l.id)===0);
+   const list=showClosedLoans?all:all.filter(l=>loanLatest(l.id)!==0);
+   let lh=list.map(l=>{
     const latest=loanLatest(l.id), todayVal=(state.loanLog[l.id]||{})[todayKey()];
     const pend=monthEndKey(1), pv=loanValAt(l.id,pend);
     let info='<span class="muted">впиши поточний борг →</span>';
     if(latest!=null){info='борг: <b>'+fmt(latest)+' '+cur+'</b>';if(latest===0)info='<span class="up">🎉 закрито!</span>';else if(pv!=null){const df=latest-pv;info+=df<0?` <span class="up">▼ ${fmt(Math.abs(df))} за міс</span>`:df>0?` <span class="down">▲ ${fmt(df)} за міс</span>`:'';}}
-    return `<div class="row"><div style="flex:1"><div>${l.name}</div><div class="delta">${info}</div></div><div class="flex"><input type="number" placeholder="${latest!=null?latest:'борг сьогодні'}" value="${todayVal??''}" style="width:130px" onchange="setLoanToday('${l.id}',this.value)"><span class="muted">${cur}</span></div></div>`;
-  }).join('')||'<div class="empty">Додай кредити в налаштуваннях</div>';
+    return `<div class="row"${latest===0?' style="opacity:.6"':''}><div style="flex:1"><div>${l.name}</div><div class="delta">${info}</div></div><div class="flex"><input type="number" placeholder="${latest!=null?latest:'борг сьогодні'}" value="${todayVal??''}" style="width:130px" onchange="setLoanToday('${l.id}',this.value)"><span class="muted">${cur}</span></div></div>`;
+   }).join('');
+   if(!all.length)lh='<div class="empty">Додай кредити в налаштуваннях</div>';
+   else if(!list.length)lh='<div class="empty">🎉 усі кредити закриті</div>';
+   if(closed.length)lh+=`<button class="sm" style="margin-top:8px" onclick="toggleClosedLoans()">${showClosedLoans?'Сховати закриті':'Показати закриті ('+closed.length+')'}</button>`;
+   $('loanList').innerHTML=lh;}
   // графік боргу
   $('dcM').className='sm '+(debtChart==='month'?'acc':'');
   $('dcD').className='sm '+(debtChart==='day'?'acc':'');
