@@ -964,16 +964,25 @@ const _c={};
 // параметри вправи, що діяли у день k (історія змін у ex.hist, як maxHist у лімітів);
 // без hist — поточні значення (стара поведінка). Минулі дні рахуються за старими нормами.
 function exParamsOn(ex,k){const h=ex.hist;if(!h||!h.length)return ex;let p=h[0];for(const e of h){if(e.d<=k)p=e;else break;}return p;}
+// ⏸ пауза вправи (травма/біль): день у паузі не рахується в бал і XP, ціль не росте і штрафу немає
+function exPausedOn(ex,k){const ps=ex.pauses;if(!ps||!ps.length)return false;return ps.some(p=>k>=p.from&&(!p.to||k<=p.to));}
+function exPausedNow(ex){return exPausedOn(ex,todayKey());}
+function toggleExPause(id){const ex=state.settings.exercises.find(e=>e.id===id);if(!ex)return;ex.pauses=ex.pauses||[];const tk=todayKey();const open=ex.pauses.find(p=>!p.to&&tk>=p.from);
+  if(open){if(open.from===tk)ex.pauses=ex.pauses.filter(p=>p!==open);else open.to=dayKey(new Date(Date.now()-86400000));toast('▶ '+ex.name+' — знову в ділі');}
+  else{ex.pauses.push({from:tk,to:null});toast('⏸ '+ex.name+' на паузі — не впливає на бал і XP');}
+  Object.keys(_c).forEach(k=>delete _c[k]);save();}
 // «чиста» прогресія цілі — росте на grow щодня, БЕЗ штрафу; скидається до бази 1-го числа кожного місяця
 function exProg(ex,k){const ck='P'+ex.id+'|'+k;if(_c[ck]!=null)return _c[ck];const pr=exParamsOn(ex,k);const p=prevKey(k);if(!state.days[p]||p.slice(0,7)!==k.slice(0,7)||(ex.since&&p<ex.since))return _c[ck]=pr.base;
+  if(exPausedOn(ex,k))return _c[ck]=exProg(ex,p); // на паузі ціль не росте
   return _c[ck]=Math.min(2000,Math.round(exProg(ex,p)+(pr.grow||0)));}
 // ціль дня = чиста прогресія + штраф за недобір проти РЕАЛЬНОЇ вчорашньої цілі (тягнеться, поки не наздоженеш);
 // сам штраф обмежений (base×5), щоб не вибухав до 2000; на 1-ше число місяця все скидається до бази
 function exTarget(ex,k){const ck=ex.id+'|'+k;if(_c[ck]!=null)return _c[ck];const pr=exParamsOn(ex,k);const p=prevKey(k);if(!state.days[p]||p.slice(0,7)!==k.slice(0,7)||(ex.since&&p<ex.since))return _c[ck]=pr.base;
+  if(exPausedOn(ex,k))return _c[ck]=exProg(ex,k); // на паузі — ціль заморожена, без штрафу
   const prog=Math.min(2000,Math.round(exProg(ex,p)+(pr.grow||0)));
   const pd=(state.days[p].exercises&&state.days[p].exercises[ex.id])||0;
   const cap=(pr.base||1)*5; // ліміт штрафної надбавки
-  const penalty=Math.min(cap,Math.max(0,exTarget(ex,p)-pd)*(pr.penalty||0)); // недобір проти вчорашньої ЦІЛІ (зі штрафом)
+  const penalty=exPausedOn(ex,p)?0:Math.min(cap,Math.max(0,exTarget(ex,p)-pd)*(pr.penalty||0)); // після паузи штрафу немає
   return _c[ck]=Math.min(2000,Math.round(prog+penalty));}
 // розмір штрафної надбавки у ціль конкретного дня (0 = штрафу немає)
 function exPenaltyOn(ex,k){const p=prevKey(k);if(!state.days[p])return 0;const clean=Math.min(2000,Math.round(exProg(ex,p)+(exParamsOn(ex,k).grow||0)));return Math.max(0,exTarget(ex,k)-clean);}
@@ -1054,7 +1063,7 @@ function exXP(done,target){if(target<=0)return 0;return goalXP(done/target);}
 function limitXP(v,mx){if(mx<=0)return 0;return v<=mx?100:-50;}
 function xpComponents(k){const d=state.days[k];if(!d||dayEmpty(d))return [];const S=state.settings,out=[];
   if(mod('water'))out.push(goalXP((d.water||0)/(S.waterGoal||1)));
-  if(mod('activity'))S.exercises.forEach(ex=>{if(ex.since&&k<ex.since)return;out.push(exXP((d.exercises&&d.exercises[ex.id])||0,exTarget(ex,k)));});
+  if(mod('activity'))S.exercises.forEach(ex=>{if((ex.since&&k<ex.since)||exPausedOn(ex,k))return;out.push(exXP((d.exercises&&d.exercises[ex.id])||0,exTarget(ex,k)));});
   if(mod('counters'))S.counters.forEach(c=>{if(c.mode==='week'||(c.since&&k<c.since))return;const g=counterGoalOn(c,k)||c.goal||0;out.push(goalXP(g?((d.counters&&d.counters[c.id])||0)/g:0));});
   if(mod('limits'))S.limitHabits.forEach(l=>{if(l.mode==='week'||(l.since&&k<l.since))return;out.push(limitXP((d.limits&&d.limits[l.id])||0,limitMaxOn(l,k)));});
   return out;}
@@ -1062,7 +1071,7 @@ function dayXPraw(k){const c=xpComponents(k);if(!c.length)return 0;return c.redu
 // розклад балів дня по модулях (для вікна рівня)
 function xpBreakdown(k){const d=state.days[k];if(!d||dayEmpty(d))return [];const S=state.settings,out=[];
   if(mod('water'))out.push({label:'💧 Вода',pts:goalXP((d.water||0)/(S.waterGoal||1))});
-  if(mod('activity'))S.exercises.forEach(ex=>{if(ex.since&&k<ex.since)return;out.push({label:'💪 '+ex.name,pts:exXP((d.exercises&&d.exercises[ex.id])||0,exTarget(ex,k))});});
+  if(mod('activity'))S.exercises.forEach(ex=>{if((ex.since&&k<ex.since)||exPausedOn(ex,k))return;out.push({label:'💪 '+ex.name,pts:exXP((d.exercises&&d.exercises[ex.id])||0,exTarget(ex,k))});});
   if(mod('counters'))S.counters.forEach(c=>{if(c.mode==='week'||(c.since&&k<c.since))return;const g=counterGoalOn(c,k)||c.goal||0;out.push({label:'🔢 '+c.name,pts:goalXP(g?((d.counters&&d.counters[c.id])||0)/g:0)});});
   if(mod('limits'))S.limitHabits.forEach(l=>{if(l.mode==='week'||(l.since&&k<l.since))return;out.push({label:'🚫 '+l.name,pts:limitXP((d.limits&&d.limits[l.id])||0,limitMaxOn(l,k))});});
   return out;}
@@ -1095,7 +1104,7 @@ function weeklyBonusData(){const S=state.settings,WB=50;
     for(let wk=new Date(firstMon);wk<curMon;wk.setDate(wk.getDate()+7)){
       const wd=[];for(let i=0;i<7;i++){const dd=new Date(wk);dd.setDate(dd.getDate()+i);wd.push(dayKey(dd));}
       const wkStart=wd[0];if(wd.filter(k=>state.days[k]&&!dayEmpty(state.days[k])).length<5)continue;
-      items.forEach(it=>{const r=it.ref;if(r&&r.since&&wkStart<r.since)return;
+      items.forEach(it=>{const r=it.ref;if(r&&r.since&&wkStart<r.since)return;if(it.kind==='ex'&&wd.some(k=>exPausedOn(r,k)))return;
         // норма — за ВСІ 7 днів тижня (а не лише за дні з даними)
         if(it.kind==='water'){let d=0,g=0;wd.forEach(k=>{d+=(state.days[k]&&state.days[k].water)||0;g+=S.waterGoal;});if(g>0&&d>=g)agg[it.key]+=WB;}
         else if(it.kind==='ex'){let d=0,t=0;wd.forEach(k=>{d+=(state.days[k]&&state.days[k].exercises&&state.days[k].exercises[r.id])||0;t+=exTarget(r,k);});if(t>0&&d>=t)agg[it.key]+=WB;}
@@ -1160,7 +1169,7 @@ function dayEmpty(d){ // день існує, але нічого не зало�
 function dayComponents(k){const d=state.days[k];if(!d||dayEmpty(d))return null;const S=state.settings,a=[];
   const add=o=>{o.ratio=compRatio(o);o.pct=o.ratio;o.ok=(o.kind==='limit')?(o.v<=o.mx):(o.v>=o.goal);a.push(o);};
   if(mod('water'))add({label:'Вода',kind:'goal',v:d.water||0,goal:S.waterGoal,txt:((d.water||0)/1000).toFixed(1)+'л / '+(S.waterGoal/1000)+'л'});
-  if(mod('activity'))S.exercises.forEach(ex=>{if(ex.since&&k<ex.since)return;const t=exTarget(ex,k),v=d.exercises[ex.id]||0;add({label:ex.name,kind:'goal',v,goal:t,txt:v+' / '+t});});
+  if(mod('activity'))S.exercises.forEach(ex=>{if((ex.since&&k<ex.since)||exPausedOn(ex,k))return;const t=exTarget(ex,k),v=d.exercises[ex.id]||0;add({label:ex.name,kind:'goal',v,goal:t,txt:v+' / '+t});});
   if(mod('limits'))S.limitHabits.forEach(l=>{if(l.mode==='week'||(l.since&&k<l.since))return;const v=d.limits[l.id]||0,mx=limitMaxOn(l,k);add({label:l.name,kind:'limit',v,mx,txt:v+' / ≤'+mx+(l.unit?(' '+l.unit):'')});});
   if(mod('counters'))S.counters.forEach(c=>{if(c.mode==='week'||(c.since&&k<c.since))return;const v=d.counters[c.id]||0,g=counterGoalOn(c,k);add({label:c.name,kind:'goal',v,goal:g,txt:fmt(v)+' / '+fmt(g)});});
   return a;}
@@ -1192,11 +1201,13 @@ function render(){
   $('waterBar').style.width=Math.min(100,d.water/S.waterGoal*100)+'%';
 
   $('exList').innerHTML=S.exercises.map(ex=>{const t=exTarget(ex,ad),done=d.exercises[ex.id]||0,grow=ex.grow||0,pen=grow===0&&t>ex.base,ok=done>=t;
-    const tag=pen?`<span class="tag pen">штраф ×${ex.penalty}</span>`:(grow>0?`<span class="tag ok">↑ +${grow}/день</span>`:'');
+    const paused=exPausedOn(ex,ad);
+    const tag=paused?`<span class="tag" style="background:rgba(227,189,104,.16);border-color:rgba(227,189,104,.4);color:var(--yellow)">⏸ пауза</span>`:(pen?`<span class="tag pen">штраф ×${ex.penalty}</span>`:(grow>0?`<span class="tag ok">↑ +${grow}/день</span>`:''));
     const sets=exSetsOf(ex.id,ad),maxSet=exMaxSet(ex.id,ad),rec=exRecord(ex.id);
     const chips=sets.map((s,i)=>`<span class="setchip" onclick="delSet('${ex.id}',${i})" title="прибрати підхід">${s}<b>×</b></span>`).join('');
-    return `<div class="row-ex"><div class="between"><span>${ex.name} ${tag}</span><span class="muted cnt">${done} / ${t}${ok?' ✅':''}</span></div>`+
-      `<div class="bar" style="margin:6px 0"><i class="g-green" style="width:${Math.min(100,done/t*100)}%"></i></div>`+
+    const pauseBtn=`<button class="sm" onclick="toggleExPause('${ex.id}')" title="${paused?'Зняти паузу':'Пауза — травма/біль: вправа не впливає на бал і XP'}" style="padding:4px 8px;font-size:12px">${paused?'▶':'⏸'}</button>`;
+    return `<div class="row-ex"${paused?' style="opacity:.62"':''}><div class="between"><span>${ex.name} ${tag}</span><span class="flex" style="gap:7px">${paused?'<span class="muted cnt">на паузі</span>':`<span class="muted cnt">${done} / ${t}${ok?' ✅':''}</span>`}${pauseBtn}</span></div>`+
+      (paused?`<div class="muted" style="font-size:11.5px;margin:6px 0 2px">Не рахується в бал дня, XP і тижневі бонуси. Ціль заморожена на ${t} — після відновлення продовжиться з неї.</div>`:`<div class="bar" style="margin:6px 0"><i class="g-green" style="width:${Math.min(100,done/t*100)}%"></i></div>`)+
       `<div class="ex-sets">${chips}<input type="number" inputmode="numeric" id="setin-${ex.id}" class="setin" placeholder="підхід" onkeydown="if(event.key==='Enter')addSet('${ex.id}')"><button class="sm acc" onclick="addSet('${ex.id}')" title="Додати підхід">+</button><span class="muted setrec">${maxSet?('макс '+maxSet+' · '):''}🏆 ${rec}</span></div></div>`;
   }).join('')||'<div class="empty">Додай вправи в налаштуваннях</div>';
 
