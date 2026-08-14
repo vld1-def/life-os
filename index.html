@@ -342,6 +342,20 @@
   </div>
 </div>
 
+<div id="authGate" class="gate hidden">
+  <div class="gate-inner" style="max-width:360px">
+    <h1>LIFE&nbsp;<span>OS</span></h1>
+    <div class="gate-sub">🔒 Вхід — Влад</div>
+    <form onsubmit="event.preventDefault();doLogin();" style="margin-top:8px">
+      <input id="authEmail" type="email" autocomplete="username" placeholder="Пошта" style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--stroke);background:rgba(255,255,255,.05);color:var(--text);font-size:15px;margin-bottom:9px;box-sizing:border-box">
+      <input id="authPass" type="password" autocomplete="current-password" placeholder="Пароль" style="width:100%;padding:13px;border-radius:12px;border:1px solid var(--stroke);background:rgba(255,255,255,.05);color:var(--text);font-size:15px;margin-bottom:9px;box-sizing:border-box">
+      <button class="acc" type="submit" id="authBtn" style="width:100%;padding:13px;font-size:15px">Увійти</button>
+    </form>
+    <div id="authMsg" class="muted" style="margin-top:10px;font-size:12.5px;min-height:18px"></div>
+    <button class="sm" onclick="location.href=location.pathname+'?pick=1'" style="margin-top:12px;opacity:.7">← Інший профіль</button>
+  </div>
+</div>
+
 <div id="app" class="hidden">
 <header>
   <div class="hdr-title-row"><h1>LIFE&nbsp;<span>OS</span></h1><div class="sub" id="todayLabel"></div></div>
@@ -365,6 +379,7 @@
           <button onclick="hdrMenuAction(openBadges)">🏅 Бейджі<span class="cnt" id="hdrBadge"></span></button>
           <button onclick="hdrMenuAction(toggleLang)"><span id="hdrLang">🌐 English</span></button>
           <button onclick="hdrMenuAction(openSettings)">⚙️ Налаштування</button>
+          <button id="hdrLogout" class="hidden" onclick="hdrMenuAction(doLogout)">🚪 Вийти</button>
         </div>
       </div>
     </div>
@@ -521,6 +536,7 @@
       <button class="menu-btn acc" onclick="openNotifs()">🔔 Сповіщення<span class="cnt" id="mNotif"></span></button>
       <button class="menu-btn acc" onclick="openSettings()">⚙️ Налаштування</button>
       <button class="menu-btn acc" onclick="toggleLang()"><span id="mLang">🌐 English</span></button>
+      <button class="menu-btn acc hidden" id="mLogout" onclick="doLogout()">🚪 Вийти</button>
     </div>
   </div>
 
@@ -784,6 +800,24 @@ async function snapshotBackup(){
   }catch(e){}
 }
 /* ===== АВТЕНТИФІКАЦІЯ ===== */
+/* ===== ВХІД (Supabase Auth) — профіль «me» під паролем ===== */
+const AUTH_PROFILE='me'; // цей профіль вимагає входу
+function needAuth(){return PROFILE===AUTH_PROFILE;}
+async function hasSession(){if(!sb)return false;try{const {data}=await sb.auth.getSession();return !!(data&&data.session);}catch(e){return false;}}
+function showAuthGate(msg){const g=$('authGate');if(!g)return;g.classList.remove('hidden');const m=$('authMsg');if(m&&msg){m.textContent=msg;m.style.color='var(--red)';}const e=$('authEmail');if(e)setTimeout(()=>e.focus(),100);}
+async function doLogin(){
+  const em=($('authEmail').value||'').trim(), pw=$('authPass').value||'';
+  const btn=$('authBtn'), msg=$('authMsg');
+  if(!em||!pw){msg.textContent='Впиши пошту і пароль';msg.style.color='var(--red)';return;}
+  btn.disabled=true;btn.textContent='Заходжу…';msg.textContent='';
+  const {error}=await sb.auth.signInWithPassword({email:em,password:pw});
+  btn.disabled=false;btn.textContent='Увійти';
+  if(error){msg.textContent=/Invalid login/i.test(error.message)?'Невірна пошта або пароль':error.message;msg.style.color='var(--red)';$('authPass').value='';return;}
+  msg.textContent='✓ Вхід виконано';msg.style.color='var(--green)';
+  $('authGate').classList.add('hidden');
+  boot();
+}
+async function doLogout(){if(!sb)return;if(!confirm('Вийти з профілю? Локальні дані на цьому пристрої буде очищено (усе лишиться в хмарі).'))return;try{await sb.auth.signOut();}catch(e){}try{localStorage.removeItem(cacheKey);}catch(e){}location.replace(location.pathname+'?u='+encodeURIComponent(PROFILE));}
 async function boot(){
   if(!configured) return;
   if(!urlU){ // немає ?u=: якщо профіль вже обирали — заходимо одразу (для PWA), інакше показуємо вибір
@@ -791,6 +825,7 @@ async function boot(){
     if(remembered && !new URLSearchParams(location.search).has('pick')){ location.replace(location.pathname+'?u='+encodeURIComponent(remembered)); return; }
     showProfileGate(); return;
   }
+  if(needAuth() && !(await hasSession())){ showAuthGate(); return; } // профіль під паролем — спершу вхід
   let started=false;
   const start=()=>{if(started)return;started=true;enterApp();};
   snapshotBackup(); // синхронно фіксує локальний кеш у bak_<id> ще до перезапису при завантаженні
@@ -823,7 +858,7 @@ async function loadProfilesRegistry(){ if(!sb)return; try{const {data}=await sb.
 async function loadProfiles(){ await loadProfilesRegistry(); if(!profiles.find(p=>p.id===PROFILE)){profiles.push({id:PROFILE,name:(urlU||PROFILE),emoji:'🧑'});await saveProfiles();} updateGameLink(); }
 async function saveProfiles(){ if(!sb)return; try{await sb.from('solo').upsert({id:'__profiles__',data:{list:profiles}});}catch(e){} }
 async function showProfileGate(){ await loadProfilesRegistry(); renderGate(); applyLang(); $('gate').classList.remove('hidden'); }
-function renderGate(){$('gateList').innerHTML=profiles.map(p=>`<div class="gate-card" onclick="switchProfile('${p.id}')"><div class="ge">${p.avatar||p.emoji||'👤'}</div><div class="gn">${p.name}</div>`+(p.id==='me'?'<div class="gtag">твої дані</div>':'')+`</div>`).join('');}
+function renderGate(){$('gateList').innerHTML=profiles.map(p=>`<div class="gate-card" onclick="switchProfile('${p.id}')"><div class="ge">${p.avatar||p.emoji||'👤'}</div><div class="gn">${p.name}${p.id===AUTH_PROFILE?' 🔒':''}</div>`+(p.id==='me'?'<div class="gtag">твої дані</div>':'')+`</div>`).join('');}
 function switchProfile(id){localStorage.setItem('lifeos_profile',id);location.href=location.pathname+'?u='+encodeURIComponent(id);}
 function addProfile(){const name=($('newProfileName').value||'').trim();if(!name)return;let id=slugify(name);if(id==='me'||profiles.find(p=>p.id===id))id=id+'-'+Math.random().toString(36).slice(2,5);profiles.push({id,name,emoji:'🧑'});saveProfiles();$('newProfileName').value='';switchProfile(id);}
 function deleteProfile(id){if(id==='me')return;if(!confirm('Видалити профіль «'+((profiles.find(p=>p.id===id)||{}).name||id)+'» разом з його даними?'))return;profiles=profiles.filter(p=>p.id!==id);saveProfiles();if(sb){const clean=structuredClone(defaults);clean.badges={};sb.from('solo').upsert({id:'profile_'+id,data:clean,updated_at:new Date().toISOString()}).then(()=>sb.from('solo').delete().eq('id','profile_'+id));}if(PROFILE===id)switchProfile('me');else if($('gate')&&!$('gate').classList.contains('hidden'))renderGate();}
@@ -854,6 +889,7 @@ function updateHdrMenu(){
   const hb=$('hdrBadge');if(hb)hb.textContent=bc||'';
   const dot=$('hdrDot');if(dot)dot.style.display=(nc||bc)?'block':'none';
   const ml=$('mLang');if(ml)ml.textContent=lang==='en'?'🌐 Українською':'🌐 English';
+  if(needAuth()){const a=$('hdrLogout'),b=$('mLogout');if(a)a.classList.remove('hidden');if(b)b.classList.remove('hidden');}
   const mn=$('mNotif');if(mn)mn.textContent=nc||'';
   const mb=$('mBadge');if(mb)mb.textContent=bc||'';
 }
