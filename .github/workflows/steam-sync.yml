@@ -2,8 +2,15 @@ name: Steam playtime sync
 
 on:
   schedule:
-    - cron: '0 5 * * *'   # 05:00 UTC = 08:00 за Києвом (літній час)
-  workflow_dispatch:       # можна запустити вручну для тесту
+    - cron: '0 5 * * *'    # 05:00 UTC = 08:00 Київ — основний
+    - cron: '30 8 * * *'   # 11:30 Київ — страховка, якщо cron затримався
+    - cron: '0 13 * * *'   # 16:00 Київ — остання страховка
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Перезаписати снапшот, навіть якщо він уже є'
+        type: boolean
+        default: false
 
 jobs:
   sync:
@@ -15,18 +22,24 @@ jobs:
           STEAM_ID: ${{ secrets.STEAM_ID }}
           SB_URL: ${{ secrets.SB_URL }}
           SB_KEY: ${{ secrets.SB_KEY }}
+          FORCE: ${{ inputs.force }}
         run: |
           node <<'EOF'
           const https=require('https');
-          const get=u=>new Promise((res,rej)=>{https.get(u,r=>{let d='';r.on('data',c=>d+=c);r.on('end',()=>res(d));}).on('error',rej);});
+          const get=(u,h)=>new Promise((res,rej)=>{https.get(u,{headers:h||{}},r=>{let d='';r.on('data',c=>d+=c);r.on('end',()=>res(d));}).on('error',rej);});
           (async()=>{
-            const {STEAM_KEY,STEAM_ID,SB_URL,SB_KEY}=process.env;
+            const {STEAM_KEY,STEAM_ID,SB_URL,SB_KEY,FORCE}=process.env;
+            const now=new Date(Date.now()+3*3600*1000); // Київ UTC+3
+            const date=now.toISOString().slice(0,10);
+            // снапшот дня фіксуємо ОДИН раз (щоб дублюючі запуски не зсували межу доби)
+            if(FORCE!=='true'){
+              const ex=await get(SB_URL+'/rest/v1/steam_playtime?date=eq.'+date+'&select=date',{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY});
+              try{ if(JSON.parse(ex).length){console.log('Снапшот за',date,'вже є — пропускаю');return;} }catch(e){}
+            }
             const raw=await get(`https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?key=${STEAM_KEY}&steamid=${STEAM_ID}&include_played_free_games=1&format=json`);
             const games=(JSON.parse(raw).response||{}).games||[];
             const total=games.reduce((s,g)=>s+(g.playtime_forever||0),0);
             if(!games.length){console.error('Профіль приватний або немає ігор');process.exit(1);}
-            const now=new Date(Date.now()+3*3600*1000); // Київ UTC+3
-            const date=now.toISOString().slice(0,10);
             const body=JSON.stringify([{date,total_minutes:total}]);
             const url=new URL(SB_URL+'/rest/v1/steam_playtime?on_conflict=date');
             await new Promise((res,rej)=>{
