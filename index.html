@@ -370,7 +370,9 @@
         <button class="acc" onclick="openNotifs()" style="position:relative">🔔<span id="notifBadge">0</span></button>
         <button class="acc" id="langBtn" onclick="toggleLang()">EN</button>
         <button class="acc" onclick="openBadges()" style="position:relative">🏅<span id="badgeReady">0</span></button>
+        <button class="acc hidden" id="dSteam" onclick="syncSteamNow()" title="Оновити Steam вручну">🎮</button>
         <button class="acc" onclick="openSettings()">⚙️</button>
+        <button class="acc hidden" id="dLogout" onclick="doLogout()" title="Вийти з профілю">🚪</button>
       </div>
       <div class="hdr-menu-wrap">
         <button class="acc" onclick="toggleHdrMenu(event)" style="position:relative">⋯<span class="hdr-dot" id="hdrDot"></span></button>
@@ -891,7 +893,7 @@ function updateHdrMenu(){
   const hb=$('hdrBadge');if(hb)hb.textContent=bc||'';
   const dot=$('hdrDot');if(dot)dot.style.display=(nc||bc)?'block':'none';
   const ml=$('mLang');if(ml)ml.textContent=lang==='en'?'🌐 Українською':'🌐 English';
-  if(needAuth()){['hdrLogout','mLogout','hdrSteam','mSteam'].forEach(id=>{const el=$(id);if(el)el.classList.remove('hidden');});}
+  if(needAuth()){['hdrLogout','mLogout','hdrSteam','mSteam','dSteam','dLogout'].forEach(id=>{const el=$(id);if(el)el.classList.remove('hidden');});}
   const mn=$('mNotif');if(mn)mn.textContent=nc||'';
   const mb=$('mBadge');if(mb)mb.textContent=bc||'';
 }
