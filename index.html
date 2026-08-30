@@ -958,9 +958,27 @@ async function loadSteam(){
   steamPlay={};
   for(let i=0;i<data.length-1;i++){const delta=data[i+1].total_minutes-data[i].total_minutes;steamPlay[data[i].date]=Math.max(0,delta);}
   applySteam(); render();
+  autoSteamSync(); // якщо снапшоту за сьогодні ще немає — тихо запускаємо синк
 }
 /* ===== Ручний синк Steam (якщо автоматика затрималась) ===== */
 const GH_REPO='vld1-def/life-os';
+let _autoSteamTried=false;
+// автосинк при відкритті застосунку: cron GitHub часто спізнюється, а застосунок відкривається щодня
+async function autoSteamSync(){
+  if(_autoSteamTried||PROFILE!=='me'||!sb)return;_autoSteamTried=true;
+  const tok=localStorage.getItem('gh_token');if(!tok)return; // без токена — тихо, prompt лише по кнопці
+  const tk=todayKey();
+  if(await steamSnapExists(tk))return;
+  try{
+    const r=await fetch(`https://api.github.com/repos/${GH_REPO}/actions/workflows/steam-sync.yml/dispatches`,{method:'POST',
+      headers:{'Authorization':'Bearer '+tok,'Accept':'application/vnd.github+json','Content-Type':'application/json'},
+      body:JSON.stringify({ref:'main',inputs:{force:'false'}})});
+    if(r.status===204){let n=0;const iv=setInterval(async()=>{n++;
+      if(await steamSnapExists(tk)){clearInterval(iv);await loadSteam();toast('🎮 Steam підтягнуто');}
+      else if(n>=10)clearInterval(iv);},5000);}
+    else if(r.status===401||r.status===403)localStorage.removeItem('gh_token');
+  }catch(e){}
+}
 async function steamSnapExists(dk){try{const {data}=await sb.from('steam_playtime').select('date').eq('date',dk).maybeSingle();return !!data;}catch(e){return false;}}
 async function syncSteamNow(){
   if(!sb){toast('Немає звʼязку');return;}
