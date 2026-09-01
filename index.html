@@ -1063,6 +1063,37 @@ function toggleExPause(id){const ex=state.settings.exercises.find(e=>e.id===id);
   if(open){if(open.from===tk)ex.pauses=ex.pauses.filter(p=>p!==open);else open.to=dayKey(new Date(Date.now()-86400000));toast('▶ '+ex.name+' — знову в ділі');}
   else{ex.pauses.push({from:tk,to:null});toast('⏸ '+ex.name+' на паузі — не впливає на бал і XP');}
   Object.keys(_c).forEach(k=>delete _c[k]);save();}
+/* ===== Розбір цілі: звідки взялося число ===== */
+function explainTarget(exId,k){
+  const ex=state.settings.exercises.find(e=>e.id===exId);if(!ex)return;
+  const pr=exParamsOn(ex,k),p=prevKey(k);
+  const rows=[];
+  const newMonth=p.slice(0,7)!==k.slice(0,7), beforeSince=ex.since&&p<ex.since;
+  const t=exTarget(ex,k);
+  if(exPausedOn(ex,k)){rows.push(['⏸ День на паузі','ціль заморожена']);}
+  else if(newMonth||beforeSince){rows.push([newMonth?'1-ше число місяця — скид':'перший день вправи','база '+pr.base]);}
+  else{
+    const prog=Math.min(2000,Math.round(exProg(ex,p)+(pr.grow||0)));
+    const days=(()=>{let n=0,c=k;while(true){const q=prevKey(c);if(q.slice(0,7)!==c.slice(0,7)||(ex.since&&q<ex.since))break;n++;c=q;if(n>40)break;}return n;})();
+    rows.push(['База (1-ше числа)',pr.base]);
+    rows.push([`Зростання: ${days} дн × +${pr.grow||0}`,'+'+(prog-pr.base)]);
+    rows.push(['= Чиста ціль',prog]);
+    const pd=(state.days[p]&&state.days[p].exercises&&state.days[p].exercises[ex.id])||0;
+    const pt=exTarget(ex,p),logged=dayLogged(p),pausedPrev=exPausedOn(ex,p);
+    if(pausedPrev)rows.push(['Вчора була пауза','штрафу немає']);
+    else if(!logged)rows.push(['Вчора нічого не логував','штрафу немає']);
+    else if(pd>=pt)rows.push([`Вчора виконано ${pd}/${pt} ✅`,'штрафу немає']);
+    else{const cap=(pr.base||1)*5,raw=Math.max(0,pt-pd)*(pr.penalty||0),pen=Math.min(cap,raw);
+      rows.push([`Вчора ${pd} з ${pt} — недобір ${pt-pd}`,'']);
+      rows.push([`Штраф: ${pt-pd} × ${pr.penalty||0}`,'+'+raw+(raw>cap?` (обрізано до ${cap})`:'')]);}
+  }
+  const html=`<div style="font-weight:700;margin-bottom:8px">${esc(ex.name)} · ${k}</div>`+
+    rows.map(r=>`<div class="between" style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.06)"><span class="muted" style="font-size:12.5px">${r[0]}</span><b>${r[1]}</b></div>`).join('')+
+    `<div class="between" style="padding:9px 0 2px;font-weight:800"><span>Ціль дня</span><b class="neon-cyan" style="font-size:19px">${t}</b></div>`+
+    `<div class="muted" style="font-size:11px;margin-top:8px">Прогресія рахується по календарю від 1-го числа — синк Steam/кроків її не змінює.</div>`;
+  $('pauseBody').innerHTML=html+`<button class="btn sm" style="margin-top:12px;width:100%;padding:10px" onclick="openPauseDlg('${exId}')">⏸ Періоди паузи</button>`;
+  pauseDlg.showModal();
+}
 /* ===== Пауза за період (у т.ч. заднім числом) ===== */
 let _pauseEx=null;
 function openPauseDlg(id){_pauseEx=id;renderPauseDlg();pauseDlg.showModal();}
@@ -1334,7 +1365,7 @@ function render(){
     const sets=exSetsOf(ex.id,ad),maxSet=exMaxSet(ex.id,ad),rec=exRecord(ex.id);
     const chips=sets.map((s,i)=>`<span class="setchip" onclick="delSet('${ex.id}',${i})" title="прибрати підхід">${s}<b>×</b></span>`).join('');
     const pauseBtn=`<button class="sm" onclick="toggleExPause('${ex.id}')" title="${paused?'Зняти паузу':'Пауза з сьогодні'}" style="padding:4px 8px;font-size:12px">${paused?'▶':'⏸'}</button><button class="sm" onclick="openPauseDlg('${ex.id}')" title="Періоди паузи (можна заднім числом)" style="padding:4px 7px;font-size:11px;opacity:.75">📅</button>`;
-    return `<div class="row-ex"${paused?' style="opacity:.62"':''}><div class="between"><span>${ex.name} ${tag}</span><span class="flex" style="gap:7px">${paused?'<span class="muted cnt">на паузі</span>':`<span class="muted cnt">${done} / ${t}${ok?' ✅':''}</span>`}${pauseBtn}</span></div>`+
+    return `<div class="row-ex"${paused?' style="opacity:.62"':''}><div class="between"><span>${ex.name} ${tag}</span><span class="flex" style="gap:7px">${paused?'<span class="muted cnt">на паузі</span>':`<span class="muted cnt" onclick="explainTarget('${ex.id}','${ad}')" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px" title="Звідки взялася ця ціль?">${done} / ${t}${ok?' ✅':''}</span>`}${pauseBtn}</span></div>`+
       (paused?`<div class="muted" style="font-size:11.5px;margin:6px 0 2px">Не рахується в бал дня, XP і тижневі бонуси. Ціль заморожена на ${t} — після відновлення продовжиться з неї.</div>`:`<div class="bar" style="margin:6px 0"><i class="g-green" style="width:${Math.min(100,done/t*100)}%"></i></div>`)+
       `<div class="ex-sets">${chips}<input type="number" inputmode="numeric" id="setin-${ex.id}" class="setin" placeholder="підхід" onkeydown="if(event.key==='Enter')addSet('${ex.id}')"><button class="sm acc" onclick="addSet('${ex.id}')" title="Додати підхід">+</button><span class="muted setrec">${maxSet?('макс '+maxSet+' · '):''}🏆 ${rec}</span></div></div>`;
   }).join('')||'<div class="empty">Додай вправи в налаштуваннях</div>';
