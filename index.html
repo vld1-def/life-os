@@ -657,6 +657,12 @@
   <div id="monthReportBody" style="margin-top:12px"></div>
 </dialog>
 
+<dialog id="pauseDlg">
+  <div class="between"><h2 style="margin:0">⏸ Пауза вправи</h2><button class="sm" onclick="pauseDlg.close()">✕</button></div>
+  <div class="muted" style="margin:6px 0 12px;font-size:12.5px">Дні на паузі не рахуються в бал, XP і тижневі бонуси; ціль не росте і штрафу немає.</div>
+  <div id="pauseBody"></div>
+</dialog>
+
 <dialog id="xpInfo">
   <div class="between"><h2 style="margin:0">📈 Рівень і XP</h2><button class="sm" onclick="xpInfo.close()">✕</button></div>
   <div id="xpBody" style="margin-top:12px"></div>
@@ -1057,6 +1063,36 @@ function toggleExPause(id){const ex=state.settings.exercises.find(e=>e.id===id);
   if(open){if(open.from===tk)ex.pauses=ex.pauses.filter(p=>p!==open);else open.to=dayKey(new Date(Date.now()-86400000));toast('▶ '+ex.name+' — знову в ділі');}
   else{ex.pauses.push({from:tk,to:null});toast('⏸ '+ex.name+' на паузі — не впливає на бал і XP');}
   Object.keys(_c).forEach(k=>delete _c[k]);save();}
+/* ===== Пауза за період (у т.ч. заднім числом) ===== */
+let _pauseEx=null;
+function openPauseDlg(id){_pauseEx=id;renderPauseDlg();pauseDlg.showModal();}
+function renderPauseDlg(){
+  const ex=state.settings.exercises.find(e=>e.id===_pauseEx);if(!ex)return;
+  const ps=(ex.pauses||[]).slice().sort((a,b)=>a.from.localeCompare(b.from));
+  const rows=ps.length?ps.map((p,i)=>`<div class="row"><div style="flex:1"><b>${p.from}</b> → <b>${p.to||'…триває'}</b></div><button class="sm del" onclick="delPause(${i})">✕</button></div>`).join(''):'<div class="empty">періодів немає</div>';
+  const tk=todayKey();
+  $('pauseBody').innerHTML=`<div style="font-weight:700;margin-bottom:6px">${esc(ex.name)}</div>${rows}
+    <div class="sec-title" style="margin-top:14px">Додати період</div>
+    <div class="tx-filters" style="margin-top:6px">
+      <input type="date" id="pFrom" value="${tk}"><span class="tx-dash">–</span><input type="date" id="pTo" value="${tk}">
+      <span class="tx-sep"></span><button class="tx-chip" onclick="addPause()">Додати</button>
+    </div>
+    <div class="muted" style="font-size:11.5px;margin-top:8px">Порожнє «по» = пауза триває далі. Можна ставити заднім числом — минулі дні перерахуються.</div>`;
+}
+function addPause(){
+  const ex=state.settings.exercises.find(e=>e.id===_pauseEx);if(!ex)return;
+  const f=$('pFrom').value, t=$('pTo').value||null;
+  if(!f){toast('Вкажи дату «з»');return;}
+  if(t&&t<f){toast('«По» раніше за «з»');return;}
+  ex.pauses=(ex.pauses||[]).concat([{from:f,to:t}]);
+  Object.keys(_c).forEach(k=>delete _c[k]);save();renderPauseDlg();toast('⏸ Пауза '+f+' → '+(t||'…'));
+}
+function delPause(i){
+  const ex=state.settings.exercises.find(e=>e.id===_pauseEx);if(!ex||!ex.pauses)return;
+  const ps=ex.pauses.slice().sort((a,b)=>a.from.localeCompare(b.from));
+  const target=ps[i];ex.pauses=ex.pauses.filter(p=>p!==target);
+  Object.keys(_c).forEach(k=>delete _c[k]);save();renderPauseDlg();toast('Період прибрано');
+}
 // «чиста» прогресія цілі — росте на grow щодня, БЕЗ штрафу; скидається до бази 1-го числа кожного місяця
 function exProg(ex,k){const ck='P'+ex.id+'|'+k;if(_c[ck]!=null)return _c[ck];const pr=exParamsOn(ex,k);const p=prevKey(k);if(!state.days[p]||p.slice(0,7)!==k.slice(0,7)||(ex.since&&p<ex.since))return _c[ck]=pr.base;
   if(exPausedOn(ex,k))return _c[ck]=exProg(ex,p); // на паузі ціль не росте
@@ -1291,7 +1327,7 @@ function render(){
     const tag=paused?`<span class="tag" style="background:rgba(227,189,104,.16);border-color:rgba(227,189,104,.4);color:var(--yellow)">⏸ пауза</span>`:(pen?`<span class="tag pen">штраф ×${ex.penalty}</span>`:(grow>0?`<span class="tag ok">↑ +${grow}/день</span>`:''));
     const sets=exSetsOf(ex.id,ad),maxSet=exMaxSet(ex.id,ad),rec=exRecord(ex.id);
     const chips=sets.map((s,i)=>`<span class="setchip" onclick="delSet('${ex.id}',${i})" title="прибрати підхід">${s}<b>×</b></span>`).join('');
-    const pauseBtn=`<button class="sm" onclick="toggleExPause('${ex.id}')" title="${paused?'Зняти паузу':'Пауза — травма/біль: вправа не впливає на бал і XP'}" style="padding:4px 8px;font-size:12px">${paused?'▶':'⏸'}</button>`;
+    const pauseBtn=`<button class="sm" onclick="toggleExPause('${ex.id}')" title="${paused?'Зняти паузу':'Пауза з сьогодні'}" style="padding:4px 8px;font-size:12px">${paused?'▶':'⏸'}</button><button class="sm" onclick="openPauseDlg('${ex.id}')" title="Періоди паузи (можна заднім числом)" style="padding:4px 7px;font-size:11px;opacity:.75">📅</button>`;
     return `<div class="row-ex"${paused?' style="opacity:.62"':''}><div class="between"><span>${ex.name} ${tag}</span><span class="flex" style="gap:7px">${paused?'<span class="muted cnt">на паузі</span>':`<span class="muted cnt">${done} / ${t}${ok?' ✅':''}</span>`}${pauseBtn}</span></div>`+
       (paused?`<div class="muted" style="font-size:11.5px;margin:6px 0 2px">Не рахується в бал дня, XP і тижневі бонуси. Ціль заморожена на ${t} — після відновлення продовжиться з неї.</div>`:`<div class="bar" style="margin:6px 0"><i class="g-green" style="width:${Math.min(100,done/t*100)}%"></i></div>`)+
       `<div class="ex-sets">${chips}<input type="number" inputmode="numeric" id="setin-${ex.id}" class="setin" placeholder="підхід" onkeydown="if(event.key==='Enter')addSet('${ex.id}')"><button class="sm acc" onclick="addSet('${ex.id}')" title="Додати підхід">+</button><span class="muted setrec">${maxSet?('макс '+maxSet+' · '):''}🏆 ${rec}</span></div></div>`;
