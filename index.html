@@ -1094,17 +1094,23 @@ function delPause(i){
   Object.keys(_c).forEach(k=>delete _c[k]);save();renderPauseDlg();toast('Період прибрано');
 }
 // «чиста» прогресія цілі — росте на grow щодня, БЕЗ штрафу; скидається до бази 1-го числа кожного місяця
-function exProg(ex,k){const ck='P'+ex.id+'|'+k;if(_c[ck]!=null)return _c[ck];const pr=exParamsOn(ex,k);const p=prevKey(k);if(!state.days[p]||p.slice(0,7)!==k.slice(0,7)||(ex.since&&p<ex.since))return _c[ck]=pr.base;
+// чи був день реально залогований вручну (limits/counters пишуть автосинки Steam/кроків — їх не рахуємо)
+function dayLogged(k){const d=state.days[k];if(!d)return false;const anyPos=o=>o&&Object.values(o).some(v=>+v>0);
+  return !!(+d.water>0||(d.note&&String(d.note).trim())||(d.sleep&&(d.sleep.b||d.sleep.w))||+d.weight>0||anyPos(d.exercises));}
+// прогресія йде ПО КАЛЕНДАРЮ (не залежить від того, які дні існують) — інакше синк Steam/кроків,
+// що створює дні заднім числом, змінював би цілі минулих днів
+function exProg(ex,k){const ck='P'+ex.id+'|'+k;if(_c[ck]!=null)return _c[ck];const pr=exParamsOn(ex,k);const p=prevKey(k);if(p.slice(0,7)!==k.slice(0,7)||(ex.since&&p<ex.since))return _c[ck]=pr.base;
   if(exPausedOn(ex,k))return _c[ck]=exProg(ex,p); // на паузі ціль не росте
   return _c[ck]=Math.min(2000,Math.round(exProg(ex,p)+(pr.grow||0)));}
 // ціль дня = чиста прогресія + штраф за недобір проти РЕАЛЬНОЇ вчорашньої цілі (тягнеться, поки не наздоженеш);
 // сам штраф обмежений (base×5), щоб не вибухав до 2000; на 1-ше число місяця все скидається до бази
-function exTarget(ex,k){const ck=ex.id+'|'+k;if(_c[ck]!=null)return _c[ck];const pr=exParamsOn(ex,k);const p=prevKey(k);if(!state.days[p]||p.slice(0,7)!==k.slice(0,7)||(ex.since&&p<ex.since))return _c[ck]=pr.base;
+function exTarget(ex,k){const ck=ex.id+'|'+k;if(_c[ck]!=null)return _c[ck];const pr=exParamsOn(ex,k);const p=prevKey(k);if(p.slice(0,7)!==k.slice(0,7)||(ex.since&&p<ex.since))return _c[ck]=pr.base;
   if(exPausedOn(ex,k))return _c[ck]=exProg(ex,k); // на паузі — ціль заморожена, без штрафу
   const prog=Math.min(2000,Math.round(exProg(ex,p)+(pr.grow||0)));
-  const pd=(state.days[p].exercises&&state.days[p].exercises[ex.id])||0;
+  const pd=(state.days[p]&&state.days[p].exercises&&state.days[p].exercises[ex.id])||0;
   const cap=(pr.base||1)*5; // ліміт штрафної надбавки
-  const penalty=exPausedOn(ex,p)?0:Math.min(cap,Math.max(0,exTarget(ex,p)-pd)*(pr.penalty||0)); // після паузи штрафу немає
+  // штраф лише якщо вчора був робочий день (щось логував) і недовиконав; за дні без записів штрафу немає
+  const penalty=(exPausedOn(ex,p)||!dayLogged(p))?0:Math.min(cap,Math.max(0,exTarget(ex,p)-pd)*(pr.penalty||0));
   return _c[ck]=Math.min(2000,Math.round(prog+penalty));}
 // розмір штрафної надбавки у ціль конкретного дня (0 = штрафу немає)
 function exPenaltyOn(ex,k){const p=prevKey(k);if(!state.days[p])return 0;const clean=Math.min(2000,Math.round(exProg(ex,p)+(exParamsOn(ex,k).grow||0)));return Math.max(0,exTarget(ex,k)-clean);}
