@@ -944,7 +944,7 @@ function migrate(s){
   }
   return s;
 }
-function save(){ render(); scheduleSync(); }
+function save(){ refreezeDay(activeDay()); render(); scheduleSync(); } // редагування дня минулого місяця оновлює його заморожений бал
 
 /* ===== ВИТРАТИ З БАЗИ ===== */
 let expRows=null;
@@ -1098,22 +1098,8 @@ function openStreakDlg(){
       <button class="sm" style="margin-top:9px;width:100%" onclick="streakDlg.close();selectDay('${broke}');toast('Відкрито ' + '${broke}' + ' — постав 🛡 захист')">Відкрити цей день</button>
     </div>`;})():'';
   const riskyBlock=risky.length?`<div class="sec-title" style="margin-top:14px">⚠️ На межі (можуть випасти)</div>`+risky.map(fmtRow).join(''):'';
-  $('streakBody').innerHTML=head+brokeBlock+`<div class="sec-title">Дні серії (${rows.length})</div><div style="max-height:300px;overflow:auto">${rows.map(fmtRow).join('')}</div>`+riskyBlock+
-    `<button class="sm" style="margin-top:12px;width:100%" onclick="copyStreakDiag()">📋 Скопіювати діагностику</button>`;
+  $('streakBody').innerHTML=head+brokeBlock+`<div class="sec-title">Дні серії (${rows.length})</div><div style="max-height:300px;overflow:auto">${rows.map(fmtRow).join('')}</div>`+riskyBlock;
   streakDlg.showModal();
-}
-// діагностика серії — текст для надсилання
-function copyStreakDiag(){
-  const MIN=streakMin();let out='STREAK DIAG · поріг '+MIN+'% · серія '+computeStreak()+'\n';
-  let d=new Date();
-  for(let i=0;i<60;i++){const k=dayKey(d);
-    const rest=!!(state.restDays&&state.restDays[k]);
-    const sc=dayScore(k),comps=dayComponents(k);
-    const parts=comps?comps.map(c=>c.label+':'+Math.round(c.pct*100)+'%('+(c.txt||'')+')').join(' '):'—';
-    out+=k+' | '+(rest?'REST':(sc==null?'null':sc+'%'))+' | '+parts+'\n';
-    d.setDate(d.getDate()-1);}
-  try{navigator.clipboard.writeText(out);toast('📋 Скопійовано — вставляй у чат');}
-  catch(e){const ta=document.createElement('textarea');ta.value=out;ta.style.cssText='position:fixed;top:10%;left:5%;width:90%;height:60%;z-index:9999';document.body.appendChild(ta);ta.select();toast('Виділи і скопіюй вручну');}
 }
 /* ===== Розбір цілі: звідки взялося число ===== */
 function explainTarget(exId,k){
@@ -1265,7 +1251,24 @@ function toggleTask(id){const t=state.tasks.find(x=>x.id===id);if(t)t.done=!t.do
 function delTask(id){state.tasks=state.tasks.filter(x=>x.id!==id);save();}
 
 function limitMaxOn(l,k){const h=l&&l.maxHist;if(!h||!h.length)return l?l.max:0;let m=h[0].max;for(const e of h){if(e.d<=k)m=e.max;else break;}return m;}
-function dayScore(k){const comps=dayComponents(k);if(!comps)return null;if(!comps.length)return 0;let s=0;comps.forEach(c=>s+=c.ratio);return Math.round(s/comps.length*100);}
+// 🔒 ЗАМОРОЖЕНІ МІСЯЦІ: коли місяць завершився, його бали фіксуються — жодна зміна налаштувань
+// (ціль води, норми вправ, лічильники, модулі) вже не перераховує минуле заднім числом.
+function frozenScore(k){const f=state.frozen&&state.frozen[k.slice(0,7)];return f&&f[k]!=null?f[k]:null;}
+function freezePastMonths(){
+  const cur=monthKey();if(!state.frozen)state.frozen={};
+  const months={};Object.keys(state.days).forEach(k=>{const m=k.slice(0,7);if(m<cur)(months[m]=months[m]||[]).push(k);});
+  let changed=false;
+  Object.keys(months).forEach(m=>{
+    if(state.frozen[m])return; // місяць уже зафіксовано
+    const snap={};months[m].forEach(k=>{const sc=rawDayScore(k);if(sc!=null)snap[k]=sc;});
+    state.frozen[m]=snap;changed=true;});
+  if(changed)scheduleSync();
+}
+// перерахувати заморожений день (якщо редагуєш день минулого місяця — його бал оновиться)
+function refreezeDay(k){const m=k.slice(0,7);if(m>=monthKey())return;if(!state.frozen||!state.frozen[m])return;
+  const sc=rawDayScore(k);if(sc==null)delete state.frozen[m][k];else state.frozen[m][k]=sc;}
+function rawDayScore(k){const comps=dayComponents(k);if(!comps)return null;if(!comps.length)return 0;let s=0;comps.forEach(c=>s+=c.ratio);return Math.round(s/comps.length*100);}
+function dayScore(k){const fz=frozenScore(k);if(fz!=null)return fz;return rawDayScore(k);}
 /* ===== XP / РІВНІ ===== */
 // завдання-ціль (вода, вправи, лічильники): −50 якщо зовсім не робив → 100 за норму → +до 20 за перевищення (лінійно від −50 до 100)
 function goalXP(r){if(r>=1)return 100+Math.min(20,(r-1)*40);return 150*r-50;}
@@ -1404,6 +1407,7 @@ function render(){
   Object.keys(_c).forEach(k=>delete _c[k]);
   applyModules();
   applySteam(); applyScreen(); applySleepDB(); applyStepsDB();
+  freezePastMonths(); // фіксуємо бали завершених місяців — щоб зміни налаштувань не міняли минуле
   const tk=todayKey(),ad=activeDay(),d=peekDay(ad),S=state.settings;
   $('todayLabel').textContent=new Date().toLocaleDateString(LOC(),{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   $('waterCnt').textContent=(d.water/1000).toFixed(2);
