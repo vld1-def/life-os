@@ -1089,9 +1089,16 @@ function openStreakDlg(){
     const col=r.ok?'var(--green)':'var(--red)';
     return `<div class="between" style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,.06)"><span style="font-size:13px">${r.ok?'✅':'❌'} ${dt}${r.isToday?' <span class="muted">(сьогодні)</span>':''}</span><b style="color:${col};font-size:13px">${val}</b></div>`;};
   const head=`<div class="center" style="margin-bottom:12px"><div class="big neon-purple" style="font-size:38px">${computeStreak()}</div><div class="muted" style="font-size:12px">днів поспіль · поріг ${MIN}%</div></div>`;
-  const brokeBlock=broke?`<div style="background:rgba(229,107,123,.12);border:1px solid rgba(229,107,123,.35);border-radius:12px;padding:10px;margin-bottom:12px"><b style="color:var(--red)">Серію обірвав день ${new Date(broke+'T00:00:00').toLocaleDateString(LOC(),{day:'numeric',month:'long'})}</b><div class="muted" style="font-size:12px;margin-top:3px">${(()=>{const sc=dayScore(broke);return sc==null?'немає даних за цей день':'бал '+sc+'% — менше порога '+MIN+'%';})()}. Постав на нього 🛡 захист у календарі, щоб серія не рвалась.</div></div>`:'';
+  const brokeBlock=broke?(()=>{
+    const sc=dayScore(broke),comps=dayComponents(broke)||[];
+    const det=comps.length?'<div style="margin-top:8px">'+comps.map(c=>`<div class="between" style="padding:3px 0;font-size:12px"><span class="muted">${esc(c.label)}</span><span style="color:${c.pct>=1?'var(--green)':c.pct>=.5?'var(--yellow)':'var(--red)'}">${Math.round(c.pct*100)}% <span class="muted">(${esc(c.txt||'')})</span></span></div>`).join('')+'</div>':'';
+    return `<div style="background:rgba(229,107,123,.12);border:1px solid rgba(229,107,123,.35);border-radius:12px;padding:10px;margin-bottom:12px">
+      <b style="color:var(--red)">Серію обірвав ${new Date(broke+'T00:00:00').toLocaleDateString(LOC(),{day:'numeric',month:'long'})}</b>
+      <div class="muted" style="font-size:12px;margin-top:3px">${sc==null?'немає даних за цей день':'бал <b style="color:var(--text)">'+sc+'%</b> — поріг '+MIN+'%'}</div>${det}
+      <button class="sm" style="margin-top:9px;width:100%" onclick="streakDlg.close();selectDay('${broke}');toast('Відкрито ' + '${broke}' + ' — постав 🛡 захист')">Відкрити цей день</button>
+    </div>`;})():'';
   const riskyBlock=risky.length?`<div class="sec-title" style="margin-top:14px">⚠️ На межі (можуть випасти)</div>`+risky.map(fmtRow).join(''):'';
-  $('streakBody').innerHTML=head+brokeBlock+`<div class="sec-title">Останні дні</div><div style="max-height:300px;overflow:auto">${rows.slice(0,25).map(fmtRow).join('')}</div>`+riskyBlock;
+  $('streakBody').innerHTML=head+brokeBlock+`<div class="sec-title">Дні серії (${rows.length})</div><div style="max-height:300px;overflow:auto">${rows.map(fmtRow).join('')}</div>`+riskyBlock;
   streakDlg.showModal();
 }
 /* ===== Розбір цілі: звідки взялося число ===== */
