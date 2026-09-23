@@ -52,6 +52,11 @@
   .pill .big{font-size:20px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1}
   .pill .lbl{font-size:9.5px; color:var(--muted); letter-spacing:.4px; text-transform:uppercase}
   .neon-cyan{color:var(--cyan)} .neon-purple{color:var(--purple)} .neon-green{color:var(--green)} .neon-red{color:var(--red)}
+  .tmr-box{display:flex;align-items:center;gap:7px;padding:3px 3px 3px 9px;border:1px solid var(--stroke);border-radius:11px}
+  .tmr-box.on{border-color:rgba(92,201,221,.45);background:rgba(92,201,221,.08)}
+  .tmr-val{font-variant-numeric:tabular-nums;font-weight:800;font-size:14px;min-width:42px;text-align:center;color:var(--muted)}
+  .tmr-box.on .tmr-val{color:var(--cyan)}
+  .tmr-stop{background:rgba(229,107,123,.16)!important;border-color:rgba(229,107,123,.4)!important;color:var(--red)!important}
   .tx-filters{display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap}
   .tx-filters input[type=date],.tx-filters select{background:var(--glass2);border:1px solid var(--stroke);border-radius:9px;color:var(--text);font-family:inherit;font-size:12px;font-weight:600;padding:6px 8px;min-width:0;outline:none}
   .tx-filters input[type=date]{width:118px;color-scheme:dark}
@@ -1068,6 +1073,33 @@ function toggleExPause(id){const ex=state.settings.exercises.find(e=>e.id===id);
   if(open){if(open.from===tk)ex.pauses=ex.pauses.filter(p=>p!==open);else open.to=dayKey(new Date(Date.now()-86400000));toast('▶ '+ex.name+' — знову в ділі');}
   else{ex.pauses.push({from:tk,to:null});toast('⏸ '+ex.name+' на паузі — не впливає на бал і XP');}
   Object.keys(_c).forEach(k=>delete _c[k]);save();}
+/* ===== ⏱ ТАЙМЕР для лічильника (напр. 15 хв англійської на день) ===== */
+let _tick=null;
+function timerRunning(cid){const t=state.timer;return !!(t&&t.cid===cid&&t.startedAt);}
+function timerElapsedSec(){const t=state.timer;if(!t||!t.startedAt)return 0;return Math.max(0,Math.floor((Date.now()-t.startedAt)/1000));}
+function fmtDur(s){const m=Math.floor(s/60),ss=s%60;return m+':'+String(ss).padStart(2,'0');}
+function startTimer(cid){
+  if(state.timer&&state.timer.startedAt&&state.timer.cid!==cid){const o=state.settings.counters.find(c=>c.id===state.timer.cid);if(!confirm('Уже йде таймер «'+((o&&o.name)||'')+'». Зупинити його і почати новий?'))return;stopTimer(true);}
+  state.timer={cid,startedAt:Date.now()};save();startTicking();
+  const c=state.settings.counters.find(x=>x.id===cid);toast('▶ Пішов час: '+((c&&c.name)||''));
+}
+function stopTimer(silent){
+  const t=state.timer;if(!t||!t.startedAt)return;
+  const sec=timerElapsedSec(),min=Math.min(240,Math.round(sec/60)),cid=t.cid; // кап 4 год — якщо забув зупинити
+  state.timer=null;stopTicking();
+  if(min>0){const k=activeDay(),d=getDay(k);d.counters[cid]=(d.counters[cid]||0)+min;}
+  save();
+  if(!silent){const c=state.settings.counters.find(x=>x.id===cid);
+    toast(min>0?('⏹ +'+min+' хв — '+((c&&c.name)||'')):'⏹ Менше хвилини — не зараховано');}
+}
+function startTicking(){stopTicking();_tick=setInterval(()=>{
+  const t=state.timer;if(!t||!t.startedAt){stopTicking();return;}
+  const el=$('tmr-'+t.cid);if(el)el.textContent=fmtDur(timerElapsedSec());
+  const bar=$('tmrbar-'+t.cid);if(bar){const c=state.settings.counters.find(x=>x.id===t.cid);const g=c?counterGoalOn(c,activeDay()):0;
+    const d=peekDay(activeDay()),base=(d&&d.counters&&d.counters[t.cid])||0;
+    if(g)bar.style.width=Math.min(100,(base+timerElapsedSec()/60)/g*100)+'%';}
+},1000);}
+function stopTicking(){if(_tick){clearInterval(_tick);_tick=null;}}
 /* ===== Розбір серії: які дні зарахувались, а який обірвав ===== */
 function openStreakDlg(){
   const MIN=streakMin(),tk=todayKey();
@@ -1440,13 +1472,17 @@ function render(){
 
   $('counterList').innerHTML=S.counters.map(c=>{const v=d.counters[c.id]||0;
     const entry=c.entry||(c.mode==='week'?'buttons':'input');
-    const ctrl=entry==='buttons'
+    const run=timerRunning(c.id);
+    const ctrl=entry==='timer'
+      ?`<span class="tmr-box${run?' on':''}"><span id="tmr-${c.id}" class="tmr-val">${run?fmtDur(timerElapsedSec()):'0:00'}</span><button class="${run?'sm tmr-stop':'acc sm'}" onclick="${run?'stopTimer()':`startTimer('${c.id}')`}" title="${run?'Зупинити і зарахувати':'Почати відлік'}">${run?'⏹':'▶'}</button></span>`
+      :entry==='buttons'
       ?`<button class="sm" onclick="addCounterToday('${c.id}',-1)">−1</button><button class="acc sm" onclick="addCounterToday('${c.id}',1)">+1</button>`
       :`<input type="number" style="width:80px" value="${v}" onchange="setCounter('${c.id}',this.value)">`;
     if(c.mode==='week'){const q=c.goalPerWeek||1,cons=weekConsumedC(c.id),ok=cons>=q;
       return `<div class="row"><div style="flex:1"><div>${c.name} <span class="tag ${ok?'ok':'warn'}">${cons}/${q} на тиждень</span></div><div class="muted">сьогодні: ${fmt(v)} ${c.unit||''} · ціль тижня ${q}</div><div class="bar"><i style="width:${Math.min(100,cons/q*100)}%;background:${ok?'linear-gradient(90deg,#2f8b66,#4fc596)':'linear-gradient(90deg,#7c6bb0,#9d8ad6)'}"></i></div></div><div class="flex" style="margin-left:10px">${ctrl}</div></div>`;}
     const g=counterGoalOn(c,ad),ok=v>=g,cut=g<c.goal;
-    return `<div class="row"><div style="flex:1"><div class="between"><span>${c.name} ${ok?'✅':''}${cut?' <span class="tag ok" title="У день із залом мінус 5000">🏋️ −5000</span>':''}</span><span class="muted cnt">${fmt(v)} / ${fmt(g)} ${c.unit}</span></div><div class="bar"><i class="g-purple" style="width:${Math.min(100,g?v/g*100:0)}%"></i></div></div><div class="flex" style="margin-left:10px">${ctrl}</div></div>`;}).join('')||'<div class="empty">Додай лічильники</div>';
+    return `<div class="row"><div style="flex:1"><div class="between"><span>${c.name} ${ok?'✅':''}${run?' <span class="tag" style="background:rgba(92,201,221,.16);border-color:rgba(92,201,221,.4);color:var(--cyan)">⏱ йде</span>':''}${cut?' <span class="tag ok" title="У день із залом мінус 5000">🏋️ −5000</span>':''}</span><span class="muted cnt">${fmt(v)} / ${fmt(g)} ${c.unit}</span></div><div class="bar"><i class="g-purple" id="tmrbar-${c.id}" style="width:${Math.min(100,g?v/g*100:0)}%"></i></div></div><div class="flex" style="margin-left:10px">${ctrl}</div></div>`;}).join('')||'<div class="empty">Додай лічильники</div>';
+  if(state.timer&&state.timer.startedAt)startTicking();else stopTicking();
 
   $('noteInput').value=d.note||'';
   const slp=d.sleep||{}; $('sleepBed').value=slp.b||''; $('sleepWake').value=slp.w||'';
@@ -2138,7 +2174,7 @@ function openSettings(){const S=state.settings,R=S.reminders||{};$('setWaterGoal
 function rl(elId,arr,type){$(elId).innerHTML=arr.map((it,i)=>{const del=`<button class="del" onclick="delItem('${type}',${i})">✕</button>`;
   if(type==='ex')return `<div class="settings-item"><input value="${it.name}" data-f="name" placeholder="Назва"><input type="number" value="${it.base}" data-f="base" style="width:66px" title="норма"><input type="number" value="${it.penalty}" data-f="penalty" step="0.5" style="width:58px" title="штраф ×"><input type="number" value="${it.grow||0}" data-f="grow" style="width:58px" title="зростання/день">${del}</div>`;
   if(type==='lim')return `<div class="settings-item"><input value="${it.name}" data-f="name" placeholder="Назва" style="min-width:90px"><select data-f="mode" style="width:auto"><option value="day"${it.mode!=='week'?' selected':''}>на день</option><option value="week"${it.mode==='week'?' selected':''}>на тиждень ↓</option></select><select data-f="entry" style="width:auto" title="як вводити значення"><option value="input"${it.entry!=='buttons'?' selected':''}>поле</option><option value="buttons"${it.entry==='buttons'?' selected':''}>кнопки ±</option></select><input type="number" value="${it.max??2}" data-f="max" step="0.5" style="width:56px" title="макс на день"><input type="number" value="${it.startPerWeek??5}" data-f="startPerWeek" style="width:48px" title="старт: скільки на тиждень"><input type="number" value="${it.stepPerWeek??1}" data-f="stepPerWeek" style="width:44px" title="мінус за тиждень"><input type="number" value="${it.minPerWeek??2}" data-f="minPerWeek" style="width:44px" title="мінімум на тиждень"><input value="${it.unit||''}" data-f="unit" style="width:56px" placeholder="од.">${del}</div>`;
-  if(type==='cnt')return `<div class="settings-item"><input value="${it.name}" data-f="name" placeholder="Назва" style="min-width:90px"><select data-f="mode" style="width:auto"><option value="day"${it.mode!=='week'?' selected':''}>на день</option><option value="week"${it.mode==='week'?' selected':''}>на тиждень</option></select><select data-f="entry" style="width:auto" title="як вводити значення"><option value="input"${it.entry!=='buttons'?' selected':''}>поле</option><option value="buttons"${it.entry==='buttons'?' selected':''}>кнопки ±</option></select><input type="number" value="${it.goal??100}" data-f="goal" style="width:70px" title="ціль на день"><input type="number" value="${it.goalPerWeek??3}" data-f="goalPerWeek" style="width:56px" title="ціль на тиждень"><input value="${it.unit||''}" data-f="unit" style="width:56px" placeholder="од.">${del}</div>`;
+  if(type==='cnt')return `<div class="settings-item"><input value="${it.name}" data-f="name" placeholder="Назва" style="min-width:90px"><select data-f="mode" style="width:auto"><option value="day"${it.mode!=='week'?' selected':''}>на день</option><option value="week"${it.mode==='week'?' selected':''}>на тиждень</option></select><select data-f="entry" style="width:auto" title="як вводити значення"><option value="input"${it.entry!=='buttons'&&it.entry!=='timer'?' selected':''}>поле</option><option value="buttons"${it.entry==='buttons'?' selected':''}>кнопки ±</option><option value="timer"${it.entry==='timer'?' selected':''}>⏱ таймер</option></select><input type="number" value="${it.goal??100}" data-f="goal" style="width:70px" title="ціль на день"><input type="number" value="${it.goalPerWeek??3}" data-f="goalPerWeek" style="width:56px" title="ціль на тиждень"><input value="${it.unit||''}" data-f="unit" style="width:56px" placeholder="од.">${del}</div>`;
   if(type==='loan')return `<div class="settings-item"><input value="${it.name}" data-f="name" placeholder="Назва кредиту">${del}</div>`;
 }).join('');}
 function readL(elId,type){return [...$(elId).querySelectorAll('.settings-item')].map(r=>{const g=f=>r.querySelector(`[data-f="${f}"]`)?.value;
