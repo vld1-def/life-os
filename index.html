@@ -868,7 +868,7 @@ function enterApp(){
   localStorage.setItem(cacheKey,JSON.stringify(state));
   render(); loadProfiles(); initTip(); startReminders(); subscribeRecords();
   loadScreen(); loadStepsDB(); // айфон-дані по користувачу (колонка who)
-  if(PROFILE==='me'){ loadExpenses(); loadSteam(); loadSleepDB(); } // Steam/фінанси/сон — лише Влад
+  if(PROFILE==='me'){ loadExpenses(); loadSteam(); loadSleepDB(); loadDuo(); } // Steam/фінанси/сон/Duolingo — лише Влад
   if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 }
 /* ===== ПРОФІЛІ: реєстр у рядку solo id='__profiles__' ===== */
@@ -966,6 +966,20 @@ function monthlySeries(n){const arr=[],now=new Date();for(let i=n-1;i>=0;i--){co
 function dailySeries(ym){const[y,mm]=ym.split('-').map(Number);const days=new Date(y,mm,0).getDate();const last=ym===monthKey()?new Date().getDate():days;const per={};(expRows||[]).forEach(r=>{if(r.ym===ym)per[r.day]=(per[r.day]||0)+r.sum;});const arr=[];for(let d=1;d<=last;d++)arr.push({x:d,y:Math.round(per[d]||0)});return arr;}
 
 /* ===== STEAM (час гри з бази steam_playtime) ===== */
+/* ===== 🦉 DUOLINGO: XP за день (снапшоти пише GitHub Action у рядок duo_me) ===== */
+let duoXP={},duoStreak=0;
+function duoCounterId(){const c=(state.settings.counters||[]).find(x=>/duolingo|дуолінго/i.test(x.name));return c?c.id:null;}
+async function loadDuo(){
+  if(!sb)return;
+  const {data,error}=await sb.from('solo').select('data').eq('id','duo_'+SOLO_ID).maybeSingle();
+  if(error||!data||!data.data)return; // ще немає снапшотів
+  const snaps=data.data.snaps||{},ks=Object.keys(snaps).sort();
+  duoXP={};
+  for(let i=0;i<ks.length-1;i++){duoXP[ks[i]]=Math.max(0,snaps[ks[i+1]]-snaps[ks[i]]);} // XP за день = різниця снапшотів
+  duoStreak=data.data.streak||0;
+  applyDuo(); render();
+}
+function applyDuo(){const cid=duoCounterId();if(!cid)return;Object.keys(duoXP).forEach(dk=>{getDay(dk).counters[cid]=duoXP[dk];});}
 let steamPlay={}; // dateKey -> хвилин за той день
 async function loadSteam(){
   if(!sb) return;
@@ -1438,7 +1452,7 @@ function dayTipHTML(k){
 function render(){
   Object.keys(_c).forEach(k=>delete _c[k]);
   applyModules();
-  applySteam(); applyScreen(); applySleepDB(); applyStepsDB();
+  applySteam(); applyScreen(); applySleepDB(); applyStepsDB(); applyDuo();
   freezePastMonths(); // фіксуємо бали завершених місяців — щоб зміни налаштувань не міняли минуле
   const tk=todayKey(),ad=activeDay(),d=peekDay(ad),S=state.settings;
   $('todayLabel').textContent=new Date().toLocaleDateString(LOC(),{weekday:'long',day:'numeric',month:'long',year:'numeric'});

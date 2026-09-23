@@ -1,0 +1,63 @@
+name: Duolingo sync
+
+on:
+  schedule:
+    # Тільки ранкові, як Steam. Снапшот дня фіксується ОДИН раз.
+    - cron: '10 2 * * *'   # 05:10 Київ
+    - cron: '10 5 * * *'   # 08:10 Київ
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Перезаписати снапшот, навіть якщо він уже є'
+        type: boolean
+        default: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch Duolingo XP and store snapshot in Supabase
+        env:
+          DUO_USER: ${{ secrets.DUO_USER }}
+          SB_URL: ${{ secrets.SB_URL }}
+          SB_KEY: ${{ secrets.SB_KEY }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          node <<'EOF'
+          const https=require('https');
+          const req=(u,o,body)=>new Promise((res,rej)=>{const r=https.request(u,o||{},x=>{let d='';x.on('data',c=>d+=c);x.on('end',()=>res({status:x.statusCode,body:d}));});r.on('error',rej);if(body)r.write(body);r.end();});
+          (async()=>{
+            const {DUO_USER,SB_URL,SB_KEY,FORCE}=process.env;
+            if(!DUO_USER){console.error('Немає секрету DUO_USER');process.exit(1);}
+            const ROW='duo_me';
+            const now=new Date(Date.now()+3*3600*1000); // Київ
+            const date=now.toISOString().slice(0,10);
+            const H={apikey:SB_KEY,Authorization:'Bearer '+SB_KEY,'Content-Type':'application/json'};
+
+            // поточний стан рядка
+            const cur=await req(SB_URL+'/rest/v1/solo?id=eq.'+ROW+'&select=data',{headers:H});
+            let data={snaps:{}};
+            try{const arr=JSON.parse(cur.body);if(arr[0]&&arr[0].data)data=arr[0].data;}catch(e){}
+            data.snaps=data.snaps||{};
+            if(FORCE!=='true'&&data.snaps[date]!=null){console.log('Снапшот за',date,'вже є — пропускаю');return;}
+
+            // профіль Duolingo
+            const prof=await req('https://www.duolingo.com/2017-06-30/users?username='+encodeURIComponent(DUO_USER),{headers:{'User-Agent':'Mozilla/5.0'}});
+            if(prof.status!==200){console.error('Duolingo відповів',prof.status);process.exit(1);}
+            const u=(JSON.parse(prof.body).users||[])[0];
+            if(!u){console.error('Профіль не знайдено:',DUO_USER);process.exit(1);}
+            const total=+u.totalXp||0;
+            data.snaps[date]=total;
+            data.streak=(u.streakData&&u.streakData.currentStreak&&u.streakData.currentStreak.length)||u.streak||0;
+            data.updated=new Date().toISOString();
+            // тримаємо не більше 400 снапшотів
+            const ks=Object.keys(data.snaps).sort();
+            if(ks.length>400)ks.slice(0,ks.length-400).forEach(k=>delete data.snaps[k]);
+
+            const w=await req(SB_URL+'/rest/v1/solo?on_conflict=id',{method:'POST',headers:Object.assign({},H,{Prefer:'resolution=merge-duplicates,return=minimal'})},
+              JSON.stringify([{id:ROW,data,updated_at:new Date().toISOString()}]));
+            console.log('Supabase status',w.status,w.body);
+            if(w.status>=400)process.exit(1);
+            console.log('OK: date',date,'totalXp',total,'streak',data.streak);
+          })().catch(e=>{console.error(e);process.exit(1);});
+          EOF
