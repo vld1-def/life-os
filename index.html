@@ -630,6 +630,9 @@
     <div class="muted" style="margin-top:8px">Працює, поки застосунок відкрито (вкладка або встановлений PWA на телефоні).</div>
   </div>
   <div class="tabpane" id="tab-data">
+    <div class="sec-title" id="ghTokSec">🔑 GitHub токен — для кнопок 🎮 Steam і 🦉 Duolingo</div>
+    <div id="ghTokBox"></div>
+    <div class="muted" style="margin:6px 0 16px;font-size:12px">Потрібен, щоб оновлювати Steam і Duolingo одним тапом із застосунку. Зберігається лише в цьому браузері — ні в код, ні в базу не потрапляє. <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" style="color:var(--cyan)">Створити токен</a> → Only select repositories: <b>life-os</b> → Permissions → Actions: <b>Read and write</b>.</div>
     <div class="sec-title">💾 Резервна копія</div>
     <div class="flex" style="flex-wrap:wrap">
       <button onclick="exportData()">⬇ Експорт у файл</button>
@@ -989,9 +992,8 @@ async function loadDuo(){
 // ручна перевірка: скільки XP просто зараз і скільки лишилось до цілі
 async function checkDuoNow(){
   if(!sb){toast('Немає звʼязку');return;}
-  const tok=localStorage.getItem('gh_token');
-  if(!tok){window.open('https://github.com/'+GH_REPO+'/actions/workflows/duolingo-sync.yml','_blank');
-    toast('Встав GitHub-токен через 🎮, щоб оновлювати одним тапом');return;}
+  const tok=needGhToken('Duolingo');
+  if(!tok){window.open('https://github.com/'+GH_REPO+'/actions/workflows/duolingo-sync.yml','_blank');return;}
   const before=duoLive?duoLive.at:'';
   toast('🦉 Перевіряю Duolingo…');
   try{
@@ -1028,6 +1030,26 @@ async function loadSteam(){
 }
 /* ===== Ручний синк Steam (якщо автоматика затрималась) ===== */
 const GH_REPO='vld1-def/life-os';
+/* --- GitHub токен: поле в налаштуваннях --- */
+function ghToken(){return localStorage.getItem('gh_token')||'';}
+function renderGhTok(){
+  const box=$('ghTokBox');if(!box)return;
+  const sec=$('ghTokSec');if(sec)sec.parentElement&&null; // секція видима лише власнику
+  const has=!!ghToken();
+  box.innerHTML=has
+    ? `<div class="row"><div style="flex:1"><b style="color:var(--green)">✅ Токен збережено</b><div class="muted" style="font-size:12px">Кнопки 🎮 і 🦉 працюють одним тапом</div></div><button class="sm del" onclick="clearGhTok()">Видалити</button></div>`
+    : `<div class="settings-item"><input type="password" id="ghTokInput" placeholder="github_pat_..." style="flex:1;min-width:150px" autocomplete="off"><button class="acc sm" onclick="saveGhTok()">Зберегти</button></div>`;
+}
+function saveGhTok(){const v=($('ghTokInput').value||'').trim();if(!v){toast('Встав токен');return;}
+  localStorage.setItem('gh_token',v);renderGhTok();toast('🔑 Токен збережено');}
+function clearGhTok(){if(!confirm('Видалити збережений токен?'))return;localStorage.removeItem('gh_token');renderGhTok();toast('Токен видалено');}
+// запитати токен, якщо його ще немає (спільне для 🎮 і 🦉)
+function needGhToken(what){
+  const t=ghToken();if(t)return t;
+  const v=(prompt('Щоб оновлювати '+what+' одним тапом, встав GitHub-токен.\n\nСтворити: github.com/settings/personal-access-tokens/new\n→ Only select repositories: life-os\n→ Permissions → Actions: Read and write\n\nЗберігається лише на цьому пристрої.\nПорожньо = відкрити сторінку запуску вручну.')||'').trim();
+  if(!v)return '';
+  localStorage.setItem('gh_token',v);renderGhTok();toast('🔑 Токен збережено');return v;
+}
 let _autoSteamTried=false;
 // автосинк при відкритті застосунку: cron GitHub часто спізнюється, а застосунок відкривається щодня
 async function autoSteamSync(){
@@ -1049,13 +1071,9 @@ async function steamSnapExists(dk){try{const {data}=await sb.from('steam_playtim
 async function syncSteamNow(){
   if(!sb){toast('Немає звʼязку');return;}
   const tk=todayKey();
+  const tok=needGhToken('Steam');
+  if(!tok){window.open('https://github.com/'+GH_REPO+'/actions/workflows/steam-sync.yml','_blank');return;}
   if(await steamSnapExists(tk)){await loadSteam();toast('✅ Steam за сьогодні вже синхронізовано');return;}
-  let tok=localStorage.getItem('gh_token')||'';
-  if(!tok){
-    tok=(prompt('Разова дія: встав GitHub token (fine-grained, право Actions: Read and write).\nЗберігається ЛИШЕ на цьому пристрої.\n\nПорожньо = відкрити сторінку запуску вручну.')||'').trim();
-    if(!tok){window.open('https://github.com/'+GH_REPO+'/actions/workflows/steam-sync.yml','_blank');return;}
-    localStorage.setItem('gh_token',tok);
-  }
   toast('🎮 Запускаю синк…');
   try{
     const r=await fetch(`https://api.github.com/repos/${GH_REPO}/actions/workflows/steam-sync.yml/dispatches`,{method:'POST',
@@ -2222,7 +2240,10 @@ function renderFinance(){
 
 /* ===== НАЛАШТУВАННЯ ===== */
 function setTab(name){['gen','act','lim','cnt','loan','rem','data'].forEach(t=>$('tab-'+t).classList.toggle('on',t===name));[...$('setTabs').children].forEach(b=>b.className='sm'+(b.getAttribute('onclick').includes("'"+name+"'")?' acc':''));}
-function openSettings(){const S=state.settings,R=S.reminders||{};$('setWaterGoal').value=S.waterGoal;$('setSleepGoal').value=S.sleepGoal||8;$('setCurrency').value=S.currency;$('remOn').checked=!!R.on;$('remEvery').value=R.everyMin||120;$('remFrom').value=R.from??9;$('remTo').value=R.to??21;rl('setExercises',S.exercises,'ex');rl('setLimits',S.limitHabits,'lim');rl('setCounters',S.counters,'cnt');rl('setLoans',S.loans,'loan');renderModuleToggles();renderOverviewToggles();setTab('gen');applyLang();settings.showModal();}
+function openSettings(){const S=state.settings,R=S.reminders||{};$('setWaterGoal').value=S.waterGoal;$('setSleepGoal').value=S.sleepGoal||8;$('setCurrency').value=S.currency;$('remOn').checked=!!R.on;$('remEvery').value=R.everyMin||120;$('remFrom').value=R.from??9;$('remTo').value=R.to??21;rl('setExercises',S.exercises,'ex');rl('setLimits',S.limitHabits,'lim');rl('setCounters',S.counters,'cnt');rl('setLoans',S.loans,'loan');renderModuleToggles();renderOverviewToggles();renderGhTok();
+  const showTok=needAuth();['ghTokSec','ghTokBox'].forEach(id=>{const el=$(id);if(el)el.classList.toggle('hidden',!showTok);});
+  if($('ghTokSec')&&$('ghTokSec').nextElementSibling===$('ghTokBox')){const hint=$('ghTokBox').nextElementSibling;if(hint&&hint.classList.contains('muted'))hint.classList.toggle('hidden',!showTok);}
+  setTab('gen');applyLang();settings.showModal();}
 function rl(elId,arr,type){$(elId).innerHTML=arr.map((it,i)=>{const del=`<button class="del" onclick="delItem('${type}',${i})">✕</button>`;
   if(type==='ex')return `<div class="settings-item"><input value="${it.name}" data-f="name" placeholder="Назва"><input type="number" value="${it.base}" data-f="base" style="width:66px" title="норма"><input type="number" value="${it.penalty}" data-f="penalty" step="0.5" style="width:58px" title="штраф ×"><input type="number" value="${it.grow||0}" data-f="grow" style="width:58px" title="зростання/день">${del}</div>`;
   if(type==='lim')return `<div class="settings-item"><input value="${it.name}" data-f="name" placeholder="Назва" style="min-width:90px"><select data-f="mode" style="width:auto"><option value="day"${it.mode!=='week'?' selected':''}>на день</option><option value="week"${it.mode==='week'?' selected':''}>на тиждень ↓</option></select><select data-f="entry" style="width:auto" title="як вводити значення"><option value="input"${it.entry!=='buttons'?' selected':''}>поле</option><option value="buttons"${it.entry==='buttons'?' selected':''}>кнопки ±</option></select><input type="number" value="${it.max??2}" data-f="max" step="0.5" style="width:56px" title="макс на день"><input type="number" value="${it.startPerWeek??5}" data-f="startPerWeek" style="width:48px" title="старт: скільки на тиждень"><input type="number" value="${it.stepPerWeek??1}" data-f="stepPerWeek" style="width:44px" title="мінус за тиждень"><input type="number" value="${it.minPerWeek??2}" data-f="minPerWeek" style="width:44px" title="мінімум на тиждень"><input value="${it.unit||''}" data-f="unit" style="width:56px" placeholder="од.">${del}</div>`;
