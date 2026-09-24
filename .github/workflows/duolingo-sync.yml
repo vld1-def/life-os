@@ -39,15 +39,17 @@ jobs:
             let data={snaps:{}};
             try{const arr=JSON.parse(cur.body);if(arr[0]&&arr[0].data)data=arr[0].data;}catch(e){}
             data.snaps=data.snaps||{};
-            if(FORCE!=='true'&&data.snaps[date]!=null){console.log('Снапшот за',date,'вже є — пропускаю');return;}
 
-            // профіль Duolingo
+            // профіль Duolingo — тягнемо ЗАВЖДИ (щоб оновити live-значення для «скільки вже сьогодні»)
             const prof=await req('https://www.duolingo.com/2017-06-30/users?username='+encodeURIComponent(DUO_USER),{headers:{'User-Agent':'Mozilla/5.0'}});
             if(prof.status!==200){console.error('Duolingo відповів',prof.status);process.exit(1);}
             const u=(JSON.parse(prof.body).users||[])[0];
             if(!u){console.error('Профіль не знайдено:',DUO_USER);process.exit(1);}
             const total=+u.totalXp||0;
-            data.snaps[date]=total;
+            data.live={xp:total,at:new Date().toISOString()}; // поточний XP на цю мить
+            // ранковий снапшот дня фіксуємо ОДИН раз — він база для підрахунку доби
+            if(data.snaps[date]==null||FORCE==='true')data.snaps[date]=total;
+            else console.log('Снапшот за',date,'лишаю як є; оновив лише live');
             data.streak=(u.streakData&&u.streakData.currentStreak&&u.streakData.currentStreak.length)||u.streak||0;
             data.updated=new Date().toISOString();
             // тримаємо не більше 400 снапшотів

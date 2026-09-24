@@ -376,6 +376,7 @@
         <button class="acc" id="langBtn" onclick="toggleLang()">EN</button>
         <button class="acc" onclick="openBadges()" style="position:relative">🏅<span id="badgeReady">0</span></button>
         <button class="acc hidden" id="dSteam" onclick="syncSteamNow()" title="Оновити Steam вручну">🎮</button>
+        <button class="acc hidden" id="dDuo" onclick="checkDuoNow()" title="Перевірити XP у Duolingo зараз">🦉</button>
         <button class="acc" onclick="openSettings()">⚙️</button>
         <button class="acc hidden" id="dLogout" onclick="doLogout()" title="Вийти з профілю">🚪</button>
       </div>
@@ -545,6 +546,7 @@
       <button class="menu-btn acc" onclick="openSettings()">⚙️ Налаштування</button>
       <button class="menu-btn acc" onclick="toggleLang()"><span id="mLang">🌐 English</span></button>
       <button class="menu-btn acc hidden" id="mSteam" onclick="syncSteamNow()">🎮 Steam</button>
+      <button class="menu-btn acc hidden" id="mDuo" onclick="checkDuoNow()">🦉 Duolingo</button>
       <button class="menu-btn acc hidden" id="mLogout" onclick="doLogout()">🚪 Вийти</button>
     </div>
   </div>
@@ -909,7 +911,7 @@ function updateHdrMenu(){
   const hb=$('hdrBadge');if(hb)hb.textContent=bc||'';
   const dot=$('hdrDot');if(dot)dot.style.display=(nc||bc)?'block':'none';
   const ml=$('mLang');if(ml)ml.textContent=lang==='en'?'🌐 Українською':'🌐 English';
-  if(needAuth()){['hdrLogout','mLogout','hdrSteam','mSteam','dSteam','dLogout'].forEach(id=>{const el=$(id);if(el)el.classList.remove('hidden');});}
+  if(needAuth()){['hdrLogout','mLogout','hdrSteam','mSteam','dSteam','dLogout','dDuo','mDuo'].forEach(id=>{const el=$(id);if(el)el.classList.remove('hidden');});}
   const mn=$('mNotif');if(mn)mn.textContent=nc||'';
   const mb=$('mBadge');if(mb)mb.textContent=bc||'';
 }
@@ -969,6 +971,7 @@ function dailySeries(ym){const[y,mm]=ym.split('-').map(Number);const days=new Da
 /* ===== 🦉 DUOLINGO: XP за день (снапшоти пише GitHub Action у рядок duo_me) ===== */
 let duoXP={},duoStreak=0;
 function duoCounterId(){const c=(state.settings.counters||[]).find(x=>/duolingo|дуолінго/i.test(x.name));return c?c.id:null;}
+let duoLive=null; // {xp, at} — поточний XP на момент останньої перевірки
 async function loadDuo(){
   if(!sb)return;
   const {data,error}=await sb.from('solo').select('data').eq('id','duo_'+SOLO_ID).maybeSingle();
@@ -977,7 +980,40 @@ async function loadDuo(){
   duoXP={};
   for(let i=0;i<ks.length-1;i++){duoXP[ks[i]]=Math.max(0,snaps[ks[i+1]]-snaps[ks[i]]);} // XP за день = різниця снапшотів
   duoStreak=data.data.streak||0;
+  duoLive=data.data.live||null;
+  // сьогодні: XP = поточний totalXp мінус ранковий снапшот (не чекаємо завтрашнього)
+  const tk=todayKey();
+  if(duoLive&&snaps[tk]!=null)duoXP[tk]=Math.max(0,duoLive.xp-snaps[tk]);
   applyDuo(); render();
+}
+// ручна перевірка: скільки XP просто зараз і скільки лишилось до цілі
+async function checkDuoNow(){
+  if(!sb){toast('Немає звʼязку');return;}
+  const tok=localStorage.getItem('gh_token');
+  if(!tok){window.open('https://github.com/'+GH_REPO+'/actions/workflows/duolingo-sync.yml','_blank');
+    toast('Встав GitHub-токен через 🎮, щоб оновлювати одним тапом');return;}
+  const before=duoLive?duoLive.at:'';
+  toast('🦉 Перевіряю Duolingo…');
+  try{
+    const r=await fetch(`https://api.github.com/repos/${GH_REPO}/actions/workflows/duolingo-sync.yml/dispatches`,{method:'POST',
+      headers:{'Authorization':'Bearer '+tok,'Accept':'application/vnd.github+json','Content-Type':'application/json'},
+      body:JSON.stringify({ref:'main',inputs:{force:'false'}})});
+    if(r.status===401||r.status===403){localStorage.removeItem('gh_token');toast('❌ Токен не підійшов');return;}
+    if(r.status!==204){toast('❌ GitHub: '+r.status);return;}
+    let n=0;const iv=setInterval(async()=>{n++;
+      await loadDuo();
+      if(duoLive&&duoLive.at!==before){clearInterval(iv);duoReport();}
+      else if(n>=10){clearInterval(iv);toast('⚠️ Не дочекався — спробуй ще раз за хвилину');}
+    },4000);
+  }catch(e){toast('❌ '+e.message);}
+}
+function duoReport(){
+  const cid=duoCounterId(),tk=todayKey();
+  const got=duoXP[tk]||0;
+  if(!cid){toast('🦉 Сьогодні '+got+' XP · всього '+(duoLive?fmt(duoLive.xp):'?')+' · серія '+duoStreak);return;}
+  const c=state.settings.counters.find(x=>x.id===cid),goal=counterGoalOn(c,tk)||c.goal||0;
+  const left=Math.max(0,goal-got);
+  toast(left>0?('🦉 '+got+' / '+goal+' XP — лишилось '+left):('🦉 Ціль закрита! '+got+' / '+goal+' XP'));
 }
 function applyDuo(){const cid=duoCounterId();if(!cid)return;Object.keys(duoXP).forEach(dk=>{getDay(dk).counters[cid]=duoXP[dk];});}
 let steamPlay={}; // dateKey -> хвилин за той день
@@ -1495,7 +1531,9 @@ function render(){
     if(c.mode==='week'){const q=c.goalPerWeek||1,cons=weekConsumedC(c.id),ok=cons>=q;
       return `<div class="row"><div style="flex:1"><div>${c.name} <span class="tag ${ok?'ok':'warn'}">${cons}/${q} на тиждень</span></div><div class="muted">сьогодні: ${fmt(v)} ${c.unit||''} · ціль тижня ${q}</div><div class="bar"><i style="width:${Math.min(100,cons/q*100)}%;background:${ok?'linear-gradient(90deg,#2f8b66,#4fc596)':'linear-gradient(90deg,#7c6bb0,#9d8ad6)'}"></i></div></div><div class="flex" style="margin-left:10px">${ctrl}</div></div>`;}
     const g=counterGoalOn(c,ad),ok=v>=g,cut=g<c.goal;
-    return `<div class="row"><div style="flex:1"><div class="between"><span>${c.name} ${ok?'✅':''}${run?' <span class="tag" style="background:rgba(92,201,221,.16);border-color:rgba(92,201,221,.4);color:var(--cyan)">⏱ йде</span>':''}${cut?' <span class="tag ok" title="У день із залом мінус 5000">🏋️ −5000</span>':''}</span><span class="muted cnt">${fmt(v)} / ${fmt(g)} ${c.unit}</span></div><div class="bar"><i class="g-purple" id="tmrbar-${c.id}" style="width:${Math.min(100,g?v/g*100:0)}%"></i></div></div><div class="flex" style="margin-left:10px">${ctrl}</div></div>`;}).join('')||'<div class="empty">Додай лічильники</div>';
+    const isDuo=c.id===duoCounterId();
+    const duoTag=isDuo?(ok?'':` <span class="tag" style="background:rgba(120,190,60,.14);border-color:rgba(120,190,60,.4);color:#8fd14f;cursor:pointer" onclick="checkDuoNow()" title="Перевірити зараз">🦉 ще ${fmt(Math.max(0,g-v))}</span>`):'';
+    return `<div class="row"><div style="flex:1"><div class="between"><span>${c.name} ${ok?'✅':''}${duoTag}${run?' <span class="tag" style="background:rgba(92,201,221,.16);border-color:rgba(92,201,221,.4);color:var(--cyan)">⏱ йде</span>':''}${cut?' <span class="tag ok" title="У день із залом мінус 5000">🏋️ −5000</span>':''}</span><span class="muted cnt">${fmt(v)} / ${fmt(g)} ${c.unit}</span></div><div class="bar"><i class="g-purple" id="tmrbar-${c.id}" style="width:${Math.min(100,g?v/g*100:0)}%"></i></div></div><div class="flex" style="margin-left:10px">${ctrl}</div></div>`;}).join('')||'<div class="empty">Додай лічильники</div>';
   if(state.timer&&state.timer.startedAt)startTicking();else stopTicking();
 
   $('noteInput').value=d.note||'';
